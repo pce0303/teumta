@@ -1,0 +1,40 @@
+# Environment
+.env
+server/.env
+mobile/.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+server/node_modules/
+mobile/node_modules/
+
+# Expo
+.expo/
+mobile/.expo/
+dist/
+web-build/
+mobile/dist/
+mobile/web-build/
+expo-env.d.ts
+mobile/expo-env.d.ts
+
+# Build outputs
+build/
+dist/
+server/dist/
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.*
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
