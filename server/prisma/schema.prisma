@@ -34,7 +34,8 @@ model Place {
   longitude           Decimal   @db.Decimal(10, 7)
   imageUrl            String?   @db.Text
   description         String?   @db.Text
-  openingHours        String?
+  openingTime         String?   @db.VarChar(5)
+  closingTime         String?   @db.VarChar(5)
   recommendedDuration Int?
   tourApiContentId    String?   @unique
   createdAt           DateTime  @default(now())
@@ -156,8 +157,6 @@ model Trip {
 }
 
 enum TripEventType {
-  ROUTE_VIEWED
-  ROUTE_SELECTED
   TRIP_STARTED
   PLACE_ARRIVED
   PLACE_LEFT
