@@ -1,4 +1,35 @@
 -- CreateTable
+CREATE TABLE `HealthCheck` (
+    `id` VARCHAR(191) NOT NULL,
+    `message` VARCHAR(191) NOT NULL DEFAULT 'teumta',
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `Place` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(191) NOT NULL,
+    `type` ENUM('TOURIST_SPOT', 'LOCAL_PLACE') NOT NULL,
+    `address` VARCHAR(191) NULL,
+    `latitude` DECIMAL(10, 7) NOT NULL,
+    `longitude` DECIMAL(10, 7) NOT NULL,
+    `imageUrl` TEXT NULL,
+    `description` TEXT NULL,
+    `openingTime` VARCHAR(5) NULL,
+    `closingTime` VARCHAR(5) NULL,
+    `recommendedDuration` INTEGER NULL,
+    `tourApiContentId` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    UNIQUE INDEX `Place_tourApiContentId_key`(`tourApiContentId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `Tag` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(191) NOT NULL,
@@ -43,8 +74,8 @@ CREATE TABLE `Route` (
     `name` VARCHAR(191) NOT NULL,
     `mainPlaceId` INTEGER NOT NULL,
     `description` TEXT NULL,
-    `totalDurationMinutes` INTEGER NULL,
-    `totalDistanceMeters` INTEGER NULL,
+    `estimatedTotalDurationMinutes` INTEGER NULL,
+    `estimatedTotalDistanceMeters` INTEGER NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
@@ -59,8 +90,8 @@ CREATE TABLE `RouteStop` (
     `placeId` INTEGER NOT NULL,
     `stopOrder` INTEGER NOT NULL,
     `stayMinutes` INTEGER NULL,
-    `travelMinutesFromPrevious` INTEGER NULL,
-    `distanceMetersFromPrevious` INTEGER NULL,
+    `estimatedTravelMinutesFromPrevious` INTEGER NULL,
+    `estimatedDistanceMetersFromPrevious` INTEGER NULL,
 
     INDEX `RouteStop_placeId_idx`(`placeId`),
     UNIQUE INDEX `RouteStop_routeId_stopOrder_key`(`routeId`, `stopOrder`),
@@ -88,7 +119,7 @@ CREATE TABLE `TripEvent` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `tripId` INTEGER NOT NULL,
     `placeId` INTEGER NULL,
-    `eventType` ENUM('ROUTE_VIEWED', 'ROUTE_SELECTED', 'TRIP_STARTED', 'PLACE_ARRIVED', 'PLACE_LEFT', 'MAIN_PLACE_RETURNED', 'TRIP_COMPLETED', 'TRIP_CANCELLED') NOT NULL,
+    `eventType` ENUM('TRIP_STARTED', 'PLACE_ARRIVED', 'PLACE_LEFT', 'MAIN_PLACE_RETURNED', 'TRIP_COMPLETED', 'TRIP_CANCELLED') NOT NULL,
     `latitude` DECIMAL(10, 7) NULL,
     `longitude` DECIMAL(10, 7) NULL,
     `occurredAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

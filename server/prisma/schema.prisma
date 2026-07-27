@@ -104,8 +104,8 @@ model Route {
   name                 String
   mainPlaceId          Int
   description          String?  @db.Text
-  totalDurationMinutes Int?
-  totalDistanceMeters  Int?
+  estimatedTotalDurationMinutes Int?
+  estimatedTotalDistanceMeters  Int?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -122,8 +122,8 @@ model RouteStop {
   placeId                    Int
   stopOrder                  Int
   stayMinutes                Int?
-  travelMinutesFromPrevious  Int?
-  distanceMetersFromPrevious Int?
+  estimatedTravelMinutesFromPrevious  Int?
+  estimatedDistanceMetersFromPrevious Int?
 
   route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
   place Place @relation(fields: [placeId], references: [id])
