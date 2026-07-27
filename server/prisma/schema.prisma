@@ -19,3 +19,166 @@ model HealthCheck {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+enum PlaceType {
+  TOURIST_SPOT
+  LOCAL_PLACE
+}
+
+model Place {
+  id                  Int       @id @default(autoincrement())
+  name                String
+  type                PlaceType
+  address             String?
+  latitude            Decimal   @db.Decimal(10, 7)
+  longitude           Decimal   @db.Decimal(10, 7)
+  imageUrl            String?   @db.Text
+  description         String?   @db.Text
+  openingTime         String?   @db.VarChar(5)
+  closingTime         String?   @db.VarChar(5)
+  recommendedDuration Int?
+  tourApiContentId    String?   @unique
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  placeTags   PlaceTag[]
+  congestions Congestion[]
+  mainRoutes  Route[]      @relation("MainPlaceRoutes")
+  routeStops  RouteStop[]
+  tripEvents  TripEvent[]
+}
+
+model Tag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  placeTags PlaceTag[]
+}
+
+model PlaceTag {
+  placeId Int
+  tagId   Int
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([placeId, tagId])
+  @@index([tagId])
+}
+
+enum CongestionType {
+  PREDICTED
+  REALTIME
+}
+
+enum CongestionLevel {
+  RELAXED
+  NORMAL
+  CROWDED
+  VERY_CROWDED
+}
+
+model Congestion {
+  id           Int             @id @default(autoincrement())
+  placeId      Int
+  type         CongestionType
+  level        CongestionLevel
+  score        Int?
+  measuredAt   DateTime?
+  predictedFor DateTime?
+  source       String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@index([placeId])
+  @@index([placeId, measuredAt])
+  @@index([placeId, predictedFor])
+}
+
+model Route {
+  id                   Int      @id @default(autoincrement())
+  name                 String
+  mainPlaceId          Int
+  description          String?  @db.Text
+  estimatedTotalDurationMinutes Int?
+  estimatedTotalDistanceMeters  Int?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  mainPlace Place       @relation("MainPlaceRoutes", fields: [mainPlaceId], references: [id])
+  stops     RouteStop[]
+  trips     Trip[]
+
+  @@index([mainPlaceId])
+}
+
+model RouteStop {
+  id                         Int  @id @default(autoincrement())
+  routeId                    Int
+  placeId                    Int
+  stopOrder                  Int
+  stayMinutes                Int?
+  estimatedTravelMinutesFromPrevious  Int?
+  estimatedDistanceMetersFromPrevious Int?
+
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  place Place @relation(fields: [placeId], references: [id])
+
+  @@unique([routeId, stopOrder])
+  @@index([placeId])
+}
+
+enum TripStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Trip {
+  id        Int        @id @default(autoincrement())
+  routeId   Int
+  deviceId  String?
+  status    TripStatus @default(PLANNED)
+  startedAt DateTime?
+  endedAt   DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  route  Route       @relation(fields: [routeId], references: [id])
+  events TripEvent[]
+
+  @@index([routeId])
+  @@index([deviceId])
+}
+
+enum TripEventType {
+  TRIP_STARTED
+  PLACE_ARRIVED
+  PLACE_LEFT
+  MAIN_PLACE_RETURNED
+  TRIP_COMPLETED
+  TRIP_CANCELLED
+}
+
+model TripEvent {
+  id         Int           @id @default(autoincrement())
+  tripId     Int
+  placeId    Int?
+  eventType  TripEventType
+  latitude   Decimal?      @db.Decimal(10, 7)
+  longitude  Decimal?      @db.Decimal(10, 7)
+  occurredAt DateTime      @default(now())
+  metadata   Json?
+
+  trip  Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  place Place? @relation(fields: [placeId], references: [id])
+
+  @@index([tripId, occurredAt])
+  @@index([placeId])
+  @@index([eventType])
+}
