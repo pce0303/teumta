@@ -30,6 +30,7 @@ model Place {
   name                String
   type                PlaceType
   address             String?
+  // 관광지/로컬 장소의 "고정 좌표"다(사용자 위치가 아님). 서버 관리 대상.
   latitude            Decimal   @db.Decimal(10, 7)
   longitude           Decimal   @db.Decimal(10, 7)
   imageUrl            String?   @db.Text
@@ -142,7 +143,6 @@ enum TripStatus {
 model Trip {
   id        Int        @id @default(autoincrement())
   routeId   Int
-  deviceId  String?
   status    TripStatus @default(PLANNED)
   startedAt DateTime?
   endedAt   DateTime?
@@ -153,8 +153,11 @@ model Trip {
   events TripEvent[]
 
   @@index([routeId])
-  @@index([deviceId])
 }
+
+// 개인정보 최소화(privacy): 사용자 위치를 서버에 저장하지 않는다.
+// - 장기 유지되는 device identifier(deviceId)는 저장하지 않는다. Trip 식별이 필요하면
+//   Trip 자체의 id(또는 Trip 한정 랜덤 session id)를 사용한다.
 
 enum TripEventType {
   TRIP_STARTED
@@ -165,13 +168,15 @@ enum TripEventType {
   TRIP_CANCELLED
 }
 
+// 개인정보 최소화(privacy): 사용자의 실제 GPS 좌표는 서버에 저장하지 않는다.
+// - latitude/longitude 필드는 의도적으로 두지 않는다(단말기 내부에서만 처리).
+// - metadata에도 사용자 위치(현재 좌표/이동경로 등)를 절대 넣지 않는다.
+//   진행상태(도착/출발/복귀 등)의 GPS 판정은 mobile local state에서만 수행한다.
 model TripEvent {
   id         Int           @id @default(autoincrement())
   tripId     Int
   placeId    Int?
   eventType  TripEventType
-  latitude   Decimal?      @db.Decimal(10, 7)
-  longitude  Decimal?      @db.Decimal(10, 7)
   occurredAt DateTime      @default(now())
   metadata   Json?
 
