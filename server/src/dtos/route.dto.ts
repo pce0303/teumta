@@ -5,6 +5,11 @@
  * Prisma `Route`/`RouteStop`의 estimated* 필드에 적재하거나 앱 응답 구성에 사용한다.
  */
 
+/**
+ * 좌표. **오직 Place(관광지/로컬 장소)의 고정 좌표에만 사용한다.**
+ * 개인정보 최소화 원칙상 사용자의 현재 GPS 좌표는 서버로 들어오지 않으며,
+ * 이 타입에도 사용자 위치를 담아서는 안 된다(Place ↔ Place 경로 계산 전용).
+ */
 export interface Coordinate {
   latitude: number;
   longitude: number;

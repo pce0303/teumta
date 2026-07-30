@@ -9,6 +9,9 @@ import { extractRouteSummary, fetchPedestrianRoute } from '../external/tmap';
  *  - A(도메인)는 이 결과를 받아 Route/RouteStop 조립에 사용한다(Route 테이블 쓰기는 A).
  *    → B는 Route 스키마에 의존하지 않는다(좌표 in / DTO out).
  *
+ * ⚠️ 개인정보 최소화: 입력 좌표는 **Place ↔ Place 고정 좌표만** 사용한다.
+ *    사용자의 현재 GPS를 이 함수에 넘기지 않는다(user GPS → backend → TMAP 금지).
+ *
  * controller에서 TMAP을 직접 호출하지 않고 이 서비스를 통해서만 사용한다.
  */
 

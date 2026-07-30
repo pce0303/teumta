@@ -32,6 +32,14 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "틈타는 코스 진행 중 도착 여부 확인을 위해 현재 위치를 사용합니다. 위치는 기기 안에서만 사용되며 서버로 전송되지 않습니다.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
       ]
     ],
     "experiments": {
