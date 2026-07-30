@@ -1,17 +1,42 @@
-import type { RouteCalculationData } from '../../dtos';
+import type { RouteCalculationData, RouteSegmentData } from '../../dtos';
+import { ExternalApiResponseError } from '../common';
 import type { TmapRouteResponse } from './tmap.dto';
 
 /**
- * TMAP 경로 원본 응답 → 틈타 내부 RouteCalculationData 변환.
+ * TMAP 보행자 경로 원본 응답 → 틈타 내부 형태 변환.
  *
- * 향후 역할: 장소 간 경로 계산 결과에서 총 이동시간/거리 및 구간별 값을 정규화한다.
- *
- * TODO(실제 연동 시):
- *  - totalTime(초) → totalDurationMinutes(분)
- *  - totalDistance(m) → totalDistanceMeters
- *  - 구간별 travelMinutes / distanceMeters 추출(RouteStop 순서 대응)
+ * ⚠️ 공식 스펙 기반. 실제 응답 샘플로 요약 feature 필드를 한 번 더 검증할 것.
  */
-export function mapTmapRouteToRouteCalculation(_raw: TmapRouteResponse): RouteCalculationData {
-  // TODO: 실제 변환 구현. 지금은 skeleton이므로 호출 시 즉시 실패시킨다.
-  throw new Error('mapTmapRouteToRouteCalculation is not implemented yet');
+
+const SERVICE = 'tmap';
+
+/** 응답에서 요약(totalDistance/totalTime)을 찾아 한 구간의 이동 정보로 변환한다. */
+export function extractRouteSummary(response: TmapRouteResponse): RouteSegmentData {
+  const summary = response.features?.find(
+    (feature) =>
+      typeof feature.properties?.totalDistance === 'number' &&
+      typeof feature.properties?.totalTime === 'number',
+  );
+
+  if (!summary) {
+    throw new ExternalApiResponseError(SERVICE, 'Route summary (totalDistance/totalTime) not found');
+  }
+
+  const distanceMeters = summary.properties.totalDistance as number;
+  const totalSeconds = summary.properties.totalTime as number;
+
+  return {
+    travelMinutes: Math.round(totalSeconds / 60),
+    distanceMeters,
+  };
+}
+
+/** 단일 출발→도착 응답을 RouteCalculationData(한 구간)로 변환한다. */
+export function mapTmapRouteToRouteCalculation(response: TmapRouteResponse): RouteCalculationData {
+  const segment = extractRouteSummary(response);
+  return {
+    totalDurationMinutes: segment.travelMinutes,
+    totalDistanceMeters: segment.distanceMeters,
+    segments: [segment],
+  };
 }

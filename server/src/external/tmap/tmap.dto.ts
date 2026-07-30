@@ -1,11 +1,40 @@
 /**
- * TMAP 경로/이동시간 API 원본 응답 타입.
+ * TMAP 보행자 경로안내 API 원본 응답 타입.
  *
- * ⚠️ 아직 공식 스펙/실제 응답 샘플을 확인하지 않았다. 실제 필드를 추측하지 않는다.
+ * 출처: SK Open API "보행자 경로안내"(POST /tmap/routes/pedestrian?version=1) 공식 스펙.
+ * 응답은 GeoJSON FeatureCollection 이며, 요약(totalDistance/totalTime)은 첫 요약 feature의
+ * properties에 담긴다(pointType "SP", 나머지 구간 feature에는 distance/time).
  *
- * TODO: 공식 스펙 확인 후 실제 필드로 대체. (예상 후보)
- *   - features[]: 경로 지오메트리, properties.totalDistance, properties.totalTime 등
+ * ⚠️ 공식 스펙 기반. 실제 응답 샘플로 요약 feature 위치/필드명을 한 번 더 검증할 것.
  */
 
-/** TMAP 경로 계산 응답(원본 전체). */
-export type TmapRouteResponse = Record<string, unknown>;
+export interface TmapRouteFeatureProperties {
+  /** 요약 feature에만 존재. 전체 이동거리(m). */
+  totalDistance?: number;
+  /** 요약 feature에만 존재. 전체 소요시간(초). */
+  totalTime?: number;
+  /** 구간(LineString) feature의 구간 거리(m). */
+  distance?: number;
+  /** 구간(LineString) feature의 구간 시간(초). */
+  time?: number;
+  index?: number;
+  pointType?: string;
+  [key: string]: unknown;
+}
+
+export interface TmapRouteGeometry {
+  type: 'Point' | 'LineString';
+  /** Point면 [x, y], LineString이면 [[x, y], ...]. */
+  coordinates: number[] | number[][];
+}
+
+export interface TmapRouteFeature {
+  type: 'Feature';
+  geometry: TmapRouteGeometry;
+  properties: TmapRouteFeatureProperties;
+}
+
+export interface TmapRouteResponse {
+  type: 'FeatureCollection';
+  features: TmapRouteFeature[];
+}
