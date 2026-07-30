@@ -1,15 +1,58 @@
 import type { ErrorRequestHandler } from 'express';
 
-export const errorMiddleware: ErrorRequestHandler = (error, _req, res, _next) => {
+import {
+  ExternalApiAuthError,
+  ExternalApiError,
+  ExternalApiRateLimitError,
+  ExternalApiTimeoutError,
+} from '../external/common/external-api.error';
+
+export interface ResolvedError {
+  status: number;
+  code: string;
+  message: string;
+}
+
+/**
+ * 에러를 HTTP 응답 형태(status/code/message)로 변환한다.
+ * 외부 API 오류가 서버 전체 500으로 이어지지 않도록 상황별 상태 코드로 매핑한다.
+ * (ExternalApiError의 message는 이미 민감정보가 제거된 상태다.)
+ */
+export function resolveErrorResponse(error: unknown): ResolvedError {
+  if (error instanceof ExternalApiError) {
+    return { status: statusForExternalError(error), code: error.code, message: error.message };
+  }
+
   const message = error instanceof Error ? error.message : 'Unexpected server error';
+  return { status: 500, code: 'INTERNAL_ERROR', message };
+}
 
-  console.error('Request failed:', message);
+function statusForExternalError(error: ExternalApiError): number {
+  // 서버 설정/미구현 문제는 우리 측 오류이므로 500.
+  if (error.code === 'CONFIG_MISSING' || error.code === 'NOT_IMPLEMENTED') {
+    return 500;
+  }
+  if (error instanceof ExternalApiTimeoutError) {
+    return 504; // Gateway Timeout
+  }
+  if (error instanceof ExternalApiRateLimitError) {
+    return 503; // Service Unavailable (upstream rate limited)
+  }
+  if (error instanceof ExternalApiAuthError) {
+    return 502; // Bad Gateway (upstream 인증 문제)
+  }
+  // NETWORK_ERROR, INVALID_RESPONSE 등 나머지 외부 오류
+  return 502;
+}
 
-  res.status(500).json({
+export const errorMiddleware: ErrorRequestHandler = (error, _req, res, _next) => {
+  const { status, code, message } = resolveErrorResponse(error);
+
+  console.error(`Request failed [${code}]:`, message);
+
+  res.status(status).json({
     success: false,
     data: null,
-    error: {
-      message,
-    },
+    error: { code, message },
   });
 };
