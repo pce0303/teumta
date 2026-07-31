@@ -11,6 +11,6 @@ app.use(cors());
 app.use(express.json());
 
 app.use(healthRouter);
-app.use(placeRouter);
+app.use('/api', placeRouter);
 
 app.use(errorMiddleware);
