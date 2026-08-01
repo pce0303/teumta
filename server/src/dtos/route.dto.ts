@@ -19,6 +19,11 @@ export interface Coordinate {
 export interface RouteSegmentData {
   travelMinutes: number;
   distanceMeters: number;
+  /**
+   * 구간 보행 경로 도형(지도 폴리라인용). `RouteStop.pathFromPrevious`에 적재한다.
+   * Place ↔ Place 고정 경로의 좌표이며 사용자 위치가 아니다.
+   */
+  path: Coordinate[];
 }
 
 export interface RouteCalculationData {
