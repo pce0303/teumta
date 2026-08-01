@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Teumta } from '@/constants/theme';
+import { useBookmarks } from '@/hooks/use-bookmarks';
 import { getMockPlaceById, getNearbyLocalPlaces } from '@/mocks/places';
 import type { CongestionLevel } from '@/types/place';
 
@@ -33,6 +34,7 @@ export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isPlaceBookmarked, togglePlaceBookmark } = useBookmarks();
   const place = getMockPlaceById(id);
 
   if (!place) {
@@ -60,13 +62,15 @@ export default function PlaceDetailScreen() {
               contentFit="contain"
             />
           </Pressable>
-          <View style={styles.heroButton}>
+          <Pressable
+            style={[styles.heroButton, isPlaceBookmarked(place.id) && styles.heroButtonSaved]}
+            onPress={() => togglePlaceBookmark(place.id)}>
             <Image
               source={require('@/assets/images/icons/bookmark.svg')}
               style={styles.heroButtonIcon}
               contentFit="contain"
             />
-          </View>
+          </Pressable>
         </View>
         <View style={styles.heroImage} />
         <View style={styles.heroTitleBand}>
@@ -205,6 +209,9 @@ const styles = StyleSheet.create({
     height: 38,
     justifyContent: 'center',
     width: 38,
+  },
+  heroButtonSaved: {
+    backgroundColor: Teumta.greenLight,
   },
   heroButtonIcon: {
     height: 19,

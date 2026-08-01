@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { Teumta } from '@/constants/theme';
 import { featuredPlaces } from '@/mocks/places';
 import type { Place } from '@/types/place';
@@ -118,44 +119,7 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.bottomNav}>
-        <View style={styles.navItem}>
-          <Image
-            source={require('@/assets/images/icons/tab-home.svg')}
-            style={styles.navIcon}
-            contentFit="contain"
-          />
-          <Text style={[styles.navLabel, styles.navLabelActive]}>홈</Text>
-        </View>
-        <Link href={'/search' as Href} asChild>
-          <Pressable style={styles.navItem}>
-            <Image
-              source={require('@/assets/images/icons/tab-explore.svg')}
-              style={styles.navIcon}
-              contentFit="contain"
-            />
-            <Text style={styles.navLabel}>탐색</Text>
-          </Pressable>
-        </Link>
-        <Link href={'/course-map' as Href} asChild>
-          <Pressable style={styles.navItem}>
-            <Image
-              source={require('@/assets/images/icons/tab-trips.svg')}
-              style={styles.navIcon}
-              contentFit="contain"
-            />
-            <Text style={styles.navLabel}>내 여행</Text>
-          </Pressable>
-        </Link>
-        <View style={styles.navItem}>
-          <Image
-            source={require('@/assets/images/icons/tab-my.svg')}
-            style={styles.navIcon}
-            contentFit="contain"
-          />
-          <Text style={styles.navLabel}>마이</Text>
-        </View>
-      </View>
+      <TeumtaTabBar active="home" />
     </SafeAreaView>
   );
 }
@@ -344,36 +308,5 @@ const styles = StyleSheet.create({
     color: Teumta.textSecondary,
     fontSize: 9,
     lineHeight: 13,
-  },
-  bottomNav: {
-    alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    flexDirection: 'row',
-    height: 82,
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    marginHorizontal: 20,
-    marginTop: 10,
-    paddingHorizontal: 18,
-  },
-  navItem: {
-    alignItems: 'center',
-    gap: 3,
-  },
-  navIcon: {
-    height: 20,
-    width: 20,
-  },
-  navLabel: {
-    color: Teumta.textTertiary,
-    fontSize: 9,
-    fontWeight: '700',
-    lineHeight: 13,
-  },
-  navLabelActive: {
-    color: Teumta.greenDark,
   },
 });

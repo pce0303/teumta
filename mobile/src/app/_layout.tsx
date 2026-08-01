@@ -2,13 +2,16 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 
+import { BookmarksProvider } from '@/hooks/use-bookmarks';
+
 SplashScreen.preventAutoHideAsync();
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack
+      <BookmarksProvider>
+        <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colorScheme === 'dark' ? '#111111' : '#ffffff' },
           headerTintColor: colorScheme === 'dark' ? '#ffffff' : '#111111',
@@ -20,7 +23,9 @@ export default function TabLayout() {
         <Stack.Screen name="detours" options={{ title: '틈타 코스', headerShown: false }} />
         <Stack.Screen name="course-map" options={{ title: '코스 상세', headerShown: false }} />
         <Stack.Screen name="trip" options={{ title: '코스 진행', headerShown: false }} />
-      </Stack>
+        <Stack.Screen name="my" options={{ title: '마이', headerShown: false }} />
+        </Stack>
+      </BookmarksProvider>
     </ThemeProvider>
   );
 }

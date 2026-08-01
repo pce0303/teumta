@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
 import { Teumta } from '@/constants/theme';
+import { useBookmarks } from '@/hooks/use-bookmarks';
 import { getMockPlaceById } from '@/mocks/places';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
@@ -16,6 +17,7 @@ export default function CourseMapScreen() {
   const { placeId, detourId } = useLocalSearchParams<{ placeId?: string; detourId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isCourseBookmarked, toggleCourseBookmark } = useBookmarks();
   const place = getMockPlaceById(placeId) ?? getMockPlaceById('gyeongbokgung');
   const detour = place?.detours.find((item) => item.id === detourId) ?? place?.detours[0];
 
@@ -77,13 +79,18 @@ export default function CourseMapScreen() {
             contentFit="contain"
           />
         </Pressable>
-        <View style={styles.topButton}>
+        <Pressable
+          style={[
+            styles.topButton,
+            isCourseBookmarked(place.id, detour.id) && styles.topButtonSaved,
+          ]}
+          onPress={() => toggleCourseBookmark(place.id, detour.id)}>
           <Image
             source={require('@/assets/images/icons/bookmark.svg')}
             style={styles.topButtonIcon}
             contentFit="contain"
           />
-        </View>
+        </Pressable>
       </View>
 
       <View style={styles.mapArea}>
@@ -184,6 +191,10 @@ const styles = StyleSheet.create({
     height: 38,
     justifyContent: 'center',
     width: 38,
+  },
+  topButtonSaved: {
+    backgroundColor: Teumta.greenLight,
+    borderColor: Teumta.green,
   },
   topButtonIcon: {
     height: 19,
