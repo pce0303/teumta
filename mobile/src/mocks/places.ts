@@ -109,6 +109,12 @@ export type NearbyLocalPlace = {
   walkMinutes: number;
   stayMinutes: number;
   congestionLabel: string;
+  description: string;
+  /** 로컬 장소의 고정 좌표(사용자 위치 아님). 외부 지도 길찾기 목적지로 사용. */
+  latitude: number;
+  longitude: number;
+  /** 이 장소를 지나는 틈타 코스(detour) id 목록. */
+  detourIds: string[];
 };
 
 export const nearbyLocalPlacesByPlaceId: Record<string, NearbyLocalPlace[]> = {
@@ -119,6 +125,11 @@ export const nearbyLocalPlacesByPlaceId: Record<string, NearbyLocalPlace[]> = {
       walkMinutes: 6,
       stayMinutes: 40,
       congestionLabel: '여유',
+      description:
+        '경복궁 서쪽 담장 너머 한옥 골목 사이로 작은 카페와 공방이 이어지는 거리예요. 대기 줄 없이 들러 쉬어가기 좋아요.',
+      latitude: 37.5794,
+      longitude: 126.9707,
+      detourIds: ['seochon-cafe-route'],
     },
     {
       id: 'tongin-market',
@@ -126,6 +137,11 @@ export const nearbyLocalPlacesByPlaceId: Record<string, NearbyLocalPlace[]> = {
       walkMinutes: 9,
       stayMinutes: 25,
       congestionLabel: '여유',
+      description:
+        '엽전 도시락으로 유명한 전통시장이에요. 골목을 따라 분식·반찬 가게를 구경하며 가볍게 한 바퀴 돌기 좋아요.',
+      latitude: 37.5806,
+      longitude: 126.9692,
+      detourIds: ['seochon-cafe-route'],
     },
   ],
   'seoul-forest': [
@@ -135,6 +151,11 @@ export const nearbyLocalPlacesByPlaceId: Record<string, NearbyLocalPlace[]> = {
       walkMinutes: 8,
       stayMinutes: 35,
       congestionLabel: '보통',
+      description:
+        '붉은 벽돌 공장 건물을 개조한 카페와 편집숍이 모여 있는 거리예요. 서울숲에서 천천히 걸어가며 동네 분위기를 즐겨보세요.',
+      latitude: 37.5427,
+      longitude: 127.0561,
+      detourIds: [],
     },
     {
       id: 'understand-avenue',
@@ -142,6 +163,11 @@ export const nearbyLocalPlacesByPlaceId: Record<string, NearbyLocalPlace[]> = {
       walkMinutes: 5,
       stayMinutes: 30,
       congestionLabel: '여유',
+      description:
+        '컨테이너 건물로 지어진 복합문화공간이에요. 서울숲 입구 바로 옆이라 자투리 시간에 들르기 좋아요.',
+      latitude: 37.5443,
+      longitude: 127.0374,
+      detourIds: ['ttukseom-link'],
     },
   ],
   'namsan-tower': [
@@ -151,6 +177,11 @@ export const nearbyLocalPlacesByPlaceId: Record<string, NearbyLocalPlace[]> = {
       walkMinutes: 7,
       stayMinutes: 20,
       congestionLabel: '여유',
+      description:
+        '남산 중턱을 따라 완만하게 이어지는 산책로예요. 케이블카 대기 없이 서울 시내 전망을 즐길 수 있어요.',
+      latitude: 37.5535,
+      longitude: 126.988,
+      detourIds: ['walking-ring'],
     },
     {
       id: 'haebangchon-alley',
@@ -158,10 +189,31 @@ export const nearbyLocalPlacesByPlaceId: Record<string, NearbyLocalPlace[]> = {
       walkMinutes: 12,
       stayMinutes: 30,
       congestionLabel: '보통',
+      description:
+        '언덕길을 따라 개성 있는 카페와 독립서점이 이어지는 동네 골목이에요. 노을 무렵 풍경이 특히 좋아요.',
+      latitude: 37.5453,
+      longitude: 126.9873,
+      detourIds: [],
     },
   ],
 };
 
 export function getNearbyLocalPlaces(placeId?: string): NearbyLocalPlace[] {
   return (placeId && nearbyLocalPlacesByPlaceId[placeId]) || [];
+}
+
+/** 로컬 장소 id로 로컬 장소와 그 기준 관광지(parent)를 함께 찾는다. */
+export function getLocalPlaceById(
+  localPlaceId?: string,
+): { local: NearbyLocalPlace; parent: Place } | undefined {
+  for (const [placeId, locals] of Object.entries(nearbyLocalPlacesByPlaceId)) {
+    const local = locals.find((item) => item.id === localPlaceId);
+    if (local) {
+      const parent = getMockPlaceById(placeId);
+      if (parent) {
+        return { local, parent };
+      }
+    }
+  }
+  return undefined;
 }

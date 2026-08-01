@@ -149,17 +149,19 @@ export default function PlaceDetailScreen() {
 
           <View style={styles.nearbyList}>
             {nearbyPlaces.map((nearby) => (
-              <View key={nearby.id} style={styles.nearbyCard}>
-                <View style={styles.nearbyThumb} />
-                <View style={styles.nearbyTexts}>
-                  <Text style={styles.nearbyName}>{nearby.name}</Text>
-                  <Text style={styles.nearbyMeta}>
-                    도보 {nearby.walkMinutes}분 · 권장 체류 {nearby.stayMinutes}분 ·{' '}
-                    {nearby.congestionLabel}
-                  </Text>
-                </View>
-                <Text style={styles.nearbyChevron}>›</Text>
-              </View>
+              <Link key={nearby.id} href={`/local-places/${nearby.id}` as Href} asChild>
+                <Pressable style={styles.nearbyCard}>
+                  <View style={styles.nearbyThumb} />
+                  <View style={styles.nearbyTexts}>
+                    <Text style={styles.nearbyName}>{nearby.name}</Text>
+                    <Text style={styles.nearbyMeta}>
+                      도보 {nearby.walkMinutes}분 · 권장 체류 {nearby.stayMinutes}분 ·{' '}
+                      {nearby.congestionLabel}
+                    </Text>
+                  </View>
+                  <Text style={styles.nearbyChevron}>›</Text>
+                </Pressable>
+              </Link>
             ))}
           </View>
         </View>

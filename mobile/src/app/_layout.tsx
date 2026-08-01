@@ -20,6 +20,10 @@ export default function RootLayout() {
           <Stack.Screen name="index" options={{ title: 'teumta', headerShown: false }} />
           <Stack.Screen name="search" options={{ title: '관광지 검색' }} />
           <Stack.Screen name="places/[id]" options={{ title: '관광지 상세', headerShown: false }} />
+          <Stack.Screen
+            name="local-places/[id]"
+            options={{ title: '로컬 장소 상세', headerShown: false }}
+          />
           <Stack.Screen name="detours" options={{ title: '틈타 코스', headerShown: false }} />
           <Stack.Screen name="course-map" options={{ title: '코스 상세', headerShown: false }} />
           <Stack.Screen name="trip" options={{ title: '코스 진행', headerShown: false }} />

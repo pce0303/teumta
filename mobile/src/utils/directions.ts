@@ -1,4 +1,4 @@
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import type { Coordinate } from '@/types/place';
 
@@ -15,9 +15,12 @@ export type DirectionsDestination = Coordinate & { name: string };
 export async function openDirections(destination: DirectionsDestination): Promise<void> {
   const { latitude, longitude, name } = destination;
 
-  // TMAP 앱이 설치돼 있으면 TMAP으로, 아니면 범용 지도 URL로 폴백. 둘 다 출발지 미지정.
+  // TMAP 앱이 설치돼 있으면 TMAP으로, 아니면 OS 기본 지도로 폴백. 모두 출발지 미지정.
   const tmapUrl = `tmap://route?goalname=${encodeURIComponent(name)}&goalx=${longitude}&goaly=${latitude}`;
-  const fallbackUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+  const fallbackUrl = Platform.select({
+    ios: `https://maps.apple.com/?daddr=${latitude},${longitude}&dirflg=w`,
+    default: `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=walking`,
+  });
 
   const canOpenTmap = await Linking.canOpenURL(tmapUrl);
   await Linking.openURL(canOpenTmap ? tmapUrl : fallbackUrl);
