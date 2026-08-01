@@ -14,11 +14,12 @@ export default function TabLayout() {
           headerTintColor: colorScheme === 'dark' ? '#ffffff' : '#111111',
           contentStyle: { backgroundColor: colorScheme === 'dark' ? '#111111' : '#f6f7f9' },
         }}>
-        <Stack.Screen name="index" options={{ title: 'teumta' }} />
+        <Stack.Screen name="index" options={{ title: 'teumta', headerShown: false }} />
         <Stack.Screen name="search" options={{ title: '관광지 검색' }} />
-        <Stack.Screen name="places/[id]" options={{ title: '관광지 상세' }} />
-        <Stack.Screen name="detours" options={{ title: '우회 코스 선택' }} />
-        <Stack.Screen name="course-map" options={{ title: '코스 진행 지도' }} />
+        <Stack.Screen name="places/[id]" options={{ title: '관광지 상세', headerShown: false }} />
+        <Stack.Screen name="detours" options={{ title: '틈타 코스', headerShown: false }} />
+        <Stack.Screen name="course-map" options={{ title: '코스 상세', headerShown: false }} />
+        <Stack.Screen name="trip" options={{ title: '코스 진행', headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );

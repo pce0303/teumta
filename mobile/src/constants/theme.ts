@@ -26,6 +26,29 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/**
+ * 틈타 디자인 토큰 (Figma "틈타 사용자 앱" 파일 기준).
+ * congestion.medium은 디자인에 정의가 없어 혼잡/여유 톤에 맞춰 보간한 값.
+ */
+export const Teumta = {
+  background: '#FAFAF7',
+  surface: '#FFFFFF',
+  border: '#E5EAE6',
+  textPrimary: '#202522',
+  textSecondary: '#737B76',
+  textTertiary: '#A3AAA5',
+  green: '#55C89A',
+  greenLight: '#EAF8F2',
+  greenDark: '#24966D',
+  imagePlaceholder: '#F2F5F3',
+  congestion: {
+    low: { text: '#24966D', background: '#EAF8F2', dot: '#35B779' },
+    medium: { text: '#B98207', background: '#FFF6E3', dot: '#F1B84B' },
+    high: { text: '#EF6D64', background: '#FFF0ED', dot: '#EF6D64' },
+    veryHigh: { text: '#E0362C', background: '#FFECEA', dot: '#FF0000' },
+  },
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

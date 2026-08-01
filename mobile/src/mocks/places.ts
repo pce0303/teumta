@@ -18,7 +18,9 @@ export const featuredPlaces: Place[] = [
         name: '민속박물관 우회 루프',
         durationMinutes: 42,
         distanceKm: 2.1,
-        description: '동쪽 보행로를 따라 혼잡한 정문 구간을 피하고 북촌 방향으로 빠지는 코스입니다.',
+        description: '혼잡한 정문 구간을 피해 북촌 방향으로 둘러봐요.',
+        stops: ['국립민속박물관', '북촌 입구', '경복궁'],
+        stayMinutes: 30,
         coordinates: [
           { latitude: 37.5796, longitude: 126.977 },
           { latitude: 37.5811, longitude: 126.9792 },
@@ -30,7 +32,9 @@ export const featuredPlaces: Place[] = [
         name: '서촌 카페 골목 코스',
         durationMinutes: 55,
         distanceKm: 2.8,
-        description: '서쪽 출구에서 서촌 골목으로 이동해 대기 시간을 줄이는 코스입니다.',
+        description: '카페와 시장 골목을 가볍게 둘러봐요.',
+        stops: ['서촌 카페거리', '통인시장', '경복궁'],
+        stayMinutes: 40,
         coordinates: [
           { latitude: 37.5796, longitude: 126.977 },
           { latitude: 37.5782, longitude: 126.9734 },
@@ -55,7 +59,9 @@ export const featuredPlaces: Place[] = [
         name: '뚝섬 연결 코스',
         durationMinutes: 38,
         distanceKm: 1.9,
-        description: '서울숲역 주변 혼잡을 피해 뚝섬역 방향으로 이동합니다.',
+        description: '서울숲역 혼잡을 피해 뚝섬 방향으로 걸어요.',
+        stops: ['서울숲 산책로', '뚝섬역 골목', '서울숲'],
+        stayMinutes: 25,
         coordinates: [
           { latitude: 37.5444, longitude: 127.0374 },
           { latitude: 37.5468, longitude: 127.0435 },
@@ -80,7 +86,9 @@ export const featuredPlaces: Place[] = [
         name: '남산순환로 도보 코스',
         durationMinutes: 65,
         distanceKm: 3.2,
-        description: '대기 시간이 긴 케이블카 구간을 피하고 순환로로 전망 지점에 접근합니다.',
+        description: '케이블카 대기를 피해 순환로로 전망을 즐겨요.',
+        stops: ['남산순환로', '전망 포인트', 'N서울타워'],
+        stayMinutes: 45,
         coordinates: [
           { latitude: 37.5512, longitude: 126.9882 },
           { latitude: 37.5496, longitude: 126.9916 },
@@ -93,4 +101,67 @@ export const featuredPlaces: Place[] = [
 
 export function getMockPlaceById(id?: string) {
   return featuredPlaces.find((place) => place.id === id);
+}
+
+export type NearbyLocalPlace = {
+  id: string;
+  name: string;
+  walkMinutes: number;
+  stayMinutes: number;
+  congestionLabel: string;
+};
+
+export const nearbyLocalPlacesByPlaceId: Record<string, NearbyLocalPlace[]> = {
+  gyeongbokgung: [
+    {
+      id: 'seochon-cafe-street',
+      name: '서촌 로컬 카페거리',
+      walkMinutes: 6,
+      stayMinutes: 40,
+      congestionLabel: '여유',
+    },
+    {
+      id: 'tongin-market',
+      name: '통인시장 골목',
+      walkMinutes: 9,
+      stayMinutes: 25,
+      congestionLabel: '여유',
+    },
+  ],
+  'seoul-forest': [
+    {
+      id: 'seongsu-cafe-street',
+      name: '성수동 카페거리',
+      walkMinutes: 8,
+      stayMinutes: 35,
+      congestionLabel: '보통',
+    },
+    {
+      id: 'understand-avenue',
+      name: '언더스탠드에비뉴',
+      walkMinutes: 5,
+      stayMinutes: 30,
+      congestionLabel: '여유',
+    },
+  ],
+  'namsan-tower': [
+    {
+      id: 'sopa-road',
+      name: '남산 소파길 산책로',
+      walkMinutes: 7,
+      stayMinutes: 20,
+      congestionLabel: '여유',
+    },
+    {
+      id: 'haebangchon-alley',
+      name: '해방촌 카페골목',
+      walkMinutes: 12,
+      stayMinutes: 30,
+      congestionLabel: '보통',
+    },
+  ],
+};
+
+export function getNearbyLocalPlaces(placeId?: string): NearbyLocalPlace[] {
+  return (placeId && nearbyLocalPlacesByPlaceId[placeId]) || [];
 }
