@@ -1,29 +1,29 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
 
+import { Teumta } from '@/constants/theme';
 import { BookmarksProvider } from '@/hooks/use-bookmarks';
 
 SplashScreen.preventAutoHideAsync();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+// 디자인이 라이트 모드 전용이라 앱 전체를 라이트로 고정한다(app.json userInterfaceStyle 참고).
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DefaultTheme}>
       <BookmarksProvider>
         <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: colorScheme === 'dark' ? '#111111' : '#ffffff' },
-          headerTintColor: colorScheme === 'dark' ? '#ffffff' : '#111111',
-          contentStyle: { backgroundColor: colorScheme === 'dark' ? '#111111' : '#f6f7f9' },
-        }}>
-        <Stack.Screen name="index" options={{ title: 'teumta', headerShown: false }} />
-        <Stack.Screen name="search" options={{ title: '관광지 검색' }} />
-        <Stack.Screen name="places/[id]" options={{ title: '관광지 상세', headerShown: false }} />
-        <Stack.Screen name="detours" options={{ title: '틈타 코스', headerShown: false }} />
-        <Stack.Screen name="course-map" options={{ title: '코스 상세', headerShown: false }} />
-        <Stack.Screen name="trip" options={{ title: '코스 진행', headerShown: false }} />
-        <Stack.Screen name="my" options={{ title: '마이', headerShown: false }} />
+          screenOptions={{
+            headerStyle: { backgroundColor: Teumta.surface },
+            headerTintColor: Teumta.textPrimary,
+            contentStyle: { backgroundColor: Teumta.background },
+          }}>
+          <Stack.Screen name="index" options={{ title: 'teumta', headerShown: false }} />
+          <Stack.Screen name="search" options={{ title: '관광지 검색' }} />
+          <Stack.Screen name="places/[id]" options={{ title: '관광지 상세', headerShown: false }} />
+          <Stack.Screen name="detours" options={{ title: '틈타 코스', headerShown: false }} />
+          <Stack.Screen name="course-map" options={{ title: '코스 상세', headerShown: false }} />
+          <Stack.Screen name="trip" options={{ title: '코스 진행', headerShown: false }} />
+          <Stack.Screen name="my" options={{ title: '마이', headerShown: false }} />
         </Stack>
       </BookmarksProvider>
     </ThemeProvider>
