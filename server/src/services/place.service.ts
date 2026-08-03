@@ -3,15 +3,52 @@ import type { PlaceType } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 
 function transformPlace(place: any) {
-  const { placeTags, ...placeData } = place;
+  const {
+    placeTags,
+    latitude,
+    longitude,
+    tourApiContentId: _tourApiContentId,
+    ...placeData
+  } = place;
 
   return {
     ...placeData,
+    latitude: Number(latitude),
+    longitude: Number(longitude),
     tags: placeTags.map((placeTag: any) => ({
       id: placeTag.tag.id,
       name: placeTag.tag.name,
     })),
   };
+}
+
+export async function findMissingTagIds(
+  tagIds: number[],
+): Promise<number[]> {
+  const uniqueTagIds = [...new Set(tagIds)];
+
+  if (uniqueTagIds.length === 0) {
+    return [];
+  }
+
+  const existingTags = await prisma.tag.findMany({
+    where: {
+      id: {
+        in: uniqueTagIds,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const existingTagIds = new Set(
+    existingTags.map((tag) => tag.id),
+  );
+
+  return uniqueTagIds.filter(
+    (tagId) => !existingTagIds.has(tagId),
+  );
 }
 
 export async function getPlaces(type?: PlaceType) {

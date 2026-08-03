@@ -3,10 +3,23 @@ import { PlaceType } from '@prisma/client';
 
 import {
   createPlace,
+  findMissingTagIds,
   getPlaceById,
   getPlaces,
   updatePlace,
 } from '../services/place.service';
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function isValidTime(value: unknown): value is string {
+  return typeof value === 'string' && TIME_PATTERN.test(value);
+}
+
+function isValidRecommendedDuration(
+  value: unknown,
+): value is number {
+  return Number.isInteger(value) && (value as number) > 0;
+}
 
 export const getPlacesController: RequestHandler = async (
   req,
@@ -119,19 +132,19 @@ export const createPlaceController: RequestHandler = async (
     }
 
     if (
-  typeof type !== 'string' ||
-  !Object.values(PlaceType).includes(type as PlaceType)
-) {
-  res.status(400).json({
-    success: false,
-    data: null,
-    error: {
-      message:
-        'type은 TOURIST_SPOT 또는 LOCAL_PLACE여야 합니다.',
-    },
-  });
-  return;
-}
+      typeof type !== 'string' ||
+      !Object.values(PlaceType).includes(type as PlaceType)
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message:
+            'type은 TOURIST_SPOT 또는 LOCAL_PLACE여야 합니다.',
+        },
+      });
+      return;
+    }
 
     if (
       typeof latitude !== 'number' ||
@@ -165,6 +178,52 @@ export const createPlaceController: RequestHandler = async (
     }
 
     if (
+      openingTime !== undefined &&
+      openingTime !== null &&
+      !isValidTime(openingTime)
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'openingTime은 HH:mm 형식이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    if (
+      closingTime !== undefined &&
+      closingTime !== null &&
+      !isValidTime(closingTime)
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'closingTime은 HH:mm 형식이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    if (
+      recommendedDuration !== undefined &&
+      recommendedDuration !== null &&
+      !isValidRecommendedDuration(recommendedDuration)
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message:
+            'recommendedDuration은 양의 정수여야 합니다.',
+        },
+      });
+      return;
+    }
+
+    if (
       tagIds !== undefined &&
       (!Array.isArray(tagIds) ||
         !tagIds.every(
@@ -180,21 +239,37 @@ export const createPlaceController: RequestHandler = async (
       });
       return;
     }
+    if (tagIds !== undefined) {
+      const missingTagIds = await findMissingTagIds(tagIds);
+
+      if (missingTagIds.length > 0) {
+        res.status(400).json({
+          success: false,
+          data: null,
+          error: {
+            message: `존재하지 않는 태그 ID가 포함되어 있습니다: ${missingTagIds.join(
+              ', ',
+            )}`,
+          },
+        });
+        return;
+      }
+    }
 
     const place = await createPlace({
-  name: name.trim(),
-  type: type as PlaceType,
-  address,
-  latitude,
-  longitude,
-  imageUrl,
-  description,
-  openingTime,
-  closingTime,
-  recommendedDuration,
-  tourApiContentId,
-  tagIds,
-});
+      name: name.trim(),
+      type: type as PlaceType,
+      address,
+      latitude,
+      longitude,
+      imageUrl,
+      description,
+      openingTime,
+      closingTime,
+      recommendedDuration,
+      tourApiContentId,
+      tagIds,
+    });
 
     res.status(201).json({
       success: true,
@@ -225,7 +300,7 @@ export const updatePlaceController: RequestHandler = async (
       return;
     }
 
-      const {
+    const {
       name,
       type,
       address,
@@ -240,7 +315,7 @@ export const updatePlaceController: RequestHandler = async (
       tagIds,
     } = req.body;
 
-        if (
+    if (
       type !== undefined &&
       (typeof type !== 'string' ||
         !Object.values(PlaceType).includes(type as PlaceType))
@@ -256,7 +331,7 @@ export const updatePlaceController: RequestHandler = async (
       return;
     }
 
-      if (
+    if (
       name !== undefined &&
       (typeof name !== 'string' || name.trim() === '')
     ) {
@@ -270,7 +345,7 @@ export const updatePlaceController: RequestHandler = async (
       return;
     }
 
-        if (
+    if (
       latitude !== undefined &&
       (typeof latitude !== 'number' ||
         latitude < -90 ||
@@ -286,7 +361,7 @@ export const updatePlaceController: RequestHandler = async (
       return;
     }
 
-        if (
+    if (
       longitude !== undefined &&
       (typeof longitude !== 'number' ||
         longitude < -180 ||
@@ -302,7 +377,53 @@ export const updatePlaceController: RequestHandler = async (
       return;
     }
 
-        if (
+    if (
+      openingTime !== undefined &&
+      openingTime !== null &&
+      !isValidTime(openingTime)
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'openingTime은 HH:mm 형식이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    if (
+      closingTime !== undefined &&
+      closingTime !== null &&
+      !isValidTime(closingTime)
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'closingTime은 HH:mm 형식이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    if (
+      recommendedDuration !== undefined &&
+      recommendedDuration !== null &&
+      !isValidRecommendedDuration(recommendedDuration)
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message:
+            'recommendedDuration은 양의 정수여야 합니다.',
+        },
+      });
+      return;
+    }
+
+    if (
       tagIds !== undefined &&
       (!Array.isArray(tagIds) ||
         !tagIds.every(
@@ -318,8 +439,24 @@ export const updatePlaceController: RequestHandler = async (
       });
       return;
     }
+    if (tagIds !== undefined) {
+      const missingTagIds = await findMissingTagIds(tagIds);
 
-        const place = await updatePlace(id, {
+      if (missingTagIds.length > 0) {
+        res.status(400).json({
+          success: false,
+          data: null,
+          error: {
+            message: `존재하지 않는 태그 ID가 포함되어 있습니다: ${missingTagIds.join(
+              ', ',
+            )}`,
+          },
+        });
+        return;
+      }
+    }
+
+    const place = await updatePlace(id, {
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(type !== undefined ? { type: type as PlaceType } : {}),
       ...(address !== undefined ? { address } : {}),
@@ -338,7 +475,7 @@ export const updatePlaceController: RequestHandler = async (
       ...(tagIds !== undefined ? { tagIds } : {}),
     });
 
-        if (!place) {
+    if (!place) {
       res.status(404).json({
         success: false,
         data: null,

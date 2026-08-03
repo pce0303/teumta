@@ -10,6 +10,7 @@ import {
 export const placeRouter = Router();
 
 placeRouter.get('/places', getPlacesController);
-placeRouter.post('/places', createPlaceController);
 placeRouter.get('/places/:id', getPlaceByIdController);
-placeRouter.patch('/places/:id', updatePlaceController);
+
+placeRouter.post('/admin/places', createPlaceController);
+placeRouter.patch('/admin/places/:id', updatePlaceController);
