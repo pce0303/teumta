@@ -1,6 +1,44 @@
-import type { PlaceType } from '@prisma/client';
+import { PlaceType } from '@prisma/client';
 
 import { prisma } from '../utils/prisma';
+
+const EARTH_RADIUS_METERS = 6_371_000;
+
+function degreesToRadians(degrees: number) {
+  return (degrees * Math.PI) / 180;
+}
+
+function calculateDistanceMeters(
+  latitude1: number,
+  longitude1: number,
+  latitude2: number,
+  longitude2: number,
+) {
+  const latitudeDifference = degreesToRadians(
+    latitude2 - latitude1,
+  );
+  const longitudeDifference = degreesToRadians(
+    longitude2 - longitude1,
+  );
+
+  const latitude1Radians = degreesToRadians(latitude1);
+  const latitude2Radians = degreesToRadians(latitude2);
+
+  const haversineValue =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(latitude1Radians) *
+    Math.cos(latitude2Radians) *
+    Math.sin(longitudeDifference / 2) ** 2;
+
+  const centralAngle =
+    2 *
+    Math.atan2(
+      Math.sqrt(haversineValue),
+      Math.sqrt(1 - haversineValue),
+    );
+
+  return Math.round(EARTH_RADIUS_METERS * centralAngle);
+}
 
 function transformPlace(place: any) {
   const {
@@ -55,8 +93,8 @@ export async function getPlaces(type?: PlaceType) {
   const places = await prisma.place.findMany({
     where: type
       ? {
-          type,
-        }
+        type,
+      }
       : undefined,
     include: {
       placeTags: {
@@ -184,17 +222,17 @@ export async function updatePlace(
       ...placeData,
       ...(tagIds !== undefined
         ? {
-            placeTags: {
-              deleteMany: {},
-              create: [...new Set(tagIds)].map((tagId) => ({
-                tag: {
-                  connect: {
-                    id: tagId,
-                  },
+          placeTags: {
+            deleteMany: {},
+            create: [...new Set(tagIds)].map((tagId) => ({
+              tag: {
+                connect: {
+                  id: tagId,
                 },
-              })),
-            },
-          }
+              },
+            })),
+          },
+        }
         : {}),
     },
     include: {
@@ -207,4 +245,82 @@ export async function updatePlace(
   });
 
   return transformPlace(updatedPlace);
+}
+
+export async function getNearbyLocalPlaces(
+  touristSpotId: number,
+  radiusMeters = 2000,
+) {
+  const touristSpot = await prisma.place.findUnique({
+    where: {
+      id: touristSpotId,
+    },
+    select: {
+      id: true,
+      type: true,
+      latitude: true,
+      longitude: true,
+    },
+  });
+
+  if (!touristSpot) {
+    return {
+      status: 'NOT_FOUND' as const,
+      places: [],
+    };
+  }
+
+  if (touristSpot.type !== PlaceType.TOURIST_SPOT) {
+    return {
+      status: 'NOT_TOURIST_SPOT' as const,
+      places: [],
+    };
+  }
+
+  const localPlaces = await prisma.place.findMany({
+    where: {
+      type: PlaceType.LOCAL_PLACE,
+    },
+    include: {
+      placeTags: {
+        include: {
+          tag: true,
+        },
+      },
+    },
+  });
+
+  const touristLatitude = Number(touristSpot.latitude);
+  const touristLongitude = Number(touristSpot.longitude);
+
+  const nearbyLocalPlaces = localPlaces
+    .map((localPlace) => {
+      const transformedPlace = transformPlace(localPlace);
+
+      const distanceMeters = calculateDistanceMeters(
+        touristLatitude,
+        touristLongitude,
+        Number(localPlace.latitude),
+        Number(localPlace.longitude),
+      );
+
+      return {
+        ...transformedPlace,
+        distanceMeters,
+      };
+    })
+    .filter(
+      (localPlace) =>
+        localPlace.distanceMeters <= radiusMeters,
+    )
+    .sort(
+      (firstPlace, secondPlace) =>
+        firstPlace.distanceMeters -
+        secondPlace.distanceMeters,
+    );
+
+  return {
+    status: 'SUCCESS' as const,
+    places: nearbyLocalPlaces,
+  };
 }
