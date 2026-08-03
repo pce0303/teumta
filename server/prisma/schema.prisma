@@ -126,6 +126,11 @@ model RouteStop {
   estimatedTravelMinutesFromPrevious  Int?
   estimatedDistanceMetersFromPrevious Int?
 
+  // 이전 정류지(첫 정류지는 mainPlace)에서 이 정류지까지의 보행 경로 도형.
+  // TMAP Place↔Place 경로에서 추출한 [{ latitude, longitude }, ...] 배열이며 지도 폴리라인 렌더링용.
+  // privacy: 장소 사이의 고정 경로 데이터다. 사용자 GPS/이동 기록을 저장하는 필드가 아니다.
+  pathFromPrevious           Json?
+
   route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
   place Place @relation(fields: [placeId], references: [id])
 

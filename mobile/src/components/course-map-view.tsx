@@ -1,39 +1,66 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
+import { Teumta } from '@/constants/theme';
 import type { DetourCourse } from '@/types/place';
 
 type CourseMapViewProps = {
   detour?: DetourCourse;
+  /** 지도에 내 위치(파란 점)를 표시. 위치 권한이 허용된 화면에서만 켠다. */
+  showsUserLocation?: boolean;
 };
 
-export function CourseMapView({ detour }: CourseMapViewProps) {
+const MARKER_ANCHOR = { x: 0.5, y: 0.5 };
+
+function markerColor(index: number, lastIndex: number) {
+  if (index === 0) {
+    return '#FF9175';
+  }
+  return index === lastIndex ? Teumta.greenDark : Teumta.green;
+}
+
+export function CourseMapView({ detour, showsUserLocation }: CourseMapViewProps) {
   const coordinates = detour?.coordinates ?? [];
-  const firstCoordinate = coordinates[0] ?? { latitude: 37.5796, longitude: 126.977 };
+  const latitudes = coordinates.map((coordinate) => coordinate.latitude);
+  const longitudes = coordinates.map((coordinate) => coordinate.longitude);
+  const region =
+    coordinates.length > 0
+      ? {
+          latitude: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+          longitude: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+          latitudeDelta: Math.max((Math.max(...latitudes) - Math.min(...latitudes)) * 1.8, 0.01),
+          longitudeDelta: Math.max((Math.max(...longitudes) - Math.min(...longitudes)) * 1.8, 0.01),
+        }
+      : { latitude: 37.5796, longitude: 126.977, latitudeDelta: 0.01, longitudeDelta: 0.01 };
 
   return (
     <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        initialRegion={{
-          latitude: firstCoordinate.latitude,
-          longitude: firstCoordinate.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        }}>
+      <MapView style={styles.map} initialRegion={region} showsUserLocation={showsUserLocation}>
         {coordinates.map((coordinate, index) => (
           <Marker
             key={`${coordinate.latitude}-${coordinate.longitude}`}
             coordinate={coordinate}
-            title={index === 0 ? '출발' : index === coordinates.length - 1 ? '도착' : '경유'}
-          />
+            anchor={MARKER_ANCHOR}
+            title={
+              detour?.stops?.[index] ??
+              (index === 0 ? '출발' : index === coordinates.length - 1 ? '도착' : '경유')
+            }>
+            <View
+              style={[
+                styles.markerDot,
+                { backgroundColor: markerColor(index, coordinates.length - 1) },
+              ]}
+            />
+          </Marker>
         ))}
-        <Polyline coordinates={coordinates} strokeColor="#1f7a68" strokeWidth={5} />
+        <Polyline
+          coordinates={coordinates}
+          strokeColor={Teumta.green}
+          strokeWidth={5}
+          lineCap="round"
+          lineDashPattern={[0, 12]}
+        />
       </MapView>
-      <View style={styles.overlay}>
-        <Text style={styles.title}>{detour?.name}</Text>
-        <Text style={styles.description}>{detour?.description}</Text>
-      </View>
     </View>
   );
 }
@@ -49,23 +76,11 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  overlay: {
-    backgroundColor: '#ffffff',
+  markerDot: {
+    borderColor: Teumta.surface,
     borderRadius: 8,
-    bottom: 24,
-    left: 20,
-    padding: 16,
-    position: 'absolute',
-    right: 20,
-  },
-  title: {
-    color: '#121417',
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  description: {
-    color: '#4a5563',
-    fontSize: 15,
-    lineHeight: 22,
+    borderWidth: 3,
+    height: 16,
+    width: 16,
   },
 });

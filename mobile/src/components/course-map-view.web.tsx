@@ -4,6 +4,8 @@ import type { DetourCourse } from '@/types/place';
 
 type CourseMapViewProps = {
   detour?: DetourCourse;
+  /** 네이티브 전용 옵션 — 웹 폴백에서는 사용하지 않는다. */
+  showsUserLocation?: boolean;
 };
 
 export function CourseMapView({ detour }: CourseMapViewProps) {
