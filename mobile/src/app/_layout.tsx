@@ -1,5 +1,6 @@
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
 
 import { Teumta } from '@/constants/theme';
 import { BookmarksProvider } from '@/hooks/use-bookmarks';
@@ -8,6 +9,10 @@ SplashScreen.preventAutoHideAsync();
 
 // 디자인이 라이트 모드 전용이라 앱 전체를 라이트로 고정한다(app.json userInterfaceStyle 참고).
 export default function RootLayout() {
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
   return (
     <ThemeProvider value={DefaultTheme}>
       <BookmarksProvider>
