@@ -5,9 +5,10 @@ import {
   DEFAULT_RADIUS_METERS,
   MAX_RADIUS_METERS,
   getNearbyLocalPlacesByContentId,
+  getNearbyLocalPlacesByPoiId,
   getNearbyLocalPlacesRealtime,
 } from '../services/nearby-local-place.service';
-import { searchTourPlaces } from '../services/place-search.service';
+import { searchDestinations } from '../services/place-search.service';
 import {
   createPlace,
   findMissingTagIds,
@@ -92,7 +93,7 @@ export const searchPlacesController: RequestHandler = async (req, res, next) => 
       return;
     }
 
-    const results = await searchTourPlaces({ keyword: keyword.trim(), pageNo });
+    const results = await searchDestinations({ keyword: keyword.trim(), pageNo });
 
     res.status(200).json({
       success: true,
@@ -104,7 +105,11 @@ export const searchPlacesController: RequestHandler = async (req, res, next) => 
   }
 };
 
-/** 사용자가 검색으로 고른 목적지(contentId) 기준 주변 로컬 장소 조회. */
+/**
+ * 사용자가 검색으로 고른 목적지 기준 주변 로컬 장소 조회.
+ * 식별자는 contentId(TourAPI) 또는 poiId(TMAP) 중 정확히 하나.
+ * 좌표는 API 입력으로 받지 않는다(privacy 정책 — 서버가 식별자로 해석).
+ */
 export const getNearbyLocalPlacesByContentIdController: RequestHandler = async (
   req,
   res,
@@ -112,13 +117,16 @@ export const getNearbyLocalPlacesByContentIdController: RequestHandler = async (
 ) => {
   try {
     const contentId = req.query.contentId;
+    const poiId = req.query.poiId;
+    const hasContentId = typeof contentId === 'string' && contentId.trim().length > 0;
+    const hasPoiId = typeof poiId === 'string' && poiId.trim().length > 0;
 
-    if (typeof contentId !== 'string' || contentId.trim().length === 0) {
+    if (hasContentId === hasPoiId) {
       res.status(400).json({
         success: false,
         data: null,
         error: {
-          message: 'contentId는 비어 있지 않은 문자열이어야 합니다.',
+          message: 'contentId 또는 poiId 중 정확히 하나를 전달해야 합니다.',
         },
       });
       return;
@@ -143,7 +151,9 @@ export const getNearbyLocalPlacesByContentIdController: RequestHandler = async (
       return;
     }
 
-    const result = await getNearbyLocalPlacesByContentId(contentId.trim(), radius);
+    const result = hasContentId
+      ? await getNearbyLocalPlacesByContentId((contentId as string).trim(), radius)
+      : await getNearbyLocalPlacesByPoiId((poiId as string).trim(), radius);
 
     if (result.status !== 'SUCCESS') {
       res.status(404).json({

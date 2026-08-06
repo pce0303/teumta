@@ -6,12 +6,17 @@ import type { Request, Response } from 'express';
  * 서비스 계층은 mock — 외부 API/DB에 닿지 않는다.
  */
 
-const { getNearbyLocalPlacesRealtimeMock, getNearbyLocalPlacesByContentIdMock, searchTourPlacesMock } =
-  vi.hoisted(() => ({
-    getNearbyLocalPlacesRealtimeMock: vi.fn(),
-    getNearbyLocalPlacesByContentIdMock: vi.fn(),
-    searchTourPlacesMock: vi.fn(),
-  }));
+const {
+  getNearbyLocalPlacesRealtimeMock,
+  getNearbyLocalPlacesByContentIdMock,
+  getNearbyLocalPlacesByPoiIdMock,
+  searchDestinationsMock,
+} = vi.hoisted(() => ({
+  getNearbyLocalPlacesRealtimeMock: vi.fn(),
+  getNearbyLocalPlacesByContentIdMock: vi.fn(),
+  getNearbyLocalPlacesByPoiIdMock: vi.fn(),
+  searchDestinationsMock: vi.fn(),
+}));
 
 vi.mock('../services/nearby-local-place.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/nearby-local-place.service')>();
@@ -19,11 +24,12 @@ vi.mock('../services/nearby-local-place.service', async (importOriginal) => {
     ...actual,
     getNearbyLocalPlacesRealtime: getNearbyLocalPlacesRealtimeMock,
     getNearbyLocalPlacesByContentId: getNearbyLocalPlacesByContentIdMock,
+    getNearbyLocalPlacesByPoiId: getNearbyLocalPlacesByPoiIdMock,
   };
 });
 
 vi.mock('../services/place-search.service', () => ({
-  searchTourPlaces: searchTourPlacesMock,
+  searchDestinations: searchDestinationsMock,
 }));
 
 // place.service는 컨트롤러 모듈이 import하지만 이 테스트에서는 DB에 닿지 않도록 mock 한다.
@@ -84,8 +90,10 @@ beforeEach(() => {
   getNearbyLocalPlacesRealtimeMock.mockResolvedValue({ status: 'SUCCESS', places: [] });
   getNearbyLocalPlacesByContentIdMock.mockReset();
   getNearbyLocalPlacesByContentIdMock.mockResolvedValue({ status: 'SUCCESS', places: [] });
-  searchTourPlacesMock.mockReset();
-  searchTourPlacesMock.mockResolvedValue([]);
+  getNearbyLocalPlacesByPoiIdMock.mockReset();
+  getNearbyLocalPlacesByPoiIdMock.mockResolvedValue({ status: 'SUCCESS', places: [] });
+  searchDestinationsMock.mockReset();
+  searchDestinationsMock.mockResolvedValue([]);
 });
 
 function makeQueryReq(query: Record<string, string>): Request {
@@ -191,12 +199,14 @@ describe('searchPlacesController — 목적지 검색', () => {
       const { res } = await runController(searchPlacesController, makeQueryReq(query as never));
       expect(res.statusCode).toBe(400);
     }
-    expect(searchTourPlacesMock).not.toHaveBeenCalled();
+    expect(searchDestinationsMock).not.toHaveBeenCalled();
   });
 
   it('정상 검색 시 결과를 봉투에 담아 반환한다', async () => {
     const item = {
+      source: 'TOUR',
       tourApiContentId: '126508',
+      tmapPoiId: null,
       contentTypeId: '12',
       name: '경복궁',
       address: '서울 종로구',
@@ -204,18 +214,35 @@ describe('searchPlacesController — 목적지 검색', () => {
       longitude: 126.977,
       imageUrl: null,
     };
-    searchTourPlacesMock.mockResolvedValue([item]);
+    searchDestinationsMock.mockResolvedValue([item]);
     const { res } = await runController(searchPlacesController, makeQueryReq({ keyword: '경복궁' }));
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ success: true, data: [item], error: null });
-    expect(searchTourPlacesMock).toHaveBeenCalledWith({ keyword: '경복궁', pageNo: 1 });
+    expect(searchDestinationsMock).toHaveBeenCalledWith({ keyword: '경복궁', pageNo: 1 });
   });
 });
 
 describe('getNearbyLocalPlacesByContentIdController — 목적지 기반 추천', () => {
-  it('contentId 없으면 400', async () => {
-    const { res } = await runController(getNearbyLocalPlacesByContentIdController, makeQueryReq({}));
-    expect(res.statusCode).toBe(400);
+  it('contentId/poiId 둘 다 없거나 둘 다 있으면 400', async () => {
+    const invalidQueries: Record<string, string>[] = [{}, { contentId: '126508', poiId: '362105' }];
+    for (const query of invalidQueries) {
+      const { res } = await runController(
+        getNearbyLocalPlacesByContentIdController,
+        makeQueryReq(query),
+      );
+      expect(res.statusCode).toBe(400);
+    }
+    expect(getNearbyLocalPlacesByContentIdMock).not.toHaveBeenCalled();
+    expect(getNearbyLocalPlacesByPoiIdMock).not.toHaveBeenCalled();
+  });
+
+  it('poiId 전달 시 POI 기반 서비스로 위임한다', async () => {
+    const { res } = await runController(
+      getNearbyLocalPlacesByContentIdController,
+      makeQueryReq({ poiId: '10817049' }),
+    );
+    expect(res.statusCode).toBe(200);
+    expect(getNearbyLocalPlacesByPoiIdMock).toHaveBeenCalledWith('10817049', 2000);
     expect(getNearbyLocalPlacesByContentIdMock).not.toHaveBeenCalled();
   });
 

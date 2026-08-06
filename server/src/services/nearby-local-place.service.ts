@@ -2,7 +2,12 @@ import { PlaceType } from '@prisma/client';
 
 import type { NearbyLocalPlaceCandidate, NearbyLocalPlaceDto } from '../dtos';
 import { ExternalApiError } from '../external/common';
-import { extractRouteTotals, fetchPedestrianRoute } from '../external/tmap';
+import {
+  extractPoiBase,
+  extractRouteTotals,
+  fetchPedestrianRoute,
+  fetchPoiDetail,
+} from '../external/tmap';
 import {
   extractDetailCoordinate,
   extractDetailItem,
@@ -51,6 +56,25 @@ export async function getNearbyLocalPlacesByContentId(
   const name = extractDetailItem(detail)?.title ?? '목적지';
 
   const places = await findNearbyLocalPlaces({ ...coordinate, name, contentId }, radiusMeters);
+  return { status: 'SUCCESS', places };
+}
+
+/**
+ * TMAP POI 목적지(poiId) 기준 주변 로컬 장소 조회. 좌표는 서버가 POI 상세로 해석한다
+ * (privacy: 좌표를 API 입력으로 받지 않는다 — docs/location-privacy.md).
+ */
+export async function getNearbyLocalPlacesByPoiId(
+  poiId: string,
+  radiusMeters: number = DEFAULT_RADIUS_METERS,
+): Promise<NearbyLocalPlacesResult> {
+  const detail = await fetchPoiDetail(poiId);
+  const base = extractPoiBase(detail);
+  if (!base) {
+    return { status: 'NOT_FOUND' };
+  }
+
+  // TMAP POI 목적지는 TourAPI contentId가 없어 자기 자신 제외 키가 없다('' = 제외 없음).
+  const places = await findNearbyLocalPlaces({ ...base, contentId: '' }, radiusMeters);
   return { status: 'SUCCESS', places };
 }
 

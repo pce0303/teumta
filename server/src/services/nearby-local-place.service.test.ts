@@ -10,21 +10,27 @@ import type { TmapRouteResponse } from '../external/tmap/tmap.dto';
  * 매퍼(mapNearbyCandidateList/extractRouteTotals 등)는 실제 구현을 사용해 통합 검증한다.
  */
 
-const { prismaMock, fetchTourPlaceDetailMock, fetchTourPlacesByLocationMock, fetchPedestrianRouteMock } =
-  vi.hoisted(() => ({
-    prismaMock: {
-      place: {
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        upsert: vi.fn(),
-      },
+const {
+  prismaMock,
+  fetchTourPlaceDetailMock,
+  fetchTourPlacesByLocationMock,
+  fetchPedestrianRouteMock,
+  fetchPoiDetailMock,
+} = vi.hoisted(() => ({
+  prismaMock: {
+    place: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      upsert: vi.fn(),
     },
-    fetchTourPlaceDetailMock: vi.fn(),
-    fetchTourPlacesByLocationMock: vi.fn(),
-    fetchPedestrianRouteMock: vi.fn(),
-  }));
+  },
+  fetchTourPlaceDetailMock: vi.fn(),
+  fetchTourPlacesByLocationMock: vi.fn(),
+  fetchPedestrianRouteMock: vi.fn(),
+  fetchPoiDetailMock: vi.fn(),
+}));
 
 vi.mock('../utils/prisma', () => ({ prisma: prismaMock }));
 
@@ -42,6 +48,7 @@ vi.mock('../external/tmap', async (importOriginal) => {
   return {
     ...actual,
     fetchPedestrianRoute: fetchPedestrianRouteMock,
+    fetchPoiDetail: fetchPoiDetailMock,
   };
 });
 
@@ -49,6 +56,7 @@ import { ExternalApiError } from '../external/common/external-api.error';
 import { resolveErrorResponse } from '../middlewares/error.middleware';
 import {
   getNearbyLocalPlacesByContentId,
+  getNearbyLocalPlacesByPoiId,
   getNearbyLocalPlacesRealtime,
   mapWithConcurrency,
   selectClosestCandidates,
@@ -385,6 +393,32 @@ describe('getNearbyLocalPlacesByContentId — 검색으로 고른 목적지 기�
       expect(result.places).toEqual([]);
     }
     expect(fetchPedestrianRouteMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('getNearbyLocalPlacesByPoiId — TMAP POI 목적지 기준', () => {
+  const poiDetail = (lat: string, lon: string) => ({
+    poiDetailInfo: { id: '10817049', name: '스타벅스 광화문점', lat, lon },
+  });
+
+  it('POI 상세 좌표를 기준으로 후보를 찾는다(DB 미사용)', async () => {
+    fetchPoiDetailMock.mockResolvedValue(poiDetail('37.57125916', '126.97629887'));
+    fetchTourPlacesByLocationMock
+      .mockResolvedValueOnce(listResponse([listItem()]))
+      .mockResolvedValue(listResponse([]));
+
+    const result = await getNearbyLocalPlacesByPoiId('10817049');
+    expect(result.status).toBe('SUCCESS');
+    expect(fetchTourPlacesByLocationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ mapX: 126.97629887, mapY: 37.57125916 }),
+    );
+    expect(prismaMock.place.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('POI 좌표가 없으면 NOT_FOUND', async () => {
+    fetchPoiDetailMock.mockResolvedValue({ poiDetailInfo: { id: 'x', name: 'x' } });
+    expect((await getNearbyLocalPlacesByPoiId('x')).status).toBe('NOT_FOUND');
+    expect(fetchTourPlacesByLocationMock).not.toHaveBeenCalled();
   });
 });
 

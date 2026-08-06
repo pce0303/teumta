@@ -1,6 +1,6 @@
 import { PlaceType } from '@prisma/client';
 
-import type { NearbyLocalPlaceCandidate, PlaceData, TourPlaceSearchResult } from '../../dtos';
+import type { DestinationSearchResult, NearbyLocalPlaceCandidate, PlaceData } from '../../dtos';
 import { ExternalApiResponseError } from '../common';
 import type {
   TourApiDetailItem,
@@ -132,9 +132,11 @@ export function mapNearbyCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCand
 }
 
 /** searchKeyword2 목록 → 검색 결과[]. 좌표 없는 항목도 목록에는 포함(null 좌표). */
-export function mapSearchResultList(response: TourApiListResponse): TourPlaceSearchResult[] {
+export function mapSearchResultList(response: TourApiListResponse): DestinationSearchResult[] {
   return extractItems(response).map((item) => ({
+    source: 'TOUR' as const,
     tourApiContentId: String(item.contentid),
+    tmapPoiId: null,
     contentTypeId: String(item.contenttypeid),
     name: item.title,
     address: buildAddress(item.addr1, item.addr2),

@@ -187,8 +187,10 @@ GET /api/places/:placeId
 ```
 GET /api/search/places?keyword=경복궁&pageNo=1
 ```
-사용자가 목적지를 직접 검색하는 흐름의 진입점(TourAPI `searchKeyword2`, 관광지 12 기본, DB 미저장).
-응답 항목의 `tourApiContentId`가 이후 주변 추천의 목적지 식별자다.
+사용자가 목적지를 직접 검색하는 흐름의 진입점(DB 미저장).
+**TourAPI(`searchKeyword2`, 관광지) 우선 → 결과 없으면 TMAP 장소 통합 검색(전국 POI) 폴백** —
+등록 관광지가 아닌 일반 상점·건물도 검색된다. 폴백 구조라 검색 1회당 외부 호출 1~2건.
+응답 항목의 `source`에 따라 `tourApiContentId`(TOUR) 또는 `tmapPoiId`(TMAP)가 목적지 식별자다.
 ```jsonc
 {
   "success": true,
@@ -210,11 +212,14 @@ GET /api/search/places?keyword=경복궁&pageNo=1
 
 ### 3.3b 주변 로컬 장소 조회 — [B] (실시간 외부 API)
 
-**목적지 기반(권장, 검색 흐름):** 사용자가 검색으로 고른 목적지의 contentId 기준. DB 불필요.
+**목적지 기반(권장, 검색 흐름):** 사용자가 검색으로 고른 목적지 기준. DB 불필요.
 ```
-GET /api/local-places?contentId=126508&radius=2000
+GET /api/local-places?contentId=126508&radius=2000   # TourAPI 목적지
+GET /api/local-places?poiId=10817049&radius=2000     # TMAP POI 목적지
 ```
-- `400` — contentId 누락, radius 범위 밖. `404` — contentId 상세 조회 결과 없음/좌표 없음.
+- `contentId`/`poiId` 중 **정확히 하나**만 전달(둘 다/둘 다 없음 → 400).
+- **좌표는 API 입력으로 받지 않는다**(location-privacy 정책) — 서버가 식별자를 좌표로 해석.
+- `400` — 식별자 규칙 위반, radius 범위 밖. `404` — 상세 조회 결과 없음/좌표 없음.
 - 응답 형태·동작·실패 정책은 아래와 동일.
 
 **내부 Place 기반(기존):**

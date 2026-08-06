@@ -50,11 +50,13 @@ export interface NearbyLocalPlaceCandidate {
 
 /**
  * 목적지 검색 결과 항목(요청 스코프 전용, DB 미저장).
- * 검색 기반 흐름에서는 contentId가 목적지 식별자이므로 응답에 노출한다.
+ * source에 따라 tourApiContentId 또는 tmapPoiId가 목적지 식별자가 된다(응답에 노출).
  */
-export interface TourPlaceSearchResult {
-  tourApiContentId: string;
-  contentTypeId: string;
+export interface DestinationSearchResult {
+  source: 'TOUR' | 'TMAP';
+  tourApiContentId: string | null;
+  tmapPoiId: string | null;
+  contentTypeId: string | null;
   name: string;
   address: string | null;
   latitude: number | null;
