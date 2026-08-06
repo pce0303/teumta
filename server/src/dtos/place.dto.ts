@@ -48,6 +48,20 @@ export interface NearbyLocalPlaceCandidate {
   tourDistanceMeters: number | null;
 }
 
+/**
+ * 목적지 검색 결과 항목(요청 스코프 전용, DB 미저장).
+ * 검색 기반 흐름에서는 contentId가 목적지 식별자이므로 응답에 노출한다.
+ */
+export interface TourPlaceSearchResult {
+  tourApiContentId: string;
+  contentTypeId: string;
+  name: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  imageUrl: string | null;
+}
+
 /** 주변 로컬 장소 응답 항목. distanceMeters는 직선거리가 아닌 TMAP 실제 보행거리. */
 export interface NearbyLocalPlaceDto {
   name: string;

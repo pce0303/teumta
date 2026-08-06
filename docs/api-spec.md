@@ -183,7 +183,41 @@ GET /api/places/:placeId
 
 ---
 
+### 3.3a 목적지 검색 — [B] (실시간 TourAPI)
+```
+GET /api/search/places?keyword=경복궁&pageNo=1
+```
+사용자가 목적지를 직접 검색하는 흐름의 진입점(TourAPI `searchKeyword2`, 관광지 12 기본, DB 미저장).
+응답 항목의 `tourApiContentId`가 이후 주변 추천의 목적지 식별자다.
+```jsonc
+{
+  "success": true,
+  "data": [
+    {
+      "tourApiContentId": "126508",
+      "contentTypeId": "12",
+      "name": "경복궁",
+      "address": "서울특별시 종로구 사직로 161 (세종로)",
+      "latitude": 37.5760307,     // 없으면 null
+      "longitude": 126.9767218,
+      "imageUrl": "https://..."
+    }
+  ],
+  "error": null
+}
+```
+- `400` — keyword 누락/공백, pageNo가 양의 정수 아님.
+
 ### 3.3b 주변 로컬 장소 조회 — [B] (실시간 외부 API)
+
+**목적지 기반(권장, 검색 흐름):** 사용자가 검색으로 고른 목적지의 contentId 기준. DB 불필요.
+```
+GET /api/local-places?contentId=126508&radius=2000
+```
+- `400` — contentId 누락, radius 범위 밖. `404` — contentId 상세 조회 결과 없음/좌표 없음.
+- 응답 형태·동작·실패 정책은 아래와 동일.
+
+**내부 Place 기반(기존):**
 ```
 GET /api/places/:id/local-places?radius=2000
 ```

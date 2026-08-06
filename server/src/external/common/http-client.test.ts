@@ -6,7 +6,12 @@ import {
   ExternalApiResponseError,
 } from './external-api.error';
 import { requestJson } from './http-client';
-import { normalizeResultCode, normalizeServiceKey, parsePublicDataXmlError } from './public-data';
+import {
+  extractPublicDataHeader,
+  normalizeResultCode,
+  normalizeServiceKey,
+  parsePublicDataXmlError,
+} from './public-data';
 
 /**
  * 공통 HTTP 클라이언트 테스트. 실제 네트워크·실제 키를 쓰지 않는다.
@@ -118,6 +123,29 @@ describe('parsePublicDataXmlError', () => {
 
   it('코드가 없으면 null', () => {
     expect(parsePublicDataXmlError('<html>oops</html>')).toBeNull();
+  });
+});
+
+describe('extractPublicDataHeader', () => {
+  it('중첩 봉투(response.header)에서 추출한다', () => {
+    expect(
+      extractPublicDataHeader({ response: { header: { resultCode: '0000', resultMsg: 'OK' } } }),
+    ).toEqual({ resultCode: '0000', resultMsg: 'OK' });
+  });
+
+  it('flat 봉투({resultCode, resultMsg})도 추출한다(파라미터 오류 실응답 형태)', () => {
+    expect(
+      extractPublicDataHeader({
+        responseTime: '2026-08-06T13:53:37.698',
+        resultCode: '10',
+        resultMsg: 'INVALID_REQUEST_PARAMETER_ERROR(defaultYN)',
+      }),
+    ).toEqual({ resultCode: '10', resultMsg: 'INVALID_REQUEST_PARAMETER_ERROR(defaultYN)' });
+  });
+
+  it('헤더가 없으면 null', () => {
+    expect(extractPublicDataHeader({ foo: 1 })).toBeNull();
+    expect(extractPublicDataHeader(null)).toBeNull();
   });
 });
 

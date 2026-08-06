@@ -2,6 +2,7 @@ import {
   classifyPublicDataResultCode,
   ExternalApiError,
   externalConfig,
+  extractPublicDataHeader,
   normalizeResultCode,
   normalizeServiceKey,
   requestJson,
@@ -72,7 +73,7 @@ export function buildForecastQuery(params: ConcentrationForecastParams): Record<
 export function normalizeForecastResponse(
   response: ConcentrationForecastListResponse,
 ): ConcentrationForecastListResponse {
-  const header = response.response?.header;
+  const header = extractPublicDataHeader(response);
   const rawCode = header?.resultCode ?? 'UNKNOWN';
   const code = normalizeResultCode(rawCode);
 

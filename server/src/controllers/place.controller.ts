@@ -4,8 +4,10 @@ import { PlaceType } from '@prisma/client';
 import {
   DEFAULT_RADIUS_METERS,
   MAX_RADIUS_METERS,
+  getNearbyLocalPlacesByContentId,
   getNearbyLocalPlacesRealtime,
 } from '../services/nearby-local-place.service';
+import { searchTourPlaces } from '../services/place-search.service';
 import {
   createPlace,
   findMissingTagIds,
@@ -55,6 +57,108 @@ export const getPlacesController: RequestHandler = async (
     res.status(200).json({
       success: true,
       data: places,
+      error: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 목적지 검색(실시간 TourAPI). 검색 결과의 tourApiContentId가 이후 추천의 기준이 된다. */
+export const searchPlacesController: RequestHandler = async (req, res, next) => {
+  try {
+    const keyword = req.query.keyword;
+
+    if (typeof keyword !== 'string' || keyword.trim().length === 0) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'keyword는 비어 있지 않은 문자열이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const pageNo = req.query.pageNo === undefined ? 1 : Number(req.query.pageNo);
+    if (!Number.isInteger(pageNo) || pageNo <= 0) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'pageNo는 양의 정수여야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const results = await searchTourPlaces({ keyword: keyword.trim(), pageNo });
+
+    res.status(200).json({
+      success: true,
+      data: results,
+      error: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 사용자가 검색으로 고른 목적지(contentId) 기준 주변 로컬 장소 조회. */
+export const getNearbyLocalPlacesByContentIdController: RequestHandler = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const contentId = req.query.contentId;
+
+    if (typeof contentId !== 'string' || contentId.trim().length === 0) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'contentId는 비어 있지 않은 문자열이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const radius =
+      req.query.radius === undefined ? DEFAULT_RADIUS_METERS : Number(req.query.radius);
+
+    if (
+      !Number.isFinite(radius) ||
+      !Number.isInteger(radius) ||
+      radius <= 0 ||
+      radius > MAX_RADIUS_METERS
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: `radius는 1 이상 ${MAX_RADIUS_METERS} 이하의 정수여야 합니다.`,
+        },
+      });
+      return;
+    }
+
+    const result = await getNearbyLocalPlacesByContentId(contentId.trim(), radius);
+
+    if (result.status !== 'SUCCESS') {
+      res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          message: '목적지를 찾을 수 없습니다.',
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result.places,
       error: null,
     });
   } catch (error) {

@@ -48,6 +48,7 @@ vi.mock('../external/tmap', async (importOriginal) => {
 import { ExternalApiError } from '../external/common/external-api.error';
 import { resolveErrorResponse } from '../middlewares/error.middleware';
 import {
+  getNearbyLocalPlacesByContentId,
   getNearbyLocalPlacesRealtime,
   mapWithConcurrency,
   selectClosestCandidates,
@@ -342,6 +343,48 @@ describe('getNearbyLocalPlacesRealtime — TMAP 거리/정렬', () => {
     await expect(getNearbyLocalPlacesRealtime(1)).rejects.toMatchObject({
       code: 'EXTERNAL_API_UNAVAILABLE',
     });
+  });
+});
+
+describe('getNearbyLocalPlacesByContentId — 검색으로 고른 목적지 기준', () => {
+  it('detailCommon2 실시간 좌표를 기준으로 후보를 찾는다(DB 미사용)', async () => {
+    fetchTourPlaceDetailMock.mockResolvedValue(detailResponse('127.1000', '37.6100'));
+    fetchTourPlacesByLocationMock
+      .mockResolvedValueOnce(listResponse([listItem()]))
+      .mockResolvedValue(listResponse([]));
+
+    const result = await getNearbyLocalPlacesByContentId('126508');
+    expect(result.status).toBe('SUCCESS');
+    expect(fetchTourPlacesByLocationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ mapX: 127.1, mapY: 37.61 }),
+    );
+    expect(prismaMock.place.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('상세 좌표가 없으면 NOT_FOUND', async () => {
+    fetchTourPlaceDetailMock.mockResolvedValue(detailResponse('', ''));
+    expect((await getNearbyLocalPlacesByContentId('999999')).status).toBe('NOT_FOUND');
+    expect(fetchTourPlacesByLocationMock).not.toHaveBeenCalled();
+  });
+
+  it('상세 조회 실패는 오류로 전파된다(fallback 좌표 없음)', async () => {
+    fetchTourPlaceDetailMock.mockRejectedValue(new ExternalApiError('tour', 'boom'));
+    await expect(getNearbyLocalPlacesByContentId('126508')).rejects.toBeInstanceOf(
+      ExternalApiError,
+    );
+  });
+
+  it('기준 목적지 자신(contentid 동일)은 결과에서 제외한다', async () => {
+    fetchTourPlaceDetailMock.mockResolvedValue(detailResponse('126.9770', '37.5788'));
+    fetchTourPlacesByLocationMock
+      .mockResolvedValueOnce(listResponse([listItem({ contentid: '126508' })]))
+      .mockResolvedValue(listResponse([]));
+
+    const result = await getNearbyLocalPlacesByContentId('126508');
+    if (result.status === 'SUCCESS') {
+      expect(result.places).toEqual([]);
+    }
+    expect(fetchPedestrianRouteMock).not.toHaveBeenCalled();
   });
 });
 

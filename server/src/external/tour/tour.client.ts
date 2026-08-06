@@ -2,6 +2,7 @@ import {
   classifyPublicDataResultCode,
   ExternalApiError,
   externalConfig,
+  extractPublicDataHeader,
   normalizeServiceKey,
   requestJson,
 } from '../common';
@@ -129,6 +130,41 @@ function assertValidRadius(radius: number): void {
   }
 }
 
+/** 키워드 검색(searchKeyword2) 파라미터. */
+export interface TourKeywordSearchParams {
+  keyword: string;
+  contentTypeId?: string | number;
+  lDongRegnCd?: string | number;
+  lDongSignguCd?: string | number;
+  pageNo?: number;
+  numOfRows?: number;
+  arrange?: string;
+}
+
+/** searchKeyword2 요청 쿼리(공통 파라미터 제외). 순수 함수. keyword 비면 즉시 입력 오류. */
+export function buildKeywordSearchQuery(params: TourKeywordSearchParams): Record<string, string> {
+  const keyword = params.keyword.trim();
+  if (keyword.length === 0) {
+    throw new ExternalApiError(SERVICE, 'keyword is required', { code: 'INVALID_PARAM' });
+  }
+  return {
+    keyword,
+    ...optionalParam('contentTypeId', params.contentTypeId),
+    ...optionalParam('lDongRegnCd', params.lDongRegnCd),
+    ...optionalParam('lDongSignguCd', params.lDongSignguCd),
+    numOfRows: String(params.numOfRows ?? 20),
+    pageNo: String(params.pageNo ?? 1),
+    arrange: params.arrange ?? 'O',
+  };
+}
+
+/** 키워드 검색(searchKeyword2). 사용자가 목적지를 직접 검색하는 흐름의 진입점. */
+export async function fetchTourPlacesByKeyword(
+  params: TourKeywordSearchParams,
+): Promise<TourApiListResponse> {
+  return requestTourList(buildTourUrl('searchKeyword2', buildKeywordSearchQuery(params)));
+}
+
 /** 공통정보 조회(detailCommon2). 기준 관광지의 현재 좌표를 실시간으로 얻는다. */
 export async function fetchTourPlaceDetail(
   contentId: string | number,
@@ -137,11 +173,8 @@ export async function fetchTourPlaceDetail(
   if (trimmed.length === 0) {
     throw new ExternalApiError(SERVICE, 'contentId is required', { code: 'INVALID_PARAM' });
   }
-  const url = buildTourUrl('detailCommon2', {
-    contentId: trimmed,
-    defaultYN: 'Y',
-    mapinfoYN: 'Y',
-  });
+  // v4.4에서 defaultYN/mapinfoYN 등 플래그는 폐지됨(전달 시 resultCode 10).
+  const url = buildTourUrl('detailCommon2', { contentId: trimmed });
   const response = await requestJson<TourApiDetailResponse>({ service: SERVICE, url });
   assertTourApiOk(response);
   return response;
@@ -180,15 +213,17 @@ function buildTourUrl(operation: string, params: Record<string, string>): string
   return url.toString();
 }
 
-/** TourAPI는 HTTP 200이어도 header.resultCode로 논리 오류를 알린다. 정상 코드는 '0000'. */
+/** TourAPI는 HTTP 200이어도 resultCode로 논리 오류를 알린다(중첩/flat 봉투 모두). 정상은 '0000'. */
 function assertTourApiOk(response: TourApiListResponse | TourApiDetailResponse): void {
-  const header = response.response?.header;
-  const code = header?.resultCode;
-
-  if (code === '0000') {
+  const header = extractPublicDataHeader(response);
+  if (header?.resultCode === '0000') {
     return;
   }
-  throw classifyPublicDataResultCode(SERVICE, code ?? 'UNKNOWN', header?.resultMsg ?? 'Unknown error');
+  throw classifyPublicDataResultCode(
+    SERVICE,
+    header?.resultCode ?? 'UNKNOWN',
+    header?.resultMsg ?? 'Unknown error',
+  );
 }
 
 function optionalParam(key: string, value: string | number | undefined): Record<string, string> {

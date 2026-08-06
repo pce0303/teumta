@@ -28,6 +28,27 @@ const AUTH_RESULT_CODES = new Set(['20', '21', '30', '31', '32', '33']);
 const RATE_LIMIT_RESULT_CODE = '22';
 
 /**
+ * 응답에서 결과 헤더를 추출한다. 정상/일부 오류는 response.header에 오지만,
+ * 파라미터 오류 등은 최상위 {resultCode, resultMsg} flat 형태로 온다(실응답 확인).
+ */
+export function extractPublicDataHeader(payload: unknown): PublicDataResponseHeader | null {
+  if (typeof payload !== 'object' || payload === null) {
+    return null;
+  }
+  const root = payload as Record<string, unknown>;
+  const nested = (root.response as Record<string, unknown> | undefined)?.header as
+    | PublicDataResponseHeader
+    | undefined;
+  if (nested?.resultCode !== undefined) {
+    return { resultCode: String(nested.resultCode), resultMsg: String(nested.resultMsg ?? '') };
+  }
+  if (root.resultCode !== undefined) {
+    return { resultCode: String(root.resultCode), resultMsg: String(root.resultMsg ?? '') };
+  }
+  return null;
+}
+
+/**
  * serviceKey 정규화. 포털의 Encoding 키(%2B 등 포함)는 한 번 디코딩해 원본으로 만든다
  * (URLSearchParams가 다시 인코딩하므로 그대로 쓰면 이중 인코딩). Decoding 키는 그대로 통과.
  */

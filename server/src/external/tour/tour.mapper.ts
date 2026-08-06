@@ -1,6 +1,6 @@
 import { PlaceType } from '@prisma/client';
 
-import type { NearbyLocalPlaceCandidate, PlaceData } from '../../dtos';
+import type { NearbyLocalPlaceCandidate, PlaceData, TourPlaceSearchResult } from '../../dtos';
 import { ExternalApiResponseError } from '../common';
 import type {
   TourApiDetailItem,
@@ -129,6 +129,19 @@ export function mapNearbyCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCand
     imageUrl: item.firstimage || item.firstimage2 || null,
     tourDistanceMeters: Number.isFinite(tourDistance) ? tourDistance : null,
   };
+}
+
+/** searchKeyword2 목록 → 검색 결과[]. 좌표 없는 항목도 목록에는 포함(null 좌표). */
+export function mapSearchResultList(response: TourApiListResponse): TourPlaceSearchResult[] {
+  return extractItems(response).map((item) => ({
+    tourApiContentId: String(item.contentid),
+    contentTypeId: String(item.contenttypeid),
+    name: item.title,
+    address: buildAddress(item.addr1, item.addr2),
+    latitude: safeCoordinate(item.mapy),
+    longitude: safeCoordinate(item.mapx),
+    imageUrl: item.firstimage || item.firstimage2 || null,
+  }));
 }
 
 /** detailCommon2 응답의 상세 항목 추출(items="" / 단일 객체 방어). */

@@ -5,6 +5,7 @@ import { ExternalApiError } from '../external/common';
 import { extractRouteTotals, fetchPedestrianRoute } from '../external/tmap';
 import {
   extractDetailCoordinate,
+  extractDetailItem,
   fetchTourPlaceDetail,
   fetchTourPlacesByLocation,
   mapNearbyCandidateList,
@@ -34,7 +35,26 @@ export type NearbyLocalPlacesResult =
   | { status: 'NO_TOUR_CONTENT_ID' }
   | { status: 'SUCCESS'; places: NearbyLocalPlaceDto[] };
 
-/** 기준 관광지 주변 로컬 장소를 실시간 조회한다(DB 저장 없음). */
+/**
+ * 사용자가 검색으로 결정한 목적지(TourAPI contentId) 기준 주변 로컬 장소 조회.
+ * DB를 전혀 사용하지 않는다. contentId 상세 조회가 실패하거나 좌표가 없으면 NOT_FOUND.
+ */
+export async function getNearbyLocalPlacesByContentId(
+  contentId: string,
+  radiusMeters: number = DEFAULT_RADIUS_METERS,
+): Promise<NearbyLocalPlacesResult> {
+  const detail = await fetchTourPlaceDetail(contentId);
+  const coordinate = extractDetailCoordinate(detail);
+  if (!coordinate) {
+    return { status: 'NOT_FOUND' };
+  }
+  const name = extractDetailItem(detail)?.title ?? '목적지';
+
+  const places = await findNearbyLocalPlaces({ ...coordinate, name, contentId }, radiusMeters);
+  return { status: 'SUCCESS', places };
+}
+
+/** 내부 DB 관광지(Place id) 기준 주변 로컬 장소 조회. 기준 확인에만 DB를 읽는다. */
 export async function getNearbyLocalPlacesRealtime(
   touristSpotId: number,
   radiusMeters: number = DEFAULT_RADIUS_METERS,
@@ -66,18 +86,24 @@ export async function getNearbyLocalPlacesRealtime(
     longitude: Number(touristSpot.longitude),
   });
 
-  const candidates = await fetchNearbyCandidates(base, radiusMeters, touristSpot.tourApiContentId);
-  if (candidates.length === 0) {
-    return { status: 'SUCCESS', places: [] };
-  }
-
-  const selected = selectClosestCandidates(candidates, base, MAX_TOUR_CANDIDATES);
-  const places = await resolveWalkingDistances(
-    { ...base, name: touristSpot.name },
-    selected,
+  const places = await findNearbyLocalPlaces(
+    { ...base, name: touristSpot.name, contentId: touristSpot.tourApiContentId },
     radiusMeters,
   );
   return { status: 'SUCCESS', places };
+}
+
+/** 공용 코어: 기준 좌표 → 후보 수집 → 선별 → TMAP 보행거리 → 필터·정렬. */
+async function findNearbyLocalPlaces(
+  base: { latitude: number; longitude: number; name: string; contentId: string },
+  radiusMeters: number,
+): Promise<NearbyLocalPlaceDto[]> {
+  const candidates = await fetchNearbyCandidates(base, radiusMeters, base.contentId);
+  if (candidates.length === 0) {
+    return [];
+  }
+  const selected = selectClosestCandidates(candidates, base, MAX_TOUR_CANDIDATES);
+  return resolveWalkingDistances(base, selected, radiusMeters);
 }
 
 /** 기준 좌표는 detailCommon2 실시간 조회 우선, 실패·누락 시에만 DB 좌표 fallback. */

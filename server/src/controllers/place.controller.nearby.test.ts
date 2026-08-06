@@ -6,17 +6,25 @@ import type { Request, Response } from 'express';
  * 서비스 계층은 mock — 외부 API/DB에 닿지 않는다.
  */
 
-const { getNearbyLocalPlacesRealtimeMock } = vi.hoisted(() => ({
-  getNearbyLocalPlacesRealtimeMock: vi.fn(),
-}));
+const { getNearbyLocalPlacesRealtimeMock, getNearbyLocalPlacesByContentIdMock, searchTourPlacesMock } =
+  vi.hoisted(() => ({
+    getNearbyLocalPlacesRealtimeMock: vi.fn(),
+    getNearbyLocalPlacesByContentIdMock: vi.fn(),
+    searchTourPlacesMock: vi.fn(),
+  }));
 
 vi.mock('../services/nearby-local-place.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/nearby-local-place.service')>();
   return {
     ...actual,
     getNearbyLocalPlacesRealtime: getNearbyLocalPlacesRealtimeMock,
+    getNearbyLocalPlacesByContentId: getNearbyLocalPlacesByContentIdMock,
   };
 });
+
+vi.mock('../services/place-search.service', () => ({
+  searchTourPlaces: searchTourPlacesMock,
+}));
 
 // place.service는 컨트롤러 모듈이 import하지만 이 테스트에서는 DB에 닿지 않도록 mock 한다.
 vi.mock('../services/place.service', () => ({
@@ -28,7 +36,11 @@ vi.mock('../services/place.service', () => ({
 }));
 
 import { ExternalApiError } from '../external/common/external-api.error';
-import { getNearbyLocalPlacesController } from './place.controller';
+import {
+  getNearbyLocalPlacesByContentIdController,
+  getNearbyLocalPlacesController,
+  searchPlacesController,
+} from './place.controller';
 
 interface FakeResponse {
   statusCode: number;
@@ -70,7 +82,25 @@ async function run(req: Request) {
 beforeEach(() => {
   getNearbyLocalPlacesRealtimeMock.mockReset();
   getNearbyLocalPlacesRealtimeMock.mockResolvedValue({ status: 'SUCCESS', places: [] });
+  getNearbyLocalPlacesByContentIdMock.mockReset();
+  getNearbyLocalPlacesByContentIdMock.mockResolvedValue({ status: 'SUCCESS', places: [] });
+  searchTourPlacesMock.mockReset();
+  searchTourPlacesMock.mockResolvedValue([]);
 });
+
+function makeQueryReq(query: Record<string, string>): Request {
+  return { params: {}, query } as unknown as Request;
+}
+
+async function runController(
+  controller: typeof searchPlacesController,
+  req: Request,
+) {
+  const res = makeRes();
+  const next = vi.fn();
+  await controller(req, res as unknown as Response, next);
+  return { res, next };
+}
 
 describe('getNearbyLocalPlacesController — 입력 검증', () => {
   it('잘못된 장소 ID(문자열/0/음수)는 400', async () => {
@@ -152,5 +182,66 @@ describe('getNearbyLocalPlacesController — 서비스 결과 매핑', () => {
     const { res, next } = await run(makeReq('1'));
     expect(next).toHaveBeenCalledWith(error);
     expect(res.statusCode).toBe(0); // 컨트롤러가 직접 응답하지 않음
+  });
+});
+
+describe('searchPlacesController — 목적지 검색', () => {
+  it('keyword 없거나 공백이면 400', async () => {
+    for (const query of [{}, { keyword: '  ' }]) {
+      const { res } = await runController(searchPlacesController, makeQueryReq(query as never));
+      expect(res.statusCode).toBe(400);
+    }
+    expect(searchTourPlacesMock).not.toHaveBeenCalled();
+  });
+
+  it('정상 검색 시 결과를 봉투에 담아 반환한다', async () => {
+    const item = {
+      tourApiContentId: '126508',
+      contentTypeId: '12',
+      name: '경복궁',
+      address: '서울 종로구',
+      latitude: 37.5788,
+      longitude: 126.977,
+      imageUrl: null,
+    };
+    searchTourPlacesMock.mockResolvedValue([item]);
+    const { res } = await runController(searchPlacesController, makeQueryReq({ keyword: '경복궁' }));
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ success: true, data: [item], error: null });
+    expect(searchTourPlacesMock).toHaveBeenCalledWith({ keyword: '경복궁', pageNo: 1 });
+  });
+});
+
+describe('getNearbyLocalPlacesByContentIdController — 목적지 기반 추천', () => {
+  it('contentId 없으면 400', async () => {
+    const { res } = await runController(getNearbyLocalPlacesByContentIdController, makeQueryReq({}));
+    expect(res.statusCode).toBe(400);
+    expect(getNearbyLocalPlacesByContentIdMock).not.toHaveBeenCalled();
+  });
+
+  it('radius 범위 초과는 400', async () => {
+    const { res } = await runController(
+      getNearbyLocalPlacesByContentIdController,
+      makeQueryReq({ contentId: '126508', radius: '20001' }),
+    );
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('목적지를 찾지 못하면 404', async () => {
+    getNearbyLocalPlacesByContentIdMock.mockResolvedValue({ status: 'NOT_FOUND' });
+    const { res } = await runController(
+      getNearbyLocalPlacesByContentIdController,
+      makeQueryReq({ contentId: '999999' }),
+    );
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('정상 조회 시 기본 radius 2000 적용', async () => {
+    const { res } = await runController(
+      getNearbyLocalPlacesByContentIdController,
+      makeQueryReq({ contentId: '126508' }),
+    );
+    expect(res.statusCode).toBe(200);
+    expect(getNearbyLocalPlacesByContentIdMock).toHaveBeenCalledWith('126508', 2000);
   });
 });
