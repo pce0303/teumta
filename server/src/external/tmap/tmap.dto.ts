@@ -38,3 +38,45 @@ export interface TmapRouteResponse {
   type: 'FeatureCollection';
   features: TmapRouteFeature[];
 }
+
+/** 장소 통합 검색(GET /tmap/pois) 응답 항목. 실응답 기준(2026-08 검증). */
+export interface TmapPoiSearchItem {
+  id: string;
+  name: string;
+  /** 대표 좌표(문자열). */
+  noorLat?: string;
+  noorLon?: string;
+  frontLat?: string;
+  frontLon?: string;
+  upperAddrName?: string;
+  middleAddrName?: string;
+  lowerAddrName?: string;
+  detailAddrName?: string;
+  roadName?: string;
+  firstBuildNo?: string;
+  [key: string]: unknown;
+}
+
+export interface TmapPoiSearchResponse {
+  searchPoiInfo?: {
+    totalCount?: string;
+    count?: string;
+    page?: string;
+    pois?: { poi?: TmapPoiSearchItem[] };
+  };
+}
+
+/** 명칭(POI) 상세 검색(GET /tmap/pois/{poiId}) 응답. 실응답 기준. */
+export interface TmapPoiDetailResponse {
+  poiDetailInfo?: {
+    id?: string;
+    name?: string;
+    lat?: string;
+    lon?: string;
+    address?: string;
+    bldAddr?: string;
+    roadName?: string;
+    bldNo1?: string;
+    [key: string]: unknown;
+  };
+}

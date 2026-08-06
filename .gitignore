@@ -38,3 +38,8 @@ pnpm-debug.*
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# 에이전트 스킬 도구 파일 (로컬 전용)
+mobile/.agents/
+mobile/.roo/
+mobile/skills-lock.json

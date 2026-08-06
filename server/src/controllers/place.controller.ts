@@ -2,9 +2,16 @@ import type { RequestHandler } from 'express';
 import { PlaceType } from '@prisma/client';
 
 import {
+  DEFAULT_RADIUS_METERS,
+  MAX_RADIUS_METERS,
+  getNearbyLocalPlacesByContentId,
+  getNearbyLocalPlacesByPoiId,
+  getNearbyLocalPlacesRealtime,
+} from '../services/nearby-local-place.service';
+import { searchDestinations } from '../services/place-search.service';
+import {
   createPlace,
   findMissingTagIds,
-  getNearbyLocalPlaces,
   getPlaceById,
   getPlaces,
   updatePlace,
@@ -58,6 +65,118 @@ export const getPlacesController: RequestHandler = async (
   }
 };
 
+/** 목적지 검색(실시간 TourAPI). 검색 결과의 tourApiContentId가 이후 추천의 기준이 된다. */
+export const searchPlacesController: RequestHandler = async (req, res, next) => {
+  try {
+    const keyword = req.query.keyword;
+
+    if (typeof keyword !== 'string' || keyword.trim().length === 0) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'keyword는 비어 있지 않은 문자열이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const pageNo = req.query.pageNo === undefined ? 1 : Number(req.query.pageNo);
+    if (!Number.isInteger(pageNo) || pageNo <= 0) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'pageNo는 양의 정수여야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const results = await searchDestinations({ keyword: keyword.trim(), pageNo });
+
+    res.status(200).json({
+      success: true,
+      data: results,
+      error: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 사용자가 검색으로 고른 목적지 기준 주변 로컬 장소 조회.
+ * 식별자는 contentId(TourAPI) 또는 poiId(TMAP) 중 정확히 하나.
+ * 좌표는 API 입력으로 받지 않는다(privacy 정책 — 서버가 식별자로 해석).
+ */
+export const getNearbyLocalPlacesByContentIdController: RequestHandler = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const contentId = req.query.contentId;
+    const poiId = req.query.poiId;
+    const hasContentId = typeof contentId === 'string' && contentId.trim().length > 0;
+    const hasPoiId = typeof poiId === 'string' && poiId.trim().length > 0;
+
+    if (hasContentId === hasPoiId) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'contentId 또는 poiId 중 정확히 하나를 전달해야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const radius =
+      req.query.radius === undefined ? DEFAULT_RADIUS_METERS : Number(req.query.radius);
+
+    if (
+      !Number.isFinite(radius) ||
+      !Number.isInteger(radius) ||
+      radius <= 0 ||
+      radius > MAX_RADIUS_METERS
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: `radius는 1 이상 ${MAX_RADIUS_METERS} 이하의 정수여야 합니다.`,
+        },
+      });
+      return;
+    }
+
+    const result = hasContentId
+      ? await getNearbyLocalPlacesByContentId((contentId as string).trim(), radius)
+      : await getNearbyLocalPlacesByPoiId((poiId as string).trim(), radius);
+
+    if (result.status !== 'SUCCESS') {
+      res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          message: '목적지를 찾을 수 없습니다.',
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result.places,
+      error: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 주변 로컬 장소 실시간 조회. 외부 API 오류는 error.middleware가 502/503/504로 변환. */
 export const getNearbyLocalPlacesController: RequestHandler =
   async (req, res, next) => {
     try {
@@ -76,25 +195,26 @@ export const getNearbyLocalPlacesController: RequestHandler =
 
       const radius =
         req.query.radius === undefined
-          ? 2000
+          ? DEFAULT_RADIUS_METERS
           : Number(req.query.radius);
 
       if (
         !Number.isFinite(radius) ||
         !Number.isInteger(radius) ||
-        radius <= 0
+        radius <= 0 ||
+        radius > MAX_RADIUS_METERS
       ) {
         res.status(400).json({
           success: false,
           data: null,
           error: {
-            message: 'radius는 양의 정수여야 합니다.',
+            message: `radius는 1 이상 ${MAX_RADIUS_METERS} 이하의 정수여야 합니다.`,
           },
         });
         return;
       }
 
-      const result = await getNearbyLocalPlaces(id, radius);
+      const result = await getNearbyLocalPlacesRealtime(id, radius);
 
       if (result.status === 'NOT_FOUND') {
         res.status(404).json({
@@ -114,6 +234,18 @@ export const getNearbyLocalPlacesController: RequestHandler =
           error: {
             message:
               '주변 로컬 장소는 관광지를 기준으로만 조회할 수 있습니다.',
+          },
+        });
+        return;
+      }
+
+      if (result.status === 'NO_TOUR_CONTENT_ID') {
+        res.status(400).json({
+          success: false,
+          data: null,
+          error: {
+            message:
+              '이 관광지는 TourAPI 연동 정보(tourApiContentId)가 없어 주변 로컬 장소를 조회할 수 없습니다.',
           },
         });
         return;

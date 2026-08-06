@@ -1,84 +1,183 @@
 import {
-  ExternalApiAuthError,
+  classifyPublicDataResultCode,
   ExternalApiError,
-  ExternalApiRateLimitError,
-  ExternalApiResponseError,
   externalConfig,
+  extractPublicDataHeader,
+  normalizeServiceKey,
   requestJson,
 } from '../common';
-import type { TourApiListResponse } from './tour.dto';
+import type { TourApiDetailResponse, TourApiListResponse } from './tour.dto';
 
 /**
  * 한국관광공사 TourAPI (KorService2) 클라이언트.
  * 통신(URL/인증/timeout)과 TourAPI 자체 오류코드 처리까지만 담당한다. 변환은 tour.mapper.ts.
  *
- * ⚠️ 실제 호출 코드지만, 유효한 TOUR_API_KEY / TOUR_API_BASE_URL 이 설정되기 전에는 동작하지 않는다.
- *    (키 미설정 시 CONFIG_MISSING 으로 즉시 실패)
+ * 매뉴얼 v4.4 기준: 요청 파라미터는 법정동 코드(lDongRegnCd/lDongSignguCd)와
+ * 분류체계(lclsSystm1~3)를 사용한다(구 areaCode/sigunguCode/cat1~3 미사용).
  *
- * 키 관련 주의:
- *  - .env 의 TOUR_API_KEY 에는 공공데이터포털의 "Decoding" 키를 넣는다.
- *    (URLSearchParams가 한 번 인코딩하므로 Encoding 키를 넣으면 이중 인코딩되어 실패)
- *  - 서비스 키 오류 등 일부 케이스는 게이트웨이가 JSON이 아닌 XML 오류 봉투를 반환할 수 있는데,
- *    이 경우 JSON 파싱 실패(ExternalApiResponseError)로 표면화된다.
+ * TOUR_API_KEY 는 Encoding/Decoding 키 모두 허용(normalizeServiceKey가 이중 인코딩 방지).
+ * 인증키 오류 등 XML 오류 봉투는 공통 http-client가 오류 계층으로 변환한다.
  */
 
 const SERVICE = 'tour';
 const MOBILE_APP = 'teumta';
 
-/** 지역기반 목록 조회 파라미터. */
+const RADIUS_MIN_METERS = 1;
+const RADIUS_MAX_METERS = 20_000;
+
+/** 지역기반 목록 조회 파라미터(areaBasedList2, v4.4). */
 export interface TourAreaListParams {
-  areaCode?: string | number;
-  sigunguCode?: string | number;
+  /** 법정동 시도 코드. */
+  lDongRegnCd?: string | number;
+  /** 법정동 시군구 코드. */
+  lDongSignguCd?: string | number;
+  /** 분류체계 1~3Depth. */
+  lclsSystm1?: string;
+  lclsSystm2?: string;
+  lclsSystm3?: string;
   contentTypeId?: string | number;
+  /** 수정일 필터(YYYYMMDD). */
+  modifiedtime?: string;
   pageNo?: number;
   numOfRows?: number;
-  /** 정렬(O=대표이미지 있는 항목 우선 등). TourAPI 스펙 참고. */
+  /** 정렬(O=대표이미지 있는 제목순 등). TourAPI 스펙 참고. */
   arrange?: string;
 }
 
-/** 위치기반 목록 조회 파라미터. */
+/** 위치기반 목록 조회 파라미터(locationBasedList2, v4.4). */
 export interface TourLocationListParams {
   /** 경도(longitude). */
   mapX: number;
   /** 위도(latitude). */
   mapY: number;
-  /** 반경(m, 최대 20000). */
+  /** 반경(m). 1 이상 20000 이하. */
   radius: number;
   contentTypeId?: string | number;
+  lDongRegnCd?: string | number;
+  lDongSignguCd?: string | number;
+  lclsSystm1?: string;
+  lclsSystm2?: string;
+  lclsSystm3?: string;
   pageNo?: number;
   numOfRows?: number;
   arrange?: string;
+}
+
+/** areaBasedList2 요청 쿼리(공통 파라미터 제외)를 만든다. 순수 함수(테스트 용이). */
+export function buildAreaListQuery(params: TourAreaListParams = {}): Record<string, string> {
+  return {
+    ...optionalParam('lDongRegnCd', params.lDongRegnCd),
+    ...optionalParam('lDongSignguCd', params.lDongSignguCd),
+    ...optionalParam('lclsSystm1', params.lclsSystm1),
+    ...optionalParam('lclsSystm2', params.lclsSystm2),
+    ...optionalParam('lclsSystm3', params.lclsSystm3),
+    ...optionalParam('contentTypeId', params.contentTypeId),
+    ...optionalParam('modifiedtime', params.modifiedtime),
+    numOfRows: String(params.numOfRows ?? 20),
+    pageNo: String(params.pageNo ?? 1),
+    arrange: params.arrange ?? 'O',
+  };
+}
+
+/**
+ * locationBasedList2 요청 쿼리(공통 파라미터 제외)를 만든다. 순수 함수(테스트 용이).
+ * radius가 1~20000(m) 범위를 벗어나면 외부 호출 없이 즉시 입력 오류를 던진다.
+ */
+export function buildLocationListQuery(params: TourLocationListParams): Record<string, string> {
+  assertValidRadius(params.radius);
+  return {
+    mapX: String(params.mapX),
+    mapY: String(params.mapY),
+    radius: String(params.radius),
+    ...optionalParam('contentTypeId', params.contentTypeId),
+    ...optionalParam('lDongRegnCd', params.lDongRegnCd),
+    ...optionalParam('lDongSignguCd', params.lDongSignguCd),
+    ...optionalParam('lclsSystm1', params.lclsSystm1),
+    ...optionalParam('lclsSystm2', params.lclsSystm2),
+    ...optionalParam('lclsSystm3', params.lclsSystm3),
+    numOfRows: String(params.numOfRows ?? 20),
+    pageNo: String(params.pageNo ?? 1),
+    // 위치기반 조회 기본 정렬은 거리순(E)을 유지한다.
+    arrange: params.arrange ?? 'E',
+  };
 }
 
 /** 지역기반 관광정보 조회(areaBasedList2). */
 export async function fetchTourPlacesByArea(
   params: TourAreaListParams = {},
 ): Promise<TourApiListResponse> {
-  const url = buildTourUrl('areaBasedList2', {
-    ...optionalParam('areaCode', params.areaCode),
-    ...optionalParam('sigunguCode', params.sigunguCode),
-    ...optionalParam('contentTypeId', params.contentTypeId),
-    numOfRows: String(params.numOfRows ?? 20),
-    pageNo: String(params.pageNo ?? 1),
-    arrange: params.arrange ?? 'O',
-  });
-  return requestTourList(url);
+  return requestTourList(buildTourUrl('areaBasedList2', buildAreaListQuery(params)));
 }
 
 /** 위치기반 관광정보 조회(locationBasedList2). "빈 시간 근처 관광지" 시나리오의 주 진입점. */
 export async function fetchTourPlacesByLocation(
   params: TourLocationListParams,
 ): Promise<TourApiListResponse> {
-  const url = buildTourUrl('locationBasedList2', {
-    mapX: String(params.mapX),
-    mapY: String(params.mapY),
-    radius: String(params.radius),
+  return requestTourList(buildTourUrl('locationBasedList2', buildLocationListQuery(params)));
+}
+
+function assertValidRadius(radius: number): void {
+  if (
+    !Number.isFinite(radius) ||
+    radius < RADIUS_MIN_METERS ||
+    radius > RADIUS_MAX_METERS
+  ) {
+    throw new ExternalApiError(
+      SERVICE,
+      `radius must be between ${RADIUS_MIN_METERS} and ${RADIUS_MAX_METERS} meters`,
+      { code: 'INVALID_PARAM' },
+    );
+  }
+}
+
+/** 키워드 검색(searchKeyword2) 파라미터. */
+export interface TourKeywordSearchParams {
+  keyword: string;
+  contentTypeId?: string | number;
+  lDongRegnCd?: string | number;
+  lDongSignguCd?: string | number;
+  pageNo?: number;
+  numOfRows?: number;
+  arrange?: string;
+}
+
+/** searchKeyword2 요청 쿼리(공통 파라미터 제외). 순수 함수. keyword 비면 즉시 입력 오류. */
+export function buildKeywordSearchQuery(params: TourKeywordSearchParams): Record<string, string> {
+  const keyword = params.keyword.trim();
+  if (keyword.length === 0) {
+    throw new ExternalApiError(SERVICE, 'keyword is required', { code: 'INVALID_PARAM' });
+  }
+  return {
+    keyword,
     ...optionalParam('contentTypeId', params.contentTypeId),
+    ...optionalParam('lDongRegnCd', params.lDongRegnCd),
+    ...optionalParam('lDongSignguCd', params.lDongSignguCd),
     numOfRows: String(params.numOfRows ?? 20),
     pageNo: String(params.pageNo ?? 1),
-    arrange: params.arrange ?? 'E',
-  });
-  return requestTourList(url);
+    arrange: params.arrange ?? 'O',
+  };
+}
+
+/** 키워드 검색(searchKeyword2). 사용자가 목적지를 직접 검색하는 흐름의 진입점. */
+export async function fetchTourPlacesByKeyword(
+  params: TourKeywordSearchParams,
+): Promise<TourApiListResponse> {
+  return requestTourList(buildTourUrl('searchKeyword2', buildKeywordSearchQuery(params)));
+}
+
+/** 공통정보 조회(detailCommon2). 기준 관광지의 현재 좌표를 실시간으로 얻는다. */
+export async function fetchTourPlaceDetail(
+  contentId: string | number,
+): Promise<TourApiDetailResponse> {
+  const trimmed = String(contentId).trim();
+  if (trimmed.length === 0) {
+    throw new ExternalApiError(SERVICE, 'contentId is required', { code: 'INVALID_PARAM' });
+  }
+  // v4.4에서 defaultYN/mapinfoYN 등 플래그는 폐지됨(전달 시 resultCode 10).
+  const url = buildTourUrl('detailCommon2', { contentId: trimmed });
+  const response = await requestJson<TourApiDetailResponse>({ service: SERVICE, url });
+  assertTourApiOk(response);
+  return response;
 }
 
 async function requestTourList(url: string): Promise<TourApiListResponse> {
@@ -103,8 +202,8 @@ function buildTourUrl(operation: string, params: Record<string, string>): string
   }
 
   const url = new URL(`${baseUrl.replace(/\/+$/, '')}/${operation}`);
-  // serviceKey 는 Decoding 키를 넣고 URLSearchParams가 한 번만 인코딩하도록 한다.
-  url.searchParams.set('serviceKey', apiKey);
+  // Encoding/Decoding 키 모두 허용 — 정규화 후 URLSearchParams가 정확히 한 번만 인코딩한다.
+  url.searchParams.set('serviceKey', normalizeServiceKey(apiKey));
   url.searchParams.set('MobileOS', 'ETC');
   url.searchParams.set('MobileApp', MOBILE_APP);
   url.searchParams.set('_type', 'json');
@@ -114,26 +213,17 @@ function buildTourUrl(operation: string, params: Record<string, string>): string
   return url.toString();
 }
 
-/** TourAPI는 HTTP 200이어도 header.resultCode로 논리 오류를 알린다. 이를 오류 계층으로 변환한다. */
-function assertTourApiOk(response: TourApiListResponse): void {
-  const header = response.response?.header;
-  const code = header?.resultCode;
-
-  if (code === '0000') {
+/** TourAPI는 HTTP 200이어도 resultCode로 논리 오류를 알린다(중첩/flat 봉투 모두). 정상은 '0000'. */
+function assertTourApiOk(response: TourApiListResponse | TourApiDetailResponse): void {
+  const header = extractPublicDataHeader(response);
+  if (header?.resultCode === '0000') {
     return;
   }
-
-  // 30: 등록되지 않은 서비스키, 31: 활용기간 만료, 32: 등록되지 않은 IP 등 인증 계열
-  if (code === '30' || code === '31' || code === '32') {
-    throw new ExternalApiAuthError(SERVICE);
-  }
-  // 22: 서비스 요청제한 횟수 초과
-  if (code === '22') {
-    throw new ExternalApiRateLimitError(SERVICE);
-  }
-
-  const message = header?.resultMsg ?? 'Unknown error';
-  throw new ExternalApiResponseError(SERVICE, `TourAPI returned resultCode ${code}: ${message}`);
+  throw classifyPublicDataResultCode(
+    SERVICE,
+    header?.resultCode ?? 'UNKNOWN',
+    header?.resultMsg ?? 'Unknown error',
+  );
 }
 
 function optionalParam(key: string, value: string | number | undefined): Record<string, string> {

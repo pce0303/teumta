@@ -247,6 +247,7 @@ export async function updatePlace(
   return transformPlace(updatedPlace);
 }
 
+/** @deprecated getNearbyLocalPlacesRealtime(실시간 TourAPI+TMAP)으로 대체됨. 신규 사용 금지. */
 export async function getNearbyLocalPlaces(
   touristSpotId: number,
   radiusMeters = 2000,

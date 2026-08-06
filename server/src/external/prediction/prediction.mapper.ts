@@ -1,18 +1,112 @@
-import type { CongestionData } from '../../dtos';
-import type { PredictionResponse } from './prediction.dto';
+import {
+  KTO_CONCENTRATION_FORECAST_SOURCE,
+  type ConcentrationForecastData,
+} from '../../dtos';
+import { ExternalApiResponseError } from '../common';
+import type {
+  ConcentrationForecastListResponse,
+  KtoConcentrationForecastItem,
+} from './prediction.dto';
 
 /**
- * 집중률 예측 원본 응답 → 틈타 내부 CongestionData(type=PREDICTED) 배열 변환.
- *
- * 향후 역할: 시간대별 예상 혼잡도를 실시간 혼잡도와 "동일한 내부 형태"로 정규화한다.
- * 실시간 혼잡도(congestion.mapper)와 같은 CongestionData를 반환해 하위 로직이 통일되게 한다.
- *
- * TODO(실제 연동 시):
- *  - 시간대별 항목 각각을 CongestionData로 변환(type=PREDICTED)
- *  - 예측 대상 시각 → predictedFor(Date)
- *  - 예측 등급/지수 → level / score 변환(실시간과 동일 규칙 재사용)
+ * 집중률 예측 원본 → ConcentrationForecastData. 날짜별 예측이므로 level/score 변환 없음
+ * (공식 등급 임계값 부재). baseYmd(KST)는 +09:00 자정으로 변환해 하루 밀림을 막는다.
  */
-export function mapPredictionToCongestionData(_raw: PredictionResponse): CongestionData[] {
-  // TODO: 실제 변환 구현. 지금은 skeleton이므로 호출 시 즉시 실패시킨다.
-  throw new Error('mapPredictionToCongestionData is not implemented yet');
+
+const SERVICE = 'prediction';
+
+/** 목록 변환 결과. 형식 불량 항목은 전체를 실패시키지 않고 skip 집계한다. */
+export interface ConcentrationForecastMapResult {
+  forecasts: ConcentrationForecastData[];
+  skipped: { tAtsNm: string; baseYmd: string; reason: string }[];
+}
+
+/** 목록 응답 전체 → ConcentrationForecastData[] + skip 집계. */
+export function mapConcentrationForecast(
+  response: ConcentrationForecastListResponse,
+): ConcentrationForecastMapResult {
+  const forecasts: ConcentrationForecastData[] = [];
+  const skipped: ConcentrationForecastMapResult['skipped'] = [];
+
+  for (const item of extractForecastItems(response)) {
+    try {
+      forecasts.push(mapConcentrationForecastItem(item));
+    } catch (error) {
+      skipped.push({
+        tAtsNm: String(item.tAtsNm ?? 'unknown'),
+        baseYmd: String(item.baseYmd ?? 'unknown'),
+        reason: error instanceof Error ? error.message : 'unknown error',
+      });
+    }
+  }
+  return { forecasts, skipped };
+}
+
+/** 응답에서 항목 배열을 안전하게 추출한다(items="" 또는 단일 객체 케이스 방어). */
+export function extractForecastItems(
+  response: ConcentrationForecastListResponse,
+): KtoConcentrationForecastItem[] {
+  const items = response.response?.body?.items;
+  if (!items) {
+    return [];
+  }
+  const item = items.item;
+  if (Array.isArray(item)) {
+    return item;
+  }
+  return item ? [item] : [];
+}
+
+export function mapConcentrationForecastItem(
+  item: KtoConcentrationForecastItem,
+): ConcentrationForecastData {
+  const { forecastDate, predictedFor } = parseBaseYmd(item.baseYmd);
+  return {
+    forecastDate,
+    predictedFor,
+    concentrationRate: parseConcentrationRate(item.cnctrRate),
+    areaCd: String(item.areaCd ?? '').trim(),
+    signguCd: String(item.signguCd ?? '').trim(),
+    tAtsNm: String(item.tAtsNm ?? '').trim(),
+    source: KTO_CONCENTRATION_FORECAST_SOURCE,
+  };
+}
+
+/** baseYmd(YYYYMMDD, KST 달력 날짜) → forecastDate("YYYY-MM-DD") + KST 자정 Date. */
+function parseBaseYmd(baseYmd: unknown): { forecastDate: string; predictedFor: Date } {
+  const raw = String(baseYmd ?? '').trim();
+  if (!/^\d{8}$/.test(raw)) {
+    throw new ExternalApiResponseError(SERVICE, `Invalid baseYmd "${raw}"`);
+  }
+  const year = raw.slice(0, 4);
+  const month = raw.slice(4, 6);
+  const day = raw.slice(6, 8);
+  const forecastDate = `${year}-${month}-${day}`;
+
+  // KST 자정으로 고정해 UTC 변환 시 예측일이 하루 밀리지 않게 한다.
+  const predictedFor = new Date(`${forecastDate}T00:00:00+09:00`);
+  if (Number.isNaN(predictedFor.getTime())) {
+    throw new ExternalApiResponseError(SERVICE, `Invalid baseYmd "${raw}"`);
+  }
+  // new Date는 '20260231' 같은 날짜를 3월로 넘겨 해석하므로 달력 날짜와 재대조한다.
+  const kstCheck = new Date(predictedFor.getTime() + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  if (kstCheck !== forecastDate) {
+    throw new ExternalApiResponseError(SERVICE, `Invalid baseYmd "${raw}"`);
+  }
+  return { forecastDate, predictedFor };
+}
+
+/**
+ * cnctrRate → 소수 문자열. Number로 유효성만 검증하고, 원본 정밀도를 잃지 않도록
+ * 문자열 그대로 유지한다(Prisma Decimal에 문자열 전달).
+ */
+function parseConcentrationRate(value: string | number | undefined): string {
+  const raw = typeof value === 'number' ? String(value) : String(value ?? '').trim();
+  const parsed = Number(raw);
+  if (raw.length === 0 || !Number.isFinite(parsed)) {
+    throw new ExternalApiResponseError(SERVICE, `Invalid cnctrRate "${raw}"`);
+  }
+  return raw;
 }
