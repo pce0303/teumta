@@ -300,7 +300,30 @@ GET /api/places/:placeId/congestion
 ```
 - 실시간 데이터가 없거나 외부 API 실패 시 `realtime: null` 로 **부분 성공**(전체 실패 아님).
 - `404 PLACE_NOT_FOUND` — 장소 자체가 없을 때만 404.
-- 현재 SK 실시간 혼잡도는 미연동 상태(범위 외). 이 엔드포인트 자체는 미구현.
+- 이 placeId 기반 통합 엔드포인트는 미구현. 실시간 혼잡도는 검색 흐름용 3.4a(poiId 기반)로 제공.
+
+### 3.4a 실시간 혼잡도 — [B] (SK 퍼즐, 구현됨)
+```
+GET /api/congestion?poiId=362105
+```
+SK 지오비전 퍼즐 "실시간 장소 혼잡도". `poiId`는 검색 결과(3.3a)의 `tmapPoiId`.
+서버 5분 캐시(해커톤 요금제 월 3,000건 쿼터 절약). DB 미저장.
+```jsonc
+{
+  "success": true,
+  "data": {
+    "poiId": "362105",
+    "poiName": "경복궁",
+    "level": "NORMAL",              // RELAXED | NORMAL | CROWDED | VERY_CROWDED
+    "source": "SK_PUZZLE",
+    "measuredAt": "2026-08-06T03:50:00.000Z",
+    "fetchedAt": "2026-08-06T03:52:10.000Z",  // 캐시 히트면 과거 값
+    "isRealtime": true
+  },
+  "error": null
+}
+```
+- `400` — poiId 누락. 외부 오류 → 502/503/504.
 
 ### 3.4b 장소 집중률 예측 — [B] (구현됨)
 ```

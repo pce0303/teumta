@@ -1,5 +1,6 @@
 import { app } from './app';
 import { env } from './config/env';
+import { startPredictionIngestScheduler } from './services/prediction-scheduler.service';
 import { prisma } from './utils/prisma';
 
 async function bootstrap() {
@@ -10,6 +11,7 @@ async function bootstrap() {
 
     app.listen(env.PORT, () => {
       console.log(`teumta-server listening on port ${env.PORT}`);
+      startPredictionIngestScheduler();
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
