@@ -183,6 +183,64 @@ GET /api/places/:placeId
 
 ---
 
+### 3.3b 주변 로컬 장소 조회 — [B] (실시간 외부 API)
+```
+GET /api/places/:id/local-places?radius=2000
+```
+
+**공모전 데이터 활용 기준(핵심):** 관광정보는 요청 시점에 TourAPI를 **실시간 호출**하여 사용하며,
+응답받은 장소명/주소/좌표/이미지를 **Place 테이블에 적재(create/upsert)하거나 DB 캐시하지 않는다.**
+DB는 기준 관광지 1건 읽기(findUnique)에만 사용한다.
+
+**동작 흐름:**
+1. 내부 Place에서 기준 관광지 확인 — 없으면 404, `TOURIST_SPOT` 아니면 400, `tourApiContentId` 없으면 400
+2. TourAPI `detailCommon2`로 기준 관광지의 현재 좌표 실시간 조회(실패 시 DB 좌표 fallback)
+3. TourAPI `locationBasedList2`를 contentTypeId 14(문화시설)/38(쇼핑)/39(음식점)별 호출 후 병합
+4. contentId 중복 제거, 좌표 없는 후보·기준 관광지 자신 제외
+5. **호출량 제한:** TourAPI dist(선별용)로 가까운 순 최대 10개만 TMAP 호출(동시 3개 제한)
+6. TMAP 보행자 경로(`POST /tmap/routes/pedestrian?version=1`)의 `totalDistance`로 실제 보행거리 계산
+7. 보행거리 ≤ radius 만 반환, `distanceMeters` 오름차순 정렬
+
+**radius:** 양의 정수, 기본 2000, 최대 20000(초과 시 400). TourAPI 후보 검색 반경이자
+최종 TMAP 보행거리 필터 기준.
+
+**응답:** 항목은 DB Place 엔티티가 아니므로 내부 `id`가 없다(`tourApiContentId`도 기존 정책대로 미노출).
+```jsonc
+{
+  "success": true,
+  "data": [
+    {
+      "name": "통인시장",
+      "address": "서울 종로구 ...",
+      "latitude": 37.58,
+      "longitude": 126.97,
+      "imageUrl": "https://...",
+      "distanceMeters": 850,        // ⚠️ 직선거리가 아니라 TMAP 실제 보행거리(totalDistance)
+      "travelTimeMinutes": 13       // TMAP totalTime 기반 Math.ceil(초/60)
+    }
+  ],
+  "error": null
+}
+```
+
+**외부 API 실패 정책:**
+- TourAPI 목록 호출 전부 실패 → 502/503/504 (`error.code`: AUTH_FAILED/RATE_LIMITED/TIMEOUT 등)
+- `detailCommon2` 실패 → DB 좌표 fallback으로 부분 성공
+- TMAP 일부 후보 실패 → **해당 후보만 제외**하고 부분 성공(기존 클라이언트가 distanceMeters로
+  정렬/표시하므로 null 노출보다 제외가 안전)
+- TMAP 전부 실패 → 502 + `error.code = EXTERNAL_API_UNAVAILABLE`
+- timeout: `EXTERNAL_API_TIMEOUT_MS`(기본 5000ms) 공통 적용
+
+**환경변수:** `TOUR_API_KEY`(Decoding 키), `TOUR_API_BASE_URL`, `TMAP_API_KEY`(SK appKey),
+`TMAP_API_BASE_URL`. serviceKey는 URLSearchParams가 정확히 한 번 인코딩하므로 Decoding 키 사용.
+
+> **기존 적재 코드 처리:** `place-ingestion.service.ts` / `scripts/ingest-tour.ts`(`npm run ingest:tour`)는
+> 이 API 런타임에서 **호출되지 않는다**. 집중률 예측 매칭용 내부 참조 데이터(법정동 코드 등) 적재
+> 용도로만 남아 있으며, 주변 로컬 장소 조회 목적의 관광정보 DB 적재에는 사용 금지.
+> `place.service.ts`의 구 `getNearbyLocalPlaces`(DB 전체 조회 + 하버사인)는 deprecated.
+
+---
+
 ### 3.4 장소 혼잡도 — [B]
 ```
 GET /api/places/:placeId/congestion
@@ -203,6 +261,41 @@ GET /api/places/:placeId/congestion
 ```
 - 실시간 데이터가 없거나 외부 API 실패 시 `realtime: null` 로 **부분 성공**(전체 실패 아님).
 - `404 PLACE_NOT_FOUND` — 장소 자체가 없을 때만 404.
+- 현재 SK 실시간 혼잡도는 미연동 상태(범위 외). 이 엔드포인트 자체는 미구현.
+
+### 3.4b 장소 집중률 예측 — [B] (구현됨)
+```
+GET /api/places/:id/concentration-forecast
+```
+한국관광공사 "관광지 집중률 방문자 추이 예측"(TatsCnctrRateService) 기반, DB 조회 전용.
+
+**데이터 의미와 한계 (중요):**
+- 현재 날짜 기준 **향후 30일의 날짜별** 집중률 예측이다(일 1회 갱신).
+- **실시간 혼잡도가 아니다.** 시간대별 예측도 아니다. "30분/60분 후 혼잡 완화" 판단에 쓸 수 없다.
+- 공식 API가 혼잡 등급 임계값을 제공하지 않으므로 level/score 로 변환하지 않고 원본 소수값을 그대로 제공한다.
+
+```jsonc
+{
+  "success": true,
+  "data": {
+    "placeId": 1,
+    "isRealtime": false,
+    "forecasts": [
+      {
+        "forecastDate": "2026-08-06",          // 예측 대상 달력 날짜(KST)
+        "concentrationRate": 23.45,             // 집중률 원본 소수값
+        "source": "KTO_CONCENTRATION_FORECAST",
+        "fetchedAt": "2026-08-06T03:00:00.000Z", // 마지막 적재/갱신 시각
+        "isRealtime": false
+      }
+    ]
+  },
+  "error": null
+}
+```
+- `400` — id가 양의 정수가 아님. `404` — 장소 없음.
+- 적재는 `npm run ingest:prediction -- --areaCd=11 --signguCd=11110 [--name=경복궁]` 수동 실행(조회 API는 DB만 바라봄).
+- 집중률 API에는 TourAPI contentid가 없어, 지역(법정동) + 정규화된 관광지명이 정확히 일치하는 경우에만 저장한다(UNMATCHED/AMBIGUOUS는 저장하지 않고 집계만).
 
 ---
 
