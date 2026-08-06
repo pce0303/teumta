@@ -25,4 +25,38 @@ export interface PlaceData {
   closingTime: string | null;
   /** 추천 체류 시간(분). */
   recommendedDuration: number | null;
+  /** 법정동 시도 코드(TourAPI v4.4). 집중률 예측 지역 매칭에 사용. */
+  lDongRegnCd?: string | null;
+  /** 법정동 시군구 코드(TourAPI v4.4). */
+  lDongSignguCd?: string | null;
+  /** 분류체계 1~3Depth(TourAPI v4.4). */
+  lclsSystm1?: string | null;
+  lclsSystm2?: string | null;
+  lclsSystm3?: string | null;
+}
+
+/** 주변 로컬 장소 후보. 요청 스코프 전용 — DB 미저장(공모전 기준), 내부 id 없음. */
+export interface NearbyLocalPlaceCandidate {
+  /** 중복 제거·자기 자신 제외용. 응답에는 미노출. */
+  tourApiContentId: string;
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  imageUrl: string | null;
+  /** TourAPI dist(m). 선별용 전용, 응답에 미노출. */
+  tourDistanceMeters: number | null;
+}
+
+/** 주변 로컬 장소 응답 항목. distanceMeters는 직선거리가 아닌 TMAP 실제 보행거리. */
+export interface NearbyLocalPlaceDto {
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  imageUrl: string | null;
+  /** TMAP 보행거리(m). */
+  distanceMeters: number;
+  /** TMAP 보행시간(분, ceil). */
+  travelTimeMinutes: number;
 }
