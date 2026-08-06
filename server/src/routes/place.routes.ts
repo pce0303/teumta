@@ -1,6 +1,9 @@
 import { Router } from 'express';
 
-import { getConcentrationForecastController } from '../controllers/congestion.controller';
+import {
+  getConcentrationForecastController,
+  getRealtimeCongestionController,
+} from '../controllers/congestion.controller';
 import {
   createPlaceController,
   getNearbyLocalPlacesByContentIdController,
@@ -13,9 +16,10 @@ import {
 
 export const placeRouter = Router();
 
-// 검색 기반 흐름: 목적지 검색 → contentId 기준 주변 로컬 장소 추천
+// 검색 기반 흐름: 목적지 검색 → contentId|poiId 기준 주변 로컬 장소 추천
 placeRouter.get('/search/places', searchPlacesController);
 placeRouter.get('/local-places', getNearbyLocalPlacesByContentIdController);
+placeRouter.get('/congestion', getRealtimeCongestionController);
 
 placeRouter.get('/places', getPlacesController);
 

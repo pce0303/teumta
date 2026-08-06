@@ -23,6 +23,12 @@ const envSchema = z.object({
 
   // 외부 API 공통 요청 timeout(ms).
   EXTERNAL_API_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+
+  // 집중률 예측 일일 자동 적재 대상. "areaCd:signguCd" 쉼표 구분(예: "11:11110,26:26350").
+  // 비우면 스케줄러 비활성(수동 스크립트만 사용).
+  PREDICTION_INGEST_TARGETS: z.string().optional().default(''),
+  // 일일 적재 실행 시각(KST, 0~23시).
+  PREDICTION_INGEST_HOUR_KST: z.coerce.number().int().min(0).max(23).default(5),
 });
 
 const parsed = envSchema.safeParse(process.env);
