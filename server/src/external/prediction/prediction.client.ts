@@ -3,6 +3,7 @@ import {
   ExternalApiError,
   externalConfig,
   normalizeResultCode,
+  normalizeServiceKey,
   requestJson,
 } from '../common';
 import type { ConcentrationForecastListResponse } from './prediction.dto';
@@ -10,7 +11,7 @@ import type { ConcentrationForecastListResponse } from './prediction.dto';
 /**
  * 관광지 집중률 예측(TatsCnctrRateService) 클라이언트. 통신 책임만, 변환은 prediction.mapper.ts.
  * 오퍼레이션은 tatsCnctrRatedList (매뉴얼의 TatsCnctrRatedService/tatsCnctrRateList 표기는 오탈자).
- * PREDICTION_API_KEY는 Decoding 키 사용(URLSearchParams가 한 번만 인코딩).
+ * PREDICTION_API_KEY 는 Encoding/Decoding 키 모두 허용(normalizeServiceKey가 이중 인코딩 방지).
  */
 
 const SERVICE = 'prediction';
@@ -106,8 +107,8 @@ function buildPredictionUrl(operation: string, params: Record<string, string>): 
   }
 
   const url = new URL(`${baseUrl.replace(/\/+$/, '')}/${operation}`);
-  // serviceKey 는 Decoding 키를 넣고 URLSearchParams가 정확히 한 번만 인코딩하도록 한다.
-  url.searchParams.set('serviceKey', apiKey);
+  // Encoding/Decoding 키 모두 허용 — 정규화 후 URLSearchParams가 정확히 한 번만 인코딩한다.
+  url.searchParams.set('serviceKey', normalizeServiceKey(apiKey));
   url.searchParams.set('MobileOS', 'ETC');
   url.searchParams.set('MobileApp', MOBILE_APP);
   url.searchParams.set('_type', 'json');

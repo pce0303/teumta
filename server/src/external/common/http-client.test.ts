@@ -6,7 +6,7 @@ import {
   ExternalApiResponseError,
 } from './external-api.error';
 import { requestJson } from './http-client';
-import { normalizeResultCode, parsePublicDataXmlError } from './public-data';
+import { normalizeResultCode, normalizeServiceKey, parsePublicDataXmlError } from './public-data';
 
 /**
  * 공통 HTTP 클라이언트 테스트. 실제 네트워크·실제 키를 쓰지 않는다.
@@ -118,6 +118,20 @@ describe('parsePublicDataXmlError', () => {
 
   it('코드가 없으면 null', () => {
     expect(parsePublicDataXmlError('<html>oops</html>')).toBeNull();
+  });
+});
+
+describe('normalizeServiceKey', () => {
+  it('Encoding 키(%XX 포함)는 한 번 디코딩한다', () => {
+    expect(normalizeServiceKey('TEST%2BKEY%2F%3D%3D')).toBe('TEST+KEY/==');
+  });
+
+  it('Decoding 키(원본)는 그대로 통과한다', () => {
+    expect(normalizeServiceKey('TEST+KEY/==')).toBe('TEST+KEY/==');
+  });
+
+  it('잘못된 % 시퀀스는 그대로 둔다', () => {
+    expect(normalizeServiceKey('TEST%ZZKEY')).toBe('TEST%ZZKEY');
   });
 });
 

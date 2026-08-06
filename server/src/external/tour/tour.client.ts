@@ -2,6 +2,7 @@ import {
   classifyPublicDataResultCode,
   ExternalApiError,
   externalConfig,
+  normalizeServiceKey,
   requestJson,
 } from '../common';
 import type { TourApiDetailResponse, TourApiListResponse } from './tour.dto';
@@ -13,10 +14,8 @@ import type { TourApiDetailResponse, TourApiListResponse } from './tour.dto';
  * 매뉴얼 v4.4 기준: 요청 파라미터는 법정동 코드(lDongRegnCd/lDongSignguCd)와
  * 분류체계(lclsSystm1~3)를 사용한다(구 areaCode/sigunguCode/cat1~3 미사용).
  *
- * 키 관련 주의:
- *  - .env 의 TOUR_API_KEY 에는 공공데이터포털의 "Decoding" 키를 넣는다.
- *    (URLSearchParams가 정확히 한 번 인코딩하므로 Encoding 키를 넣으면 이중 인코딩되어 실패)
- *  - 인증키 오류 등 XML 오류 봉투는 공통 http-client가 판별해 오류 계층으로 변환한다.
+ * TOUR_API_KEY 는 Encoding/Decoding 키 모두 허용(normalizeServiceKey가 이중 인코딩 방지).
+ * 인증키 오류 등 XML 오류 봉투는 공통 http-client가 오류 계층으로 변환한다.
  */
 
 const SERVICE = 'tour';
@@ -170,8 +169,8 @@ function buildTourUrl(operation: string, params: Record<string, string>): string
   }
 
   const url = new URL(`${baseUrl.replace(/\/+$/, '')}/${operation}`);
-  // serviceKey 는 Decoding 키를 넣고 URLSearchParams가 정확히 한 번만 인코딩하도록 한다.
-  url.searchParams.set('serviceKey', apiKey);
+  // Encoding/Decoding 키 모두 허용 — 정규화 후 URLSearchParams가 정확히 한 번만 인코딩한다.
+  url.searchParams.set('serviceKey', normalizeServiceKey(apiKey));
   url.searchParams.set('MobileOS', 'ETC');
   url.searchParams.set('MobileApp', MOBILE_APP);
   url.searchParams.set('_type', 'json');

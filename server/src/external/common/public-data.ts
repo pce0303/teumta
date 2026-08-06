@@ -27,6 +27,21 @@ const AUTH_RESULT_CODES = new Set(['20', '21', '30', '31', '32', '33']);
 /** 22: 서비스 요청제한 횟수 초과. */
 const RATE_LIMIT_RESULT_CODE = '22';
 
+/**
+ * serviceKey 정규화. 포털의 Encoding 키(%2B 등 포함)는 한 번 디코딩해 원본으로 만든다
+ * (URLSearchParams가 다시 인코딩하므로 그대로 쓰면 이중 인코딩). Decoding 키는 그대로 통과.
+ */
+export function normalizeServiceKey(key: string): string {
+  if (!/%[0-9A-Fa-f]{2}/.test(key)) {
+    return key;
+  }
+  try {
+    return decodeURIComponent(key);
+  } catch {
+    return key;
+  }
+}
+
 /** 본문이 XML 오류 봉투로 보이는지 판별한다(Content-Type 또는 첫 문자 기준). */
 export function looksLikeXml(contentType: string | null, bodyText: string): boolean {
   if (contentType && /xml/i.test(contentType)) {
