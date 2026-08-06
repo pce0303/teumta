@@ -4,6 +4,7 @@ import { PlaceType } from '@prisma/client';
 import {
   createPlace,
   findMissingTagIds,
+  getNearbyLocalPlaces,
   getPlaceById,
   getPlaces,
   updatePlace,
@@ -56,6 +57,77 @@ export const getPlacesController: RequestHandler = async (
     next(error);
   }
 };
+
+export const getNearbyLocalPlacesController: RequestHandler =
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+
+      if (!Number.isInteger(id) || id <= 0) {
+        res.status(400).json({
+          success: false,
+          data: null,
+          error: {
+            message: '장소 ID는 양의 정수여야 합니다.',
+          },
+        });
+        return;
+      }
+
+      const radius =
+        req.query.radius === undefined
+          ? 2000
+          : Number(req.query.radius);
+
+      if (
+        !Number.isFinite(radius) ||
+        !Number.isInteger(radius) ||
+        radius <= 0
+      ) {
+        res.status(400).json({
+          success: false,
+          data: null,
+          error: {
+            message: 'radius는 양의 정수여야 합니다.',
+          },
+        });
+        return;
+      }
+
+      const result = await getNearbyLocalPlaces(id, radius);
+
+      if (result.status === 'NOT_FOUND') {
+        res.status(404).json({
+          success: false,
+          data: null,
+          error: {
+            message: '장소를 찾을 수 없습니다.',
+          },
+        });
+        return;
+      }
+
+      if (result.status === 'NOT_TOURIST_SPOT') {
+        res.status(400).json({
+          success: false,
+          data: null,
+          error: {
+            message:
+              '주변 로컬 장소는 관광지를 기준으로만 조회할 수 있습니다.',
+          },
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: result.places,
+        error: null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 
 export const getPlaceByIdController: RequestHandler = async (
   req,
