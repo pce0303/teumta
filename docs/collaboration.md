@@ -2,7 +2,7 @@
 
 > 대상: 백엔드 서버(`server/`)
 > 담당: **A (지수)** · **B (초은)**
-> 관련 문서: [API 명세](./api-spec.md) · [데이터 스키마](./data-schema.md)
+> 관련 문서: [API 명세](./api-spec.md) · [전체 구조](./service-overview.md) · [팀 TODO](./team-todo.md)
 
 ---
 
