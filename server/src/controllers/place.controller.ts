@@ -2,9 +2,13 @@ import type { RequestHandler } from 'express';
 import { PlaceType } from '@prisma/client';
 
 import {
+  DEFAULT_RADIUS_METERS,
+  MAX_RADIUS_METERS,
+  getNearbyLocalPlacesRealtime,
+} from '../services/nearby-local-place.service';
+import {
   createPlace,
   findMissingTagIds,
-  getNearbyLocalPlaces,
   getPlaceById,
   getPlaces,
   updatePlace,
@@ -58,6 +62,7 @@ export const getPlacesController: RequestHandler = async (
   }
 };
 
+/** 주변 로컬 장소 실시간 조회. 외부 API 오류는 error.middleware가 502/503/504로 변환. */
 export const getNearbyLocalPlacesController: RequestHandler =
   async (req, res, next) => {
     try {
@@ -76,25 +81,26 @@ export const getNearbyLocalPlacesController: RequestHandler =
 
       const radius =
         req.query.radius === undefined
-          ? 2000
+          ? DEFAULT_RADIUS_METERS
           : Number(req.query.radius);
 
       if (
         !Number.isFinite(radius) ||
         !Number.isInteger(radius) ||
-        radius <= 0
+        radius <= 0 ||
+        radius > MAX_RADIUS_METERS
       ) {
         res.status(400).json({
           success: false,
           data: null,
           error: {
-            message: 'radius는 양의 정수여야 합니다.',
+            message: `radius는 1 이상 ${MAX_RADIUS_METERS} 이하의 정수여야 합니다.`,
           },
         });
         return;
       }
 
-      const result = await getNearbyLocalPlaces(id, radius);
+      const result = await getNearbyLocalPlacesRealtime(id, radius);
 
       if (result.status === 'NOT_FOUND') {
         res.status(404).json({
@@ -114,6 +120,18 @@ export const getNearbyLocalPlacesController: RequestHandler =
           error: {
             message:
               '주변 로컬 장소는 관광지를 기준으로만 조회할 수 있습니다.',
+          },
+        });
+        return;
+      }
+
+      if (result.status === 'NO_TOUR_CONTENT_ID') {
+        res.status(400).json({
+          success: false,
+          data: null,
+          error: {
+            message:
+              '이 관광지는 TourAPI 연동 정보(tourApiContentId)가 없어 주변 로컬 장소를 조회할 수 없습니다.',
           },
         });
         return;

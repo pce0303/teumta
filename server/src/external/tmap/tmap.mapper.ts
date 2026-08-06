@@ -35,8 +35,10 @@ export function extractRoutePath(response: TmapRouteResponse): Coordinate[] {
   return path;
 }
 
-/** 응답에서 요약(totalDistance/totalTime)과 경로 도형을 찾아 한 구간의 이동 정보로 변환한다. */
-export function extractRouteSummary(response: TmapRouteResponse): RouteSegmentData {
+/** 응답에서 요약 feature의 전체 거리(m)/시간(초)만 추출한다(분 변환은 호출부 정책에 따름). */
+export function extractRouteTotals(
+  response: TmapRouteResponse,
+): { distanceMeters: number; totalSeconds: number } {
   const summary = response.features?.find(
     (feature) =>
       typeof feature.properties?.totalDistance === 'number' &&
@@ -47,8 +49,15 @@ export function extractRouteSummary(response: TmapRouteResponse): RouteSegmentDa
     throw new ExternalApiResponseError(SERVICE, 'Route summary (totalDistance/totalTime) not found');
   }
 
-  const distanceMeters = summary.properties.totalDistance as number;
-  const totalSeconds = summary.properties.totalTime as number;
+  return {
+    distanceMeters: summary.properties.totalDistance as number,
+    totalSeconds: summary.properties.totalTime as number,
+  };
+}
+
+/** 응답에서 요약(totalDistance/totalTime)과 경로 도형을 찾아 한 구간의 이동 정보로 변환한다. */
+export function extractRouteSummary(response: TmapRouteResponse): RouteSegmentData {
+  const { distanceMeters, totalSeconds } = extractRouteTotals(response);
 
   return {
     travelMinutes: Math.round(totalSeconds / 60),
