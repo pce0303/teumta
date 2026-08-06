@@ -6,6 +6,11 @@ import {
   ExternalApiResponseError,
   ExternalApiTimeoutError,
 } from './external-api.error';
+import {
+  classifyPublicDataResultCode,
+  looksLikeXml,
+  parsePublicDataXmlError,
+} from './public-data';
 
 /**
  * 모든 외부 API 클라이언트가 공유하는 fetch 래퍼.
@@ -69,8 +74,31 @@ export async function requestJson<T = unknown>(options: RequestJsonOptions): Pro
     throw classifyHttpError(service, response.status);
   }
 
+  // 본문은 정확히 한 번만 읽는다. 공공데이터포털은 _type=json 요청이어도
+  // 인증키 오류 등의 경우 HTTP 200 + XML 오류 봉투를 반환할 수 있다.
+  let bodyText: string;
   try {
-    return (await response.json()) as T;
+    bodyText = await response.text();
+  } catch (error) {
+    throw new ExternalApiResponseError(service, 'Failed to read response body', {
+      status: response.status,
+      cause: error,
+    });
+  }
+
+  if (looksLikeXml(response.headers.get('content-type'), bodyText)) {
+    const envelope = parsePublicDataXmlError(bodyText);
+    if (envelope) {
+      throw classifyPublicDataResultCode(service, envelope.resultCode, envelope.resultMsg);
+    }
+    // 오류 봉투 형태도 아닌 XML. 원문은 message에 넣지 않는다(민감정보 방지).
+    throw new ExternalApiResponseError(service, 'Received unexpected XML response', {
+      status: response.status,
+    });
+  }
+
+  try {
+    return JSON.parse(bodyText) as T;
   } catch (error) {
     throw new ExternalApiResponseError(service, 'Failed to parse response body as JSON', {
       status: response.status,
