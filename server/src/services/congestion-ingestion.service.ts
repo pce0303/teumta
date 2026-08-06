@@ -1,6 +1,15 @@
 import { CongestionType, Prisma } from '@prisma/client';
 
-import type { CongestionData } from '../dtos';
+import type { CongestionData, ConcentrationForecastData } from '../dtos';
+import { KTO_CONCENTRATION_FORECAST_SOURCE } from '../dtos';
+import {
+  fetchConcentrationForecast,
+  mapConcentrationForecast,
+  matchForecastToPlace,
+  type ConcentrationForecastParams,
+  type ForecastMatchResult,
+  type ForecastPlaceCandidate,
+} from '../external/prediction';
 import { prisma } from '../utils/prisma';
 
 /**
@@ -64,4 +73,136 @@ export function toPredictedCongestionRows(
       measuredAt: prediction.measuredAt,
       predictedFor: prediction.predictedFor,
     }));
+}
+
+// KTO 집중률 예측 적재 — 향후 30일 날짜별(실시간·시간대별 아님), 공식 등급 기준 없어 level 미저장.
+
+export interface ConcentrationForecastSaveResult {
+  /** 같은 source의 반환 날짜 범위 내 기존 로우 삭제 수. */
+  deleted: number;
+  inserted: number;
+}
+
+/** Congestion 삽입 로우 변환(순수). level/score는 null, 원본 소수값 보존. */
+export function toConcentrationForecastRows(
+  placeId: number,
+  forecasts: ConcentrationForecastData[],
+): Prisma.CongestionCreateManyInput[] {
+  return forecasts.map((forecast) => ({
+    placeId,
+    type: CongestionType.PREDICTED,
+    level: null,
+    score: null,
+    concentrationRate: forecast.concentrationRate,
+    source: forecast.source,
+    measuredAt: null,
+    predictedFor: forecast.predictedFor,
+  }));
+}
+
+/** 집중률 예측 저장. 같은 source + 반환 날짜 범위만 교체(다른 source 미삭제). */
+export async function saveConcentrationForecasts(
+  placeId: number,
+  forecasts: ConcentrationForecastData[],
+): Promise<ConcentrationForecastSaveResult> {
+  const rows = toConcentrationForecastRows(placeId, forecasts);
+  if (rows.length === 0) {
+    return { deleted: 0, inserted: 0 };
+  }
+
+  const dates = forecasts.map((forecast) => forecast.predictedFor.getTime());
+  const rangeStart = new Date(Math.min(...dates));
+  const rangeEnd = new Date(Math.max(...dates));
+
+  return prisma.$transaction(async (tx) => {
+    const deleted = await tx.congestion.deleteMany({
+      where: {
+        placeId,
+        type: CongestionType.PREDICTED,
+        source: KTO_CONCENTRATION_FORECAST_SOURCE,
+        predictedFor: { gte: rangeStart, lte: rangeEnd },
+      },
+    });
+    const created = await tx.congestion.createMany({ data: rows });
+    return { deleted: deleted.count, inserted: created.count };
+  });
+}
+
+export interface ConcentrationForecastIngestResult {
+  /** 안전하게 매칭되어 저장된 관광지 수. */
+  matchedPlaces: number;
+  inserted: number;
+  deleted: number;
+  /** 후보 없음 — 자동 저장하지 않고 집계만 반환. */
+  unmatched: { tAtsNm: string }[];
+  /** 후보 둘 이상 — 자동 저장하지 않고 집계만 반환. */
+  ambiguous: { tAtsNm: string; candidatePlaceIds: number[] }[];
+  /** 형식 불량으로 매핑 단계에서 건너뛴 항목. */
+  skipped: { tAtsNm: string; baseYmd: string; reason: string }[];
+}
+
+/** fetch → map → 매칭 → 저장. MATCHED만 저장, UNMATCHED/AMBIGUOUS는 집계만. */
+export async function ingestConcentrationForecasts(
+  params: ConcentrationForecastParams,
+): Promise<ConcentrationForecastIngestResult> {
+  const response = await fetchConcentrationForecast(params);
+  const { forecasts, skipped } = mapConcentrationForecast(response);
+
+  const result: ConcentrationForecastIngestResult = {
+    matchedPlaces: 0,
+    inserted: 0,
+    deleted: 0,
+    unmatched: [],
+    ambiguous: [],
+    skipped,
+  };
+
+  if (forecasts.length === 0) {
+    return result;
+  }
+
+  // 지역(법정동 시도) 후보만 로드한다. 시군구 판정은 matcher가 담당한다.
+  const candidateRows = await prisma.place.findMany({
+    where: { lDongRegnCd: String(params.areaCd).trim() },
+    select: { id: true, name: true, lDongRegnCd: true, lDongSignguCd: true },
+  });
+  const candidates: ForecastPlaceCandidate[] = candidateRows.map((row) => ({
+    placeId: row.id,
+    name: row.name,
+    lDongRegnCd: row.lDongRegnCd,
+    lDongSignguCd: row.lDongSignguCd,
+  }));
+
+  // 같은 관광지명(tAtsNm) 묶음 단위로 매칭 후 저장한다.
+  const groups = new Map<string, ConcentrationForecastData[]>();
+  for (const forecast of forecasts) {
+    const key = `${forecast.areaCd}|${forecast.signguCd}|${forecast.tAtsNm}`;
+    const group = groups.get(key);
+    if (group) {
+      group.push(forecast);
+    } else {
+      groups.set(key, [forecast]);
+    }
+  }
+
+  for (const group of groups.values()) {
+    const { areaCd, signguCd, tAtsNm } = group[0];
+    const match: ForecastMatchResult = matchForecastToPlace(
+      { areaCd, signguCd, tAtsNm },
+      candidates,
+    );
+
+    if (match.status === 'MATCHED') {
+      const saved = await saveConcentrationForecasts(match.placeId, group);
+      result.matchedPlaces += 1;
+      result.inserted += saved.inserted;
+      result.deleted += saved.deleted;
+    } else if (match.status === 'UNMATCHED') {
+      result.unmatched.push({ tAtsNm });
+    } else {
+      result.ambiguous.push({ tAtsNm, candidatePlaceIds: match.candidatePlaceIds });
+    }
+  }
+
+  return result;
 }

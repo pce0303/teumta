@@ -39,6 +39,13 @@ model Place {
   closingTime         String?   @db.VarChar(5)
   recommendedDuration Int?
   tourApiContentId    String?   @unique
+  // TourAPI(KorService2 v4.4) 최신 법정동 코드/분류체계. 집중률 예측(TatsCnctrRateService)의
+  // areaCd/signguCd 기반 지역 매칭에 사용한다. 미수집 데이터는 null.
+  lDongRegnCd         String?   @db.VarChar(8)
+  lDongSignguCd       String?   @db.VarChar(8)
+  lclsSystm1          String?   @db.VarChar(16)
+  lclsSystm2          String?   @db.VarChar(16)
+  lclsSystm3          String?   @db.VarChar(16)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -47,6 +54,8 @@ model Place {
   mainRoutes  Route[]      @relation("MainPlaceRoutes")
   routeStops  RouteStop[]
   tripEvents  TripEvent[]
+
+  @@index([lDongRegnCd, lDongSignguCd])
 }
 
 model Tag {
@@ -85,8 +94,12 @@ model Congestion {
   id           Int             @id @default(autoincrement())
   placeId      Int
   type         CongestionType
-  level        CongestionLevel
+  // KTO 집중률 예측(TatsCnctrRateService)은 등급 임계값을 제공하지 않으므로 level 없이 저장한다.
+  // 공식 기준 없이 임의 등급을 만들지 않기 위해 nullable로 둔다.
+  level        CongestionLevel?
   score        Int?
+  // KTO 집중률 예측의 원본 소수값(cnctrRate). 실시간·시간대별 데이터가 아닌 일 단위 예측치.
+  concentrationRate Decimal?   @db.Decimal(5, 2)
   measuredAt   DateTime?
   predictedFor DateTime?
   source       String?
@@ -95,6 +108,7 @@ model Congestion {
 
   place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
 
+  @@unique([placeId, source, predictedFor])
   @@index([placeId])
   @@index([placeId, measuredAt])
   @@index([placeId, predictedFor])
