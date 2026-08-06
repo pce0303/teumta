@@ -52,17 +52,29 @@ REALTIME 데이터는 현재 혼잡 상태를 판단하는 데 사용하며, 미
 | CROWDED | 혼잡 | 현재 혼잡하여 우회 코스를 확인할 수 있습니다. |
 | VERY_CROWDED | 매우 혼잡 | 현재 매우 혼잡하여 우회 코스를 우선 추천합니다. |
 
-KTO 관광지 집중률과 SK 장소 혼잡도의 원본 데이터는 값의 범위, 의미 및 산정 기준이 서로 다를 수 있다.
+위 사용자 안내 문구와 혼잡도 단계는 현재 혼잡 상태를 보여주는 `REALTIME` 데이터를 중심으로 사용한다.
 
-따라서 서로 다른 데이터 소스의 원본 점수를 직접 비교하거나 동일한 점수 구간을 공통으로 적용하지 않는다.
+백엔드의 `Congestion.level` 필드는 nullable로 정의되어 있으므로, 모든 외부 데이터에 반드시 `CongestionLevel`을 부여하지 않는다.
 
-각 데이터 소스에 맞는 별도의 변환 기준을 적용한 뒤 백엔드의 공통 `CongestionLevel`로 정규화한다.
+KTO 관광지 집중률 예측 데이터는 공식적인 혼잡도 등급 임계값을 제공하지 않으므로, 공식 기준 없이 임의로 `RELAXED`, `NORMAL`, `CROWDED`, `VERY_CROWDED` 단계를 생성하지 않는다.
+
+KTO 데이터의 원본 집중률 값은 `Congestion.concentrationRate`에 저장하고, `level`은 null로 저장한다.
 
 ```text
-KTO 원본 데이터
-→ KTO 전용 mapping
-→ CongestionLevel
+KTO 원본 concentrationRate
+→ concentrationRate에 원본값 저장
+→ level은 null로 저장
 
 SK 원본 데이터
-→ SK 전용 mapping
+→ 실제 API 응답 형식 확인
+→ SK 전용 mapping 기준 정의
 → CongestionLevel
+```
+
+KTO 관광지 집중률과 SK 장소 혼잡도의 원본 데이터는 값의 범위, 의미 및 산정 기준이 서로 다르므로 직접 비교하지 않는다.
+
+또한 두 데이터 소스에 동일한 점수 구간이나 공통 threshold를 적용하지 않는다.
+
+SK 장소 혼잡도 데이터의 `level`, `score`, `measuredAt` 저장 기준은 실제 API 응답의 단계, 점수 범위 및 측정 시각 제공 여부를 확인한 후 확정한다.
+
+추후 KTO 데이터의 값 범위와 분포를 충분히 확인하고 팀에서 별도의 기준을 확정한 경우에만 KTO 전용 `CongestionLevel` mapping 적용 여부를 검토한다.
