@@ -46,9 +46,13 @@
 | 200 | 조회 성공 |
 | 201 | 생성 성공 (POST) |
 | 400 | 잘못된 요청(파라미터/바디 검증 실패) |
+| 401 | 관리자 인증 실패/토큰 없음·만료 (`UNAUTHORIZED`, `INVALID_CREDENTIALS`) |
 | 404 | 리소스 없음 |
+| 409 | 충돌 (`TAG_ALREADY_EXISTS`, `PLACE_IN_USE`) |
+| 429 | 로그인 시도 초과 (`TOO_MANY_ATTEMPTS`, `Retry-After` 헤더 포함) |
 | 500 | 서버 내부 오류 |
 | 502 / 503 | 외부 API 연동 실패/지연 (B 영역) |
+| 503 | 관리자 인증 미설정 (`ADMIN_AUTH_NOT_CONFIGURED`) |
 
 ---
 
@@ -118,11 +122,12 @@ TripEventType    = TRIP_STARTED | PLACE_ARRIVED | PLACE_LEFT
 ```
 
 ### Trip / TripEvent
+> privacy(location-privacy.md): Trip에 `deviceId`를, TripEvent에 사용자 좌표를 **두지 않는다**
+> (스키마에서 의도적으로 제거됨 — 도착/복귀 판정은 단말 내부에서 수행하고 이벤트 종류만 기록).
 ```jsonc
 {
   "id": 100,
   "routeId": 10,
-  "deviceId": "device-uuid",     // 익명 식별자 | null
   "status": "IN_PROGRESS",
   "startedAt": "...",           // | null
   "endedAt": null,
@@ -131,10 +136,8 @@ TripEventType    = TRIP_STARTED | PLACE_ARRIVED | PLACE_LEFT
       "id": 1,
       "eventType": "TRIP_STARTED",
       "placeId": null,
-      "latitude": 37.5796,
-      "longitude": 126.9770,
       "occurredAt": "...",
-      "metadata": null            // JSON | null
+      "metadata": null            // JSON | null (사용자 위치/이동경로 저장 금지)
     }
   ]
 }
@@ -382,7 +385,7 @@ POST /api/trips
 ```
 Body:
 ```jsonc
-{ "routeId": 10, "deviceId": "device-uuid" }   // deviceId optional
+{ "routeId": 10 }   // deviceId 없음 — Trip id 자체가 식별자(privacy)
 ```
 - `400 INVALID_ROUTE_ID`, `404 ROUTE_NOT_FOUND`
 - 201: `data`는 생성된 `Trip`(status=`PLANNED`).
@@ -396,9 +399,7 @@ Body:
 {
   "eventType": "PLACE_ARRIVED",   // TripEventType (필수)
   "placeId": 1,                     // optional
-  "latitude": 37.5796,              // optional
-  "longitude": 126.9770,            // optional
-  "metadata": { }                    // optional JSON
+  "metadata": { }                    // optional JSON — 사용자 좌표 넣지 말 것(privacy)
 }
 ```
 - `400 INVALID_EVENT_TYPE`, `404 TRIP_NOT_FOUND`
@@ -432,3 +433,66 @@ GET /api/trips/:tripId
 6. **`error.code` 도입**(선택) — 클라이언트 분기용 코드 문자열.
 
 > B는 3.4(혼잡도)와 3.2/3.5의 데이터 적재·가공(TourAPI/SK/TMAP)을 담당한다.
+
+---
+
+## 6. 관리자 API — [B] (구현됨, 2026-08-07)
+
+관리자 웹(`admin/`)이 소비한다. 소스: `server/src/routes/admin.routes.ts`, `place.routes.ts`.
+
+### 6.1 인증 규약
+
+- **`/api/admin/*` 전체가 Bearer 토큰 필수** (로그인 제외). 토큰 없음/무효/만료 → `401 UNAUTHORIZED`.
+- 서버 환경변수 `ADMIN_PASSWORD` 미설정 시 로그인 포함 전부 `503 ADMIN_AUTH_NOT_CONFIGURED`(fail closed).
+- 토큰은 무상태 HMAC(만료 12시간). **비밀번호를 바꾸면 발급된 토큰이 전부 무효화**된다.
+- 로그인 rate limit: IP별 15분 창에서 실패 10회 초과 시 `429 TOO_MANY_ATTEMPTS` + `Retry-After`(초).
+
+```
+POST /api/admin/login
+```
+Body: `{ "password": "..." }`
+- 200: `data = { "token": "...", "expiresAt": "2026-08-07T21:00:00.000Z" }` — 이후 요청에 `Authorization: Bearer <token>`.
+- `401 INVALID_CREDENTIALS` — 비밀번호 불일치.
+
+### 6.2 장소 관리
+
+```
+POST   /api/admin/places        # 생성 (201)
+PATCH  /api/admin/places/:id    # 부분 수정 — 전달한 필드만 반영
+DELETE /api/admin/places/:id    # 삭제
+```
+- 필드: `name`\*, `type`\*, `latitude`\*, `longitude`\*, `address`, `imageUrl`, `description`,
+  `openingTime`/`closingTime`(`HH:mm`), `recommendedDuration`(양의 정수), `tourApiContentId`, `tagIds`(number[]).
+- `tagIds`는 **전체 교체** 방식 — 전달하면 해당 장소의 태그 연결이 이 목록으로 대체된다. 존재하지 않는 태그 ID → 400.
+- DELETE: PlaceTag/Congestion/ForecastPlaceAlias는 연쇄 삭제. **Route/RouteStop에서 사용 중이면
+  `409 PLACE_IN_USE`** — 코스에서 먼저 제거해야 삭제 가능(A의 코스 데이터 보호).
+
+### 6.3 태그
+
+```
+GET    /api/tags                # 공개 — [{ id, name, placeCount }]
+POST   /api/admin/tags          # 생성. Body { "name": "..." } (50자 이하, unique)
+DELETE /api/admin/tags/:id      # 삭제 — 모든 장소에서 연결 제거(장소는 유지)
+```
+- 중복 이름 생성 → `409 TAG_ALREADY_EXISTS`.
+
+### 6.4 KTO 집중률 매칭 도구
+
+자동 매칭(지역+정규화 이름 정확 일치)이 못 잇는 항목을 관리자가 수동 연결(alias)한다.
+alias는 적재(3.4b 데이터) 시 자동 매칭보다 **우선 적용**된다. 모델: `ForecastPlaceAlias`.
+
+```
+GET    /api/admin/concentration-matching/preview?areaCd=11&signguCd=11110
+```
+KTO 외부 API 1회 호출(저장 없음). `data`: `counts{matched,aliasMatched,unmatched,ambiguous}`,
+`items[]{tAtsNm,status,forecastCount,averageRate,matchedPlace,candidates}`, `truncated`, `skipped`.
+
+```
+POST   /api/admin/concentration-matching/ingest        # Body { areaCd, signguCd } — 즉시 적재 실행
+GET    /api/admin/concentration-matching/aliases       # alias 목록(연결 장소 포함)
+POST   /api/admin/concentration-matching/aliases       # upsert. Body { areaCd, signguCd, tAtsNm, placeId }
+DELETE /api/admin/concentration-matching/aliases/:id
+```
+- preview/ingest는 KTO 쿼터(일 1,000)를 소모하므로 관리자 화면에서 버튼 클릭 시에만 호출(자동 폴링 금지).
+- 적재 조회 행 수는 5,000(`FORECAST_FETCH_NUM_OF_ROWS`) — 행 수 = 관광지 수 × 30일이라
+  구 기본값(100)은 지역당 2~3곳만 담겼음. 호출 수는 동일 1회.
