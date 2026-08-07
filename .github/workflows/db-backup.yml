@@ -1,8 +1,8 @@
 # 운영 DB(Cloudtype MariaDB) 일일 백업 — mariadb-dump 후 GitHub Actions artifact로 보관(30일).
 #
-# 사전 조건 (fork 저장소 기준):
+# 사전 조건 (org 저장소 기준):
 # 1. Cloudtype DB에 "외부 접속" 활성화 (Actions 러너가 인터넷에서 접속해야 함)
-# 2. fork 저장소 Settings → Secrets → Actions에 BACKUP_DATABASE_URL 등록
+# 2. org 저장소 Settings → Secrets and variables → Actions에 BACKUP_DATABASE_URL 등록
 #    형식: mysql://<user>:<password>@<외부호스트>:<외부포트>/teumta
 #    (서버의 DATABASE_URL에서 호스트/포트만 외부 접속 주소로 바꾼 값)
 #
@@ -19,7 +19,8 @@ on:
 
 jobs:
   backup:
-    if: github.repository == 'pce0303/teumta'
+    # org에서만 실행 — fork에 이 파일이 남아 있어도 cron/secret 소모 없음.
+    if: github.repository == 'saesgil-yulamdan/teumta'
     runs-on: ubuntu-latest
     steps:
       - name: Install MariaDB client
