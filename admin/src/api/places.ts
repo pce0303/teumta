@@ -1,0 +1,37 @@
+import type {
+  CreatePlaceInput,
+  Place,
+  PlaceType,
+  UpdatePlaceInput,
+} from '../types/place';
+import { apiRequest } from './client';
+
+/** GET /api/places — type 미지정 시 전체. tags 포함. */
+export function fetchPlaces(type?: PlaceType): Promise<Place[]> {
+  const query = type ? `?type=${type}` : '';
+  return apiRequest<Place[]>(`/places${query}`);
+}
+
+/** GET /api/places/:id */
+export function fetchPlace(id: number): Promise<Place> {
+  return apiRequest<Place>(`/places/${id}`);
+}
+
+/** POST /api/admin/places — 주의: 현재 서버에 관리자 인증 없음(팀 TODO). */
+export function createPlace(input: CreatePlaceInput): Promise<Place> {
+  return apiRequest<Place>('/admin/places', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+/** PATCH /api/admin/places/:id — 전달한 필드만 수정된다. */
+export function updatePlace(
+  id: number,
+  input: UpdatePlaceInput,
+): Promise<Place> {
+  return apiRequest<Place>(`/admin/places/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
