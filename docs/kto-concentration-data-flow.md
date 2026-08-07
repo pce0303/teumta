@@ -18,9 +18,28 @@ KTO 관광지 집중률 예측 데이터는 향후 30일의 날짜별 관광지 
 - 미래 특정 시각의 혼잡도를 판단하는 데 사용하지 않는다.
 - 여행 전 방문 예정일의 관광지 집중률을 확인하는 참고정보로 활용한다.
 
-백엔드 스크립트의 데이터 정의상 일 1회 갱신되는 데이터로 처리하지만, 현재 정기 배치 작업은 구현되어 있지 않다.
+KTO 집중률 예측 데이터는 백엔드의 정기 적재 스케줄러를 통해 자동으로 갱신한다.
 
-현재는 수동 적재 스크립트를 실행해 데이터를 불러오고 저장한다.
+환경변수 `PREDICTION_INGEST_TARGETS`에 적재 대상 지역을 설정한 경우 스케줄러가 활성화된다.
+
+예시는 다음과 같다.
+
+```text
+PREDICTION_INGEST_TARGETS=11:11110
+```
+
+여러 지역을 적재 대상으로 설정하는 경우 쉼표로 구분할 수 있다.
+
+스케줄러는 다음 시점에 적재를 실행한다.
+
+- 서버 기동 직후 1회
+- 매일 KST 기준 지정된 시각 1회
+
+일일 실행 시각은 `PREDICTION_INGEST_HOUR_KST` 환경변수로 설정하며, 기본값은 오전 5시이다.
+
+현재 배포 서버에도 관련 환경변수가 설정되어 있어 KTO 집중률 예측 데이터가 매일 자동으로 적재된다.
+
+수동 적재 스크립트는 자동 적재와 별도로 특정 지역의 재적재, 테스트 또는 수동 실행을 위한 보조 수단으로 사용한다.
 
 ---
 
@@ -184,9 +203,11 @@ areaCd + signguCd + tAtsNm
 | `level` | `null` |
 | `score` | `null` |
 | `concentrationRate` | KTO `cnctrRate` 원본값 |
-| `source` | `KTO_CONCENTRATION_FORECAST_SOURCE` |
+| `source` | `KTO_CONCENTRATION_FORECAST` |
 | `measuredAt` | `null` |
 | `predictedFor` | `baseYmd`를 KST 날짜 기준으로 변환한 값 |
+
+코드에서는 `KTO_CONCENTRATION_FORECAST_SOURCE` 상수를 사용하지만, DB의 `source` 필드에는 실제 문자열 값인 `KTO_CONCENTRATION_FORECAST`가 저장된다.
 
 전체 처리 흐름은 다음과 같다.
 
@@ -200,7 +221,7 @@ KTO API 호출
 → DB 저장
 ```
 
-실시간 혼잡도인 `REALTIME` 데이터는 해당 적재 서비스에서 처리하지 않는다.
+실시간 혼잡도인 `REALTIME` 데이터는 해당 KTO 예측 데이터 적재 서비스에서 처리하지 않는다.
 
 ---
 
@@ -250,7 +271,7 @@ KTO 데이터를 다시 적재할 때는 같은 장소와 같은 KTO source의 �
 
 ## 12. 수동 적재 방식
 
-현재 KTO 집중률 예측 데이터는 수동 적재 스크립트를 통해 저장한다.
+자동 정기 적재와 별도로, KTO 집중률 예측 데이터는 수동 적재 스크립트를 통해서도 저장할 수 있다.
 
 ```bash
 npm run ingest:prediction -- --areaCd=<시도코드> --signguCd=<시군구코드> [--name=<관광지명>]
@@ -271,6 +292,8 @@ npm run ingest:prediction -- --areaCd=11 --signguCd=11110 --name=경복궁
 
 `areaCd` 또는 `signguCd`가 없으면 API 적재를 실행하지 않고 사용 방법을 출력한다.
 
+수동 적재는 정기 적재를 대체하는 기본 방식이 아니라, 특정 지역의 수동 재적재나 테스트 등에 사용하는 보조 수단이다.
+
 ---
 
 ## 13. 예외 및 보안 처리
@@ -287,8 +310,21 @@ npm run ingest:prediction -- --areaCd=11 --signguCd=11110 --name=경복궁
 
 공공데이터포털이 JSON 요청에 XML 형식의 오류 응답을 반환하는 경우에도 공통 HTTP 클라이언트에서 오류 유형을 구분해 처리한다.
 
+결과 코드 `03`은 데이터가 없는 상태로 처리하며 정상적인 빈 결과로 정규화한다.
+
+```text
+resultCode = 03
+→ 데이터 없음
+→ 빈 목록으로 처리
+```
+
+다만 인증 실패, 요청 횟수 제한, 비정상 응답 등의 오류는 데이터 없음 상태로 처리하지 않는다.
+
+즉 실제로 조회 결과가 없는 경우와 외부 API 호출 자체가 실패한 경우를 구분한다.
+
 확인된 오류 유형은 다음과 같다.
 
+- 데이터 없음
 - 인증 오류
 - 요청 횟수 제한 오류
 - 정상적인 오류 봉투가 아닌 응답
@@ -298,7 +334,7 @@ npm run ingest:prediction -- --areaCd=11 --signguCd=11110 --name=경복궁
 
 ## 14. 현재 구현 범위
 
-현재 백엔드에 구현된 범위는 다음과 같다.
+현재 백엔드에 구현된 KTO 집중률 예측 관련 범위는 다음과 같다.
 
 - KTO 관광지 집중률 예측 API 호출
 - 응답 데이터 추출 및 변환
@@ -307,29 +343,55 @@ npm run ingest:prediction -- --areaCd=11 --signguCd=11110 --name=경복궁
 - `MATCHED`, `UNMATCHED`, `AMBIGUOUS` 구분
 - `MATCHED` 데이터의 `Congestion` 저장
 - 동일 source 및 날짜 범위 데이터 교체
+- 일일 자동 적재 스케줄러
+- 서버 기동 직후 자동 적재
 - 수동 데이터 적재 스크립트
 - 외부 API 오류 및 보안 처리
 
+자동 적재 스케줄러는 `PREDICTION_INGEST_TARGETS`가 설정된 경우 활성화된다.
+
+서버 기동 직후 1회 실행하며, 이후 `PREDICTION_INGEST_HOUR_KST`에 설정된 KST 기준 시각에 매일 실행한다.
+
+`PREDICTION_INGEST_HOUR_KST`의 기본값은 오전 5시이다.
+
+현재 배포 서버에서도 자동 적재가 활성화되어 있다.
+
+### SK 실시간 혼잡도
+
+SK 실시간 혼잡도는 KTO 예측 데이터와 달리 DB에 적재하지 않는 구조로 설계되어 있다.
+
+외부 SK API의 현재 혼잡도 정보를 조회한 뒤 클라이언트에 전달하는 pass-through 방식으로 처리한다.
+
+현재 다음 조회 API가 구현되어 있다.
+
+```text
+GET /api/congestion?poiId=<POI_ID>
+```
+
+SK 실시간 혼잡도 응답은 서버에서 5분 동안 캐시한다.
+
+따라서 SK 실시간 혼잡도는 "DB 적재 기능이 아직 구현되지 않은 상태"가 아니라, 설계상 DB에 저장하지 않고 실시간 조회 결과를 사용하는 구조이다.
+
 현재 구현되지 않았거나 별도 확인이 필요한 범위는 다음과 같다.
 
-- 자동 정기 적재 배치
 - KTO 집중률의 `CongestionLevel` 변환
 - `UNMATCHED` 관광지의 자동 Place 생성
 - `AMBIGUOUS` 데이터의 자동 후보 선택
-- SK 실시간 혼잡도 데이터 적재
-- KTO 집중률을 이용한 사용자 화면 표시 기준
+- KTO 집중률의 사용자 화면 표시 기준
+- SK 실시간 혼잡도의 세부 `CongestionLevel` mapping 기준
+- SK 실시간 혼잡도 응답의 사용자 화면 활용 기준
 
 ---
 
 ## 15. 추후 확인 사항
 
-- 수동 적재를 정기 배치 작업으로 전환할지 여부
-- KTO 데이터의 실제 갱신 시각
-- 데이터 적재 실행 주기
+- KTO 데이터의 실제 갱신 시각과 현재 자동 적재 실행 시각의 적절성
 - `UNMATCHED` 관광지를 Place에 추가하는 절차
 - `AMBIGUOUS` 후보를 수동으로 해소하는 절차
+- `UNMATCHED` 및 `AMBIGUOUS` 데이터를 관리자 웹에서 확인하고 해소하는 절차
 - 관리자용 적재 결과 확인 방식
 - KTO 집중률의 사용자 화면 표시 방식
 - 날짜별 집중률 비교 기준
 - 공식 기준 또는 팀 기준 확정 후 `CongestionLevel` mapping을 도입할지 여부
-- SK 실시간 혼잡도 데이터 처리 기준
+- SK 실시간 혼잡도의 `CongestionLevel` mapping 기준
+- SK 실시간 혼잡도 API 응답 필드의 사용자 화면 활용 기준
