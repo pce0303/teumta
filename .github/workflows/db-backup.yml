@@ -1,0 +1,68 @@
+# 운영 DB(Cloudtype MariaDB) 일일 백업 — mariadb-dump 후 GitHub Actions artifact로 보관(30일).
+#
+# 사전 조건 (fork 저장소 기준):
+# 1. Cloudtype DB에 "외부 접속" 활성화 (Actions 러너가 인터넷에서 접속해야 함)
+# 2. fork 저장소 Settings → Secrets → Actions에 BACKUP_DATABASE_URL 등록
+#    형식: mysql://<user>:<password>@<외부호스트>:<외부포트>/teumta
+#    (서버의 DATABASE_URL에서 호스트/포트만 외부 접속 주소로 바꾼 값)
+#
+# 복원: artifact 다운로드 후
+#   gunzip -c teumta-YYYYMMDD-HHMM.sql.gz | mariadb -h <호스트> -P <포트> -u <user> -p teumta
+#
+# 실행 시각: 매일 05:30 KST (20:30 UTC) — 05:00 KST 집중률 적재 직후, 자정 UTC DB 순단 시간대 회피.
+name: DB backup
+
+on:
+  schedule:
+    - cron: "30 20 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    if: github.repository == 'pce0303/teumta'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install MariaDB client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mariadb-client
+
+      - name: Dump database
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$BACKUP_DATABASE_URL" ]; then
+            echo "::error::BACKUP_DATABASE_URL secret이 설정되지 않았습니다."
+            exit 1
+          fi
+          # URL 인코딩된 비밀번호까지 안전하게 파싱한다.
+          eval "$(python3 - <<'PY'
+          import os, shlex
+          from urllib.parse import urlsplit, unquote
+          u = urlsplit(os.environ["BACKUP_DATABASE_URL"])
+          print(f"DB_HOST={shlex.quote(u.hostname or '')}")
+          print(f"DB_PORT={shlex.quote(str(u.port or 3306))}")
+          print(f"DB_USER={shlex.quote(unquote(u.username or ''))}")
+          print(f"DB_PASS={shlex.quote(unquote(u.password or ''))}")
+          print(f"DB_NAME={shlex.quote(u.path.lstrip('/'))}")
+          PY
+          )"
+          STAMP=$(TZ=Asia/Seoul date +%Y%m%d-%H%M)
+          MYSQL_PWD="$DB_PASS" mariadb-dump \
+            -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" \
+            --single-transaction --no-tablespaces --skip-ssl-verify-server-cert \
+            "$DB_NAME" | gzip > "teumta-$STAMP.sql.gz"
+          # 빈 덤프(연결은 됐지만 내용 없음) 감지
+          SIZE=$(stat -c%s "teumta-$STAMP.sql.gz")
+          echo "dump size: ${SIZE} bytes"
+          if [ "$SIZE" -lt 1024 ]; then
+            echo "::error::덤프가 비정상적으로 작습니다(${SIZE}B). 연결/권한을 확인하세요."
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: teumta-db-backup-${{ github.run_id }}
+          path: teumta-*.sql.gz
+          retention-days: 30
