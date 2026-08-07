@@ -36,6 +36,7 @@
    | `TMAP_API_BASE_URL` | `https://apis.openapi.sk.com` |
    | `CONGESTION_API_BASE_URL` | `https://apis.openapi.sk.com/puzzle` |
    | `PREDICTION_INGEST_TARGETS` | `11:11110` (집중률 자동 적재. 실험 중엔 비워도 됨) |
+   | `ADMIN_PASSWORD` | 관리자 웹 로그인 비밀번호. **미설정 시 `/api/admin/*` 전부 503**(fail closed). 변경 시 발급된 토큰 전부 무효화 |
 
 4. 배포 로그에서 확인: `migrate deploy` 적용 로그(①) → `teumta-server listening` → health check 통과
 
@@ -69,7 +70,33 @@ time curl -s "$BASE/api/congestion?poiId=362105" > /dev/null
 
 - `mobile/.env`의 API 주소를 배포 주소로 교체 → 프론트 담당 전달
 - `PREDICTION_INGEST_TARGETS` 설정 → 집중률 자동 적재 활성
-- DB 백업: GitHub Actions cron으로 일 1회 `mysqldump` (별도 작업)
+
+## 6. 관리자 웹 배포 (2026-08-07 완료)
+
+주소: `https://port-0-teumta-admin-web-msh476v8e47b3c7e.sel3.cloudtype.app`
+
+같은 프로젝트 → 새 서비스(Node.js) → `saesgil-yulamdan/teumta` `main`:
+
+| 항목 | 값 |
+|---|---|
+| Root Directory | `admin` |
+| Build | `npm ci --include=dev && npm run build` ← **`--include=dev` 필수** (Cloudtype 빌드가 `NODE_ENV=production`이라 없으면 `tsc: not found`로 실패) |
+| Start | `npm start` (`serve -s dist` — SPA 딥링크 fallback 내장) |
+| Port | 3000 |
+| 환경변수 | `VITE_API_BASE_URL=https://<서버 주소>/api` |
+
+⚠️ `VITE_API_BASE_URL`은 **빌드 시점에 번들에 들어간다** — 값을 바꾸면 재배포해야 반영됨.
+서버 코드가 바뀌어도 admin 웹은 별도 서비스라 **각각 "배포하기"** 눌러야 한다.
+
+## 7. DB 백업 (2026-08-07 완료)
+
+- GitHub Actions `.github/workflows/db-backup.yml` — 매일 05:30 KST `mariadb-dump` →
+  artifact 30일 보관 (org 저장소 Actions 탭에서 다운로드)
+- 필요 설정: ① Cloudtype **프로젝트 설정 하단 방화벽 → "TCP 외부 접속 허용" + 적용하기**
+  (DB 서비스 연결 탭에 외부 주소가 보여도 이 스위치가 꺼져 있으면 접속 불가!) ②
+  org 저장소 Repository secret `BACKUP_DATABASE_URL` = `mysql://root:<pw>@svc.sel3.cloudtype.app:<외부포트>/teumta`
+- ⚠️ **DB 재시작 시 외부 포트가 바뀔 수 있음** — 백업이 갑자기 실패하면 연결 탭에서 포트 확인 후 secret 갱신
+- 복원: artifact 받아서 `gunzip -c teumta-*.sql.gz | mariadb -h <호스트> -P <포트> -u root -p teumta`
 
 ## 주의
 

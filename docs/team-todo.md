@@ -1,8 +1,10 @@
-# 팀 업무 분담 TODO (2026-08-07 갱신)
+# 팀 업무 분담 TODO (2026-08-07 2차 갱신)
 
-> **서버 배포 완료** — 백엔드 외부 연동 API 전부 구현·검증됨. 전체 구조는 [service-overview.md](./service-overview.md), 상세 명세는 [api-spec.md](./api-spec.md) 참조.
+> **서버 배포 완료** — 백엔드 외부 연동 API 전부 구현·검증됨. **관리자 웹도 배포됨.**
+> 전체 구조는 [service-overview.md](./service-overview.md), 상세 명세는 [api-spec.md](./api-spec.md) 참조.
 >
-> **배포 주소**: `https://port-0-teumta-server-msh476v8e47b3c7e.sel3.cloudtype.app` (24시간 상시 실행)
+> **서버**: `https://port-0-teumta-server-msh476v8e47b3c7e.sel3.cloudtype.app` (24시간 상시 실행)
+> **관리자 웹**: `https://port-0-teumta-admin-web-msh476v8e47b3c7e.sel3.cloudtype.app` (로그인 필요 — 비밀번호는 B에게)
 
 ---
 
@@ -89,15 +91,19 @@ cp mobile/.env.example mobile/.env   # 배포 서버 주소가 기본값 — 핫
 
 ## 🛠 백엔드 B 담당 (외부 연동·인프라)
 
-완료: 외부 API 연동 전체, 배포(Cloudtype 유료, 서울), 집중률 일일 자동 적재, 실시간 혼잡도 API.
+완료(2026-08-07 기준):
+- 외부 API 연동 전체, 배포(Cloudtype 유료, 서울), 집중률 일일 자동 적재, 실시간 혼잡도 API
+- **관리자 웹 배포** — 로그인(rate limit 포함), 대시보드, 장소 관리(등록/수정/삭제/태그),
+  집중률 매칭 도구(preview + alias 수동 연결). 명세: [api-spec.md §6](./api-spec.md)
+- 관리자 인증(`ADMIN_PASSWORD` + Bearer 토큰), Tag API, 장소 삭제 API(코스 사용 중이면 409)
+- 종로구 장소 528곳 적재(contentTypeId 12/14/38) + KTO 매칭 98/113곳(alias 11건 포함,
+  잔여 15건은 TourAPI에 없는 KTO 전용 항목 — 억지 연결 금지)
+- DB 백업 자동화 — GitHub Actions `db-backup.yml`, 매일 05:30 KST, artifact 30일 보관
 
 다음:
-1. **관리자 웹** —
-   - 집중률 매칭 UNMATCHED/AMBIGUOUS 해소 도구(현재 로그로만 확인 가능)
-   - 장소 큐레이션: 태그·추천 체류시간·설명 입력(`POST/PATCH /admin/places` 기존 API 활용)
-   - 코스 구성 입력기(A의 Route API 완성 후)
-2. 운영 루틴: org main 머지 → Cloudtype 콘솔 "배포하기" 수동 실행(자동 배포 웹훅 검토)
-3. DB 백업 자동화(GitHub Actions mysqldump) — 여유 될 때
+1. 장소 큐레이션 운영 작업 — 태그·추천 체류시간·설명 입력(도구 완비, 대시보드에 미입력 현황 표시)
+2. 코스 구성 입력기(A의 Route API 완성 후)
+3. 운영 루틴: org main 머지 → Cloudtype 콘솔 "배포하기" 수동 실행 — **서버·관리자 웹 각각**
 
 ---
 

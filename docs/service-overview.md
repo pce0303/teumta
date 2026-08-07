@@ -47,7 +47,8 @@
   Place:       ingest:tour 스크립트(수동) — tourApiContentId·법정동 코드 등
                집중률 매칭용 참조 데이터. 주변 장소 API 런타임에서는 사용 안 함
   Congestion:  집중률 예측 스케줄러(자동) — 서버 기동 시 + 매일 05시 KST
-               KTO 30일 예측 → 지역+이름 매칭 → MATCHED만 저장
+               KTO 30일 예측 → 지역+이름 매칭(관리자 alias 우선) → MATCHED만 저장
+               미매칭 항목은 관리자 웹 "데이터 매칭" 화면에서 수동 연결(ForecastPlaceAlias)
   Route/Trip:  팀원 A 구현 예정 — TMAP 경로 계산(route-calculation.service) 소비
 ```
 
@@ -80,7 +81,10 @@ GitHub org main 머지 → Cloudtype 콘솔 "배포하기" → 반영
 
 - 서버: `https://port-0-teumta-server-msh476v8e47b3c7e.sel3.cloudtype.app`
   (기동 시 `prisma migrate deploy` 자동 실행 — 스키마 변경도 머지→배포로 반영)
+- 관리자 웹: `https://port-0-teumta-admin-web-msh476v8e47b3c7e.sel3.cloudtype.app`
+  (로그인 필요 — 서버 환경변수 `ADMIN_PASSWORD`로 검증)
 - DB: MariaDB 11.2, 영구 볼륨(재시작 시 데이터 유지 검증됨)
+- DB 백업: GitHub Actions(`db-backup.yml`) 매일 05:30 KST → artifact 30일 보관
 - 서버·DB 모두 유료 리소스 — 상시 실행
 - 상세: [deploy-cloudtype.md](./deploy-cloudtype.md)
 
@@ -93,12 +97,17 @@ server/src/
 ├── external/          # [B] 외부 API 클라이언트·매퍼 (tour/tmap/congestion/prediction/common)
 ├── services/
 │   ├── place.service.ts              # [A] 장소 도메인 (구 getNearbyLocalPlaces는 deprecated)
+│   ├── tag.service.ts                # [B] 태그 관리 (관리자 웹용)
+│   ├── concentration-matching.service.ts # [B] 집중률 매칭 preview/alias (관리자 웹용)
 │   ├── nearby-local-place.service.ts # [B] 실시간 주변 장소
 │   ├── place-search.service.ts       # [B] 목적지 검색
 │   ├── congestion.service.ts         # [B] 혼잡도/예측 조회
 │   ├── *-ingestion.service.ts        # [B] 적재
 │   ├── prediction-scheduler.service.ts # [B] 일일 적재 스케줄러
 │   └── route-calculation.service.ts  # [B 제공 → A 소비] TMAP 경로 계산
+├── middlewares/                      # error / admin-auth / login-rate-limit
 ├── controllers/ · routes/            # [A/B 각자 담당 엔드포인트]
 └── prisma/                           # [A] 스키마 (외부 연동 필드는 B와 협의)
 ```
+
+관리자 웹은 `admin/` (React+TS+Vite, [B]) — API 명세는 [api-spec.md §6](./api-spec.md).
