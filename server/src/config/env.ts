@@ -24,6 +24,10 @@ const envSchema = z.object({
   // 외부 API 공통 요청 timeout(ms).
   EXTERNAL_API_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
 
+  // 관리자 인증 비밀번호. 미설정 시 관리자 로그인/모든 /api/admin/* 요청이 거부된다(fail closed).
+  // 코드/Git에 절대 넣지 않는다. 배포 환경(Cloudtype)에도 반드시 설정한다.
+  ADMIN_PASSWORD: z.string().optional().default(''),
+
   // 집중률 예측 일일 자동 적재 대상. "areaCd:signguCd" 쉼표 구분(예: "11:11110,26:26350").
   // 비우면 스케줄러 비활성(수동 스크립트만 사용).
   PREDICTION_INGEST_TARGETS: z.string().optional().default(''),

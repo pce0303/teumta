@@ -46,7 +46,7 @@ export async function runPredictionIngest(targets: IngestTarget[]): Promise<void
       const result = await ingestConcentrationForecasts(target);
       console.log(
         `[prediction-scheduler] areaCd=${target.areaCd} signguCd=${target.signguCd}: ` +
-          `매칭 ${result.matchedPlaces}곳, 저장 ${result.inserted}건, ` +
+          `매칭 ${result.matchedPlaces}곳(alias ${result.aliasMatchedPlaces}), 저장 ${result.inserted}건, ` +
           `unmatched ${result.unmatched.length}, ambiguous ${result.ambiguous.length}`,
       );
     } catch (error) {

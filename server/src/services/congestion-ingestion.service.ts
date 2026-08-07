@@ -11,6 +11,12 @@ import {
   type ForecastPlaceCandidate,
 } from '../external/prediction';
 import { prisma } from '../utils/prisma';
+import {
+  FORECAST_FETCH_NUM_OF_ROWS,
+  buildForecastAliasKey,
+  groupForecastsByKey,
+  loadForecastAliasMap,
+} from './concentration-matching.service';
 
 /**
  * 예측 혼잡도(집중률 예측) 데이터를 내부 Congestion 테이블에 적재하는 서비스.
@@ -129,8 +135,10 @@ export async function saveConcentrationForecasts(
 }
 
 export interface ConcentrationForecastIngestResult {
-  /** 안전하게 매칭되어 저장된 관광지 수. */
+  /** 안전하게 매칭되어 저장된 관광지 수(alias 매칭 포함). */
   matchedPlaces: number;
+  /** matchedPlaces 중 관리자 alias(ForecastPlaceAlias)로 연결된 수. */
+  aliasMatchedPlaces: number;
   inserted: number;
   deleted: number;
   /** 후보 없음 — 자동 저장하지 않고 집계만 반환. */
@@ -141,15 +149,23 @@ export interface ConcentrationForecastIngestResult {
   skipped: { tAtsNm: string; baseYmd: string; reason: string }[];
 }
 
-/** fetch → map → 매칭 → 저장. MATCHED만 저장, UNMATCHED/AMBIGUOUS는 집계만. */
+/**
+ * fetch → map → 매칭 → 저장. MATCHED만 저장, UNMATCHED/AMBIGUOUS는 집계만.
+ * 관리자 alias(ForecastPlaceAlias)가 있으면 자동 이름 매칭보다 우선 적용한다.
+ */
 export async function ingestConcentrationForecasts(
   params: ConcentrationForecastParams,
 ): Promise<ConcentrationForecastIngestResult> {
-  const response = await fetchConcentrationForecast(params);
+  // 행 수 = 관광지 수 × 30일. 클라이언트 기본값(100)은 지역당 3곳 수준이라 전 지역이 담기도록 키운다.
+  const response = await fetchConcentrationForecast({
+    numOfRows: FORECAST_FETCH_NUM_OF_ROWS,
+    ...params,
+  });
   const { forecasts, skipped } = mapConcentrationForecast(response);
 
   const result: ConcentrationForecastIngestResult = {
     matchedPlaces: 0,
+    aliasMatchedPlaces: 0,
     inserted: 0,
     deleted: 0,
     unmatched: [],
@@ -162,10 +178,13 @@ export async function ingestConcentrationForecasts(
   }
 
   // 지역(법정동 시도) 후보만 로드한다. 시군구 판정은 matcher가 담당한다.
-  const candidateRows = await prisma.place.findMany({
-    where: { lDongRegnCd: String(params.areaCd).trim() },
-    select: { id: true, name: true, lDongRegnCd: true, lDongSignguCd: true },
-  });
+  const [candidateRows, aliasMap] = await Promise.all([
+    prisma.place.findMany({
+      where: { lDongRegnCd: String(params.areaCd).trim() },
+      select: { id: true, name: true, lDongRegnCd: true, lDongSignguCd: true },
+    }),
+    loadForecastAliasMap(params.areaCd),
+  ]);
   const candidates: ForecastPlaceCandidate[] = candidateRows.map((row) => ({
     placeId: row.id,
     name: row.name,
@@ -174,19 +193,22 @@ export async function ingestConcentrationForecasts(
   }));
 
   // 같은 관광지명(tAtsNm) 묶음 단위로 매칭 후 저장한다.
-  const groups = new Map<string, ConcentrationForecastData[]>();
-  for (const forecast of forecasts) {
-    const key = `${forecast.areaCd}|${forecast.signguCd}|${forecast.tAtsNm}`;
-    const group = groups.get(key);
-    if (group) {
-      group.push(forecast);
-    } else {
-      groups.set(key, [forecast]);
-    }
-  }
-
-  for (const group of groups.values()) {
+  for (const group of groupForecastsByKey(forecasts).values()) {
     const { areaCd, signguCd, tAtsNm } = group[0];
+
+    const aliasPlaceId = aliasMap.get(
+      buildForecastAliasKey(areaCd, signguCd, tAtsNm),
+    );
+
+    if (aliasPlaceId !== undefined) {
+      const saved = await saveConcentrationForecasts(aliasPlaceId, group);
+      result.matchedPlaces += 1;
+      result.aliasMatchedPlaces += 1;
+      result.inserted += saved.inserted;
+      result.deleted += saved.deleted;
+      continue;
+    }
+
     const match: ForecastMatchResult = matchForecastToPlace(
       { areaCd, signguCd, tAtsNm },
       candidates,
