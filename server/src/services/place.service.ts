@@ -1,4 +1,4 @@
-import { PlaceType } from '@prisma/client';
+import { PlaceType, Prisma } from '@prisma/client';
 
 import { prisma } from '../utils/prisma';
 
@@ -245,6 +245,35 @@ export async function updatePlace(
   });
 
   return transformPlace(updatedPlace);
+}
+
+export type DeletePlaceResult = 'DELETED' | 'NOT_FOUND' | 'IN_USE';
+
+/**
+ * 장소 삭제. PlaceTag/Congestion/ForecastPlaceAlias는 cascade로 함께 정리된다.
+ * Route(mainPlace)/RouteStop이 참조 중이면 DB 제약(RESTRICT)에 걸려 IN_USE를 반환한다 —
+ * 코스 데이터를 보호하기 위한 의도된 동작이다(코스에서 먼저 제거해야 삭제 가능).
+ */
+export async function deletePlace(id: number): Promise<DeletePlaceResult> {
+  try {
+    await prisma.place.delete({
+      where: {
+        id,
+      },
+    });
+    return 'DELETED';
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        return 'NOT_FOUND';
+      }
+      // P2003: FK 제약 위반(Route/RouteStop 등에서 사용 중).
+      if (error.code === 'P2003') {
+        return 'IN_USE';
+      }
+    }
+    throw error;
+  }
 }
 
 /** @deprecated getNearbyLocalPlacesRealtime(실시간 TourAPI+TMAP)으로 대체됨. 신규 사용 금지. */

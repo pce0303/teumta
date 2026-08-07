@@ -13,6 +13,9 @@ import { errorMiddleware } from './middlewares/error.middleware';
 
 export const app = express();
 
+// Cloudtype LB 뒤에서 req.ip가 실제 클라이언트를 가리키도록(로그인 rate limit 키).
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json());
 

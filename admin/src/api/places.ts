@@ -35,3 +35,10 @@ export function updatePlace(
     body: JSON.stringify(input),
   });
 }
+
+/** DELETE /api/admin/places/:id — 코스에서 사용 중이면 409(PLACE_IN_USE). */
+export function deletePlace(id: number): Promise<{ deleted: boolean }> {
+  return apiRequest<{ deleted: boolean }>(`/admin/places/${id}`, {
+    method: 'DELETE',
+  });
+}

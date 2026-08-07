@@ -6,6 +6,7 @@ import {
 } from '../controllers/congestion.controller';
 import {
   createPlaceController,
+  deletePlaceController,
   getNearbyLocalPlacesByContentIdController,
   getNearbyLocalPlacesController,
   getPlaceByIdController,
@@ -37,3 +38,4 @@ placeRouter.get('/places/:id', getPlaceByIdController);
 
 placeRouter.post('/admin/places', createPlaceController);
 placeRouter.patch('/admin/places/:id', updatePlaceController);
+placeRouter.delete('/admin/places/:id', deletePlaceController);

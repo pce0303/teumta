@@ -13,3 +13,10 @@ export function createTag(name: string): Promise<TagWithUsage> {
     body: JSON.stringify({ name }),
   });
 }
+
+/** DELETE /api/admin/tags/:id — 전체 장소에서 이 태그 연결이 제거된다. */
+export function deleteTag(id: number): Promise<{ deleted: boolean }> {
+  return apiRequest<{ deleted: boolean }>(`/admin/tags/${id}`, {
+    method: 'DELETE',
+  });
+}

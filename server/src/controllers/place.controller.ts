@@ -11,6 +11,7 @@ import {
 import { searchDestinations } from '../services/place-search.service';
 import {
   createPlace,
+  deletePlace,
   findMissingTagIds,
   getPlaceById,
   getPlaces,
@@ -478,6 +479,62 @@ export const createPlaceController: RequestHandler = async (
     res.status(201).json({
       success: true,
       data: place,
+      error: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** DELETE /api/admin/places/:id — 코스(Route/RouteStop)에서 사용 중이면 409. */
+export const deletePlaceController: RequestHandler = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: '장소 ID는 양의 정수여야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const result = await deletePlace(id);
+
+    if (result === 'NOT_FOUND') {
+      res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          message: '장소를 찾을 수 없습니다.',
+        },
+      });
+      return;
+    }
+
+    if (result === 'IN_USE') {
+      res.status(409).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'PLACE_IN_USE',
+          message:
+            '코스(Route)에서 사용 중인 장소는 삭제할 수 없습니다. 코스에서 먼저 제거하세요.',
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { deleted: true },
       error: null,
     });
   } catch (error) {

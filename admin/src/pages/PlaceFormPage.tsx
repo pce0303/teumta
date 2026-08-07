@@ -2,8 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { getErrorMessage } from '../api/client';
-import { createPlace, fetchPlace, updatePlace } from '../api/places';
-import { createTag, fetchTags } from '../api/tags';
+import {
+  createPlace,
+  deletePlace,
+  fetchPlace,
+  updatePlace,
+} from '../api/places';
+import { createTag, deleteTag, fetchTags } from '../api/tags';
 import { ErrorState, LoadingState } from '../components/Feedback';
 import {
   PLACE_TYPES,
@@ -164,6 +169,8 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [newTagName, setNewTagName] = useState('');
   const [creatingTag, setCreatingTag] = useState(false);
   const [tagActionError, setTagActionError] = useState<string | null>(null);
+  const [managingTags, setManagingTags] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const justCreated = Boolean(
     (location.state as { created?: boolean } | null)?.created,
   );
@@ -251,6 +258,53 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
   };
 
+  /** 태그 전체 삭제(모든 장소에서 제거). 관리 모드에서만 노출된다. */
+  const handleDeleteTag = async (tagId: number, tagName: string) => {
+    const usage = allTags?.find((tag) => tag.id === tagId)?.placeCount;
+    const usageText =
+      usage === undefined ? '' : ` 현재 ${usage}곳에 지정되어 있습니다.`;
+    if (
+      !window.confirm(
+        `'${tagName}' 태그를 삭제할까요? 모든 장소에서 제거되며 되돌릴 수 없습니다.${usageText}`,
+      )
+    ) {
+      return;
+    }
+    setTagActionError(null);
+    try {
+      await deleteTag(tagId);
+      setAllTags(
+        (previous) => previous?.filter((tag) => tag.id !== tagId) ?? null,
+      );
+      setSelectedTagIds((previous) => previous.filter((id) => id !== tagId));
+    } catch (caught) {
+      setTagActionError(getErrorMessage(caught));
+    }
+  };
+
+  /** 장소 삭제. 코스에서 사용 중이면 서버가 409로 막는다. */
+  const handleDeletePlace = async () => {
+    if (placeId === null || !place) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `'${place.name}' 장소를 삭제할까요? 태그 연결·집중률 데이터도 함께 삭제되며 되돌릴 수 없습니다.`,
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setSaveError(null);
+    try {
+      await deletePlace(placeId);
+      navigate('/places', { replace: true });
+    } catch (caught) {
+      setSaveError(getErrorMessage(caught));
+      setDeleting(false);
+    }
+  };
+
   const setField = (field: keyof FormValues, value: string) => {
     setValues((previous) => ({ ...previous, [field]: value }));
   };
@@ -295,17 +349,20 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
   };
 
   // 태그 선택지: 전체 태그 + (목록 API 실패/누락 대비) 현재 장소에 이미 붙은 태그.
-  const knownTags = new Map<number, string>();
+  const knownTags = new Map<
+    number,
+    { name: string; placeCount: number | null }
+  >();
   for (const tag of allTags ?? []) {
-    knownTags.set(tag.id, tag.name);
+    knownTags.set(tag.id, { name: tag.name, placeCount: tag.placeCount });
   }
   for (const tag of place?.tags ?? []) {
     if (!knownTags.has(tag.id)) {
-      knownTags.set(tag.id, tag.name);
+      knownTags.set(tag.id, { name: tag.name, placeCount: null });
     }
   }
   const tagOptions = [...knownTags.entries()]
-    .map(([id, name]) => ({ id, name }))
+    .map(([id, info]) => ({ id, ...info }))
     .sort((first, second) => first.name.localeCompare(second.name, 'ko'));
 
   if (loading) {
@@ -526,6 +583,20 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
             <p className="cell-muted">태그 목록을 불러오는 중…</p>
           ) : (
             <>
+              <div className="tag-picker-header">
+                <span className="field-label">
+                  {managingTags
+                    ? '태그 관리 — 클릭하면 태그가 전체에서 삭제됩니다'
+                    : '클릭해서 이 장소의 태그를 선택/해제'}
+                </span>
+                <button
+                  type="button"
+                  className="tag-manage-toggle"
+                  onClick={() => setManagingTags((previous) => !previous)}
+                >
+                  {managingTags ? '관리 끝내기' : '태그 관리'}
+                </button>
+              </div>
               {tagOptions.length === 0 ? (
                 <p className="cell-muted">
                   아직 태그가 없습니다. 아래에서 첫 태그를 만들어 보세요.
@@ -534,6 +605,27 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 <div className="tag-picker">
                   {tagOptions.map((tag) => {
                     const selected = selectedTagIds.includes(tag.id);
+                    if (managingTags) {
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          className="tag-chip tag-chip-danger"
+                          onClick={() =>
+                            void handleDeleteTag(tag.id, tag.name)
+                          }
+                          title="태그 삭제"
+                        >
+                          {tag.name}
+                          {tag.placeCount !== null && (
+                            <span className="tag-chip-count">
+                              {tag.placeCount}곳
+                            </span>
+                          )}
+                          <span aria-hidden>×</span>
+                        </button>
+                      );
+                    }
                     return (
                       <button
                         key={tag.id}
@@ -581,13 +673,23 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
         </fieldset>
 
         <div className="form-actions">
+          {mode === 'edit' && place && (
+            <button
+              type="button"
+              className="button button-danger form-actions-left"
+              onClick={() => void handleDeletePlace()}
+              disabled={deleting || saving}
+            >
+              {deleting ? '삭제 중…' : '장소 삭제'}
+            </button>
+          )}
           <Link to="/places" className="button button-secondary">
             취소
           </Link>
           <button
             type="submit"
             className="button button-primary"
-            disabled={saving}
+            disabled={saving || deleting}
           >
             {saving
               ? '저장 중…'
