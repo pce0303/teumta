@@ -17,6 +17,7 @@ vi.mock('../config/env', () => envMock);
 import { adminLoginController } from '../controllers/admin-auth.controller';
 import { issueAdminToken } from '../utils/admin-token';
 import { adminAuthMiddleware } from './admin-auth.middleware';
+import { resetLoginRateLimit } from './login-rate-limit.middleware';
 
 interface FakeResponse {
   statusCode: number;
@@ -51,6 +52,7 @@ function makeReq(overrides: Partial<Request> = {}): Request {
 
 beforeEach(() => {
   envMock.env.ADMIN_PASSWORD = 'test-admin-password';
+  resetLoginRateLimit();
 });
 
 describe('adminAuthMiddleware', () => {

@@ -2,6 +2,10 @@ import type { RequestHandler } from 'express';
 
 import { env } from '../config/env';
 import {
+  recordLoginFailure,
+  recordLoginSuccess,
+} from '../middlewares/login-rate-limit.middleware';
+import {
   issueAdminToken,
   verifyAdminPassword,
 } from '../utils/admin-token';
@@ -36,6 +40,7 @@ export const adminLoginController: RequestHandler = (req, res, next) => {
     }
 
     if (!verifyAdminPassword(password, env.ADMIN_PASSWORD)) {
+      recordLoginFailure(req);
       res.status(401).json({
         success: false,
         data: null,
@@ -47,6 +52,7 @@ export const adminLoginController: RequestHandler = (req, res, next) => {
       return;
     }
 
+    recordLoginSuccess(req);
     res.status(200).json({
       success: true,
       data: issueAdminToken(env.ADMIN_PASSWORD),

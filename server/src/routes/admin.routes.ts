@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { adminLoginController } from '../controllers/admin-auth.controller';
+import { loginRateLimitMiddleware } from '../middlewares/login-rate-limit.middleware';
 import {
   deleteAliasController,
   listAliasesController,
@@ -16,7 +17,7 @@ import {
 
 /** 인증 제외 대상: 로그인만. app.ts에서 adminAuthMiddleware보다 먼저 마운트한다. */
 export const adminLoginRouter = Router();
-adminLoginRouter.post('/', adminLoginController);
+adminLoginRouter.post('/', loginRateLimitMiddleware, adminLoginController);
 
 /** 태그 조회는 공개(GET), 생성/삭제는 /api/admin/* 보호 범위. */
 export const tagRouter = Router();
