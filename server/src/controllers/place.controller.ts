@@ -37,6 +37,7 @@ export const getPlacesController: RequestHandler = async (
 ) => {
   try {
     const type = req.query.type;
+    const tag = req.query.tag;
 
     if (
       type !== undefined &&
@@ -54,7 +55,24 @@ export const getPlacesController: RequestHandler = async (
       return;
     }
 
-    const places = await getPlaces(type as PlaceType | undefined);
+    if (
+      tag !== undefined &&
+      (typeof tag !== 'string' || tag.trim().length === 0)
+    ) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          message: 'tag는 비어 있지 않은 문자열이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const places = await getPlaces(
+      type as PlaceType | undefined,
+      typeof tag === 'string' ? tag.trim() : undefined,
+    );
 
     res.status(200).json({
       success: true,

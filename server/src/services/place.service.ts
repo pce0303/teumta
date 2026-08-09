@@ -89,13 +89,25 @@ export async function findMissingTagIds(
   );
 }
 
-export async function getPlaces(type?: PlaceType) {
+export async function getPlaces(
+  type?: PlaceType,
+  tag?: string,
+) {
   const places = await prisma.place.findMany({
-    where: type
-      ? {
-        type,
-      }
-      : undefined,
+    where: {
+      ...(type ? { type } : {}),
+      ...(tag
+        ? {
+          placeTags: {
+            some: {
+              tag: {
+                name: tag,
+              },
+            },
+          },
+        }
+        : {}),
+    },
     include: {
       placeTags: {
         include: {
