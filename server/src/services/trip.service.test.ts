@@ -5,12 +5,16 @@ const {
   routeFindUniqueMock,
   tripFindUniqueMock,
   tripCreateMock,
+  tripUpdateMock,
   tripEventCreateMock,
+  transactionMock,
 } = vi.hoisted(() => ({
   routeFindUniqueMock: vi.fn(),
   tripFindUniqueMock: vi.fn(),
   tripCreateMock: vi.fn(),
+  tripUpdateMock: vi.fn(),
   tripEventCreateMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock('../utils/prisma', () => ({
@@ -21,10 +25,12 @@ vi.mock('../utils/prisma', () => ({
     trip: {
       findUnique: tripFindUniqueMock,
       create: tripCreateMock,
+      update: tripUpdateMock,
     },
     tripEvent: {
       create: tripEventCreateMock,
     },
+    $transaction: transactionMock,
   },
 }));
 
@@ -42,6 +48,19 @@ beforeEach(() => {
 
   routeFindUniqueMock.mockResolvedValue(null);
   tripFindUniqueMock.mockResolvedValue(null);
+  tripUpdateMock.mockReset();
+  transactionMock.mockReset();
+
+  transactionMock.mockImplementation(async (callback) =>
+    callback({
+      trip: {
+        update: tripUpdateMock,
+      },
+      tripEvent: {
+        create: tripEventCreateMock,
+      },
+    }),
+  );
 });
 
 describe('createTrip', () => {
@@ -84,56 +103,17 @@ describe('createTrip', () => {
 });
 
 describe('createTripEvent', () => {
-  it('존재하는 Trip이면 이벤트를 생성한다', async () => {
+  it('TRIP_STARTED 이벤트 생성 시 Trip 상태를 IN_PROGRESS로 변경한다', async () => {
     const event = {
       id: 1,
       tripId: 5,
-      placeId: 3,
-      eventType: TripEventType.PLACE_ARRIVED,
-      metadata: {},
+      eventType: TripEventType.TRIP_STARTED,
     };
 
     tripFindUniqueMock.mockResolvedValue({ id: 5 });
     tripEventCreateMock.mockResolvedValue(event);
 
     const result = await createTripEvent(5, {
-      eventType: TripEventType.PLACE_ARRIVED,
-      placeId: 3,
-      metadata: {},
-    });
-
-    expect(tripFindUniqueMock).toHaveBeenCalledWith({
-      where: {
-        id: 5,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    expect(tripEventCreateMock).toHaveBeenCalledWith({
-      data: {
-        tripId: 5,
-        eventType: TripEventType.PLACE_ARRIVED,
-        placeId: 3,
-        metadata: {},
-      },
-    });
-
-    expect(result).toEqual(event);
-  });
-
-  it('optional 값이 없으면 placeId와 metadata를 저장 요청에 넣지 않는다', async () => {
-    tripFindUniqueMock.mockResolvedValue({ id: 5 });
-    tripEventCreateMock.mockResolvedValue({
-      id: 2,
-      tripId: 5,
-      placeId: null,
-      eventType: TripEventType.TRIP_STARTED,
-      metadata: null,
-    });
-
-    await createTripEvent(5, {
       eventType: TripEventType.TRIP_STARTED,
     });
 
@@ -143,6 +123,18 @@ describe('createTripEvent', () => {
         eventType: TripEventType.TRIP_STARTED,
       },
     });
+
+    expect(tripUpdateMock).toHaveBeenCalledWith({
+      where: {
+        id: 5,
+      },
+      data: {
+        status: 'IN_PROGRESS',
+        startedAt: expect.any(Date),
+      },
+    });
+
+    expect(result).toEqual(event);
   });
 
   it('Trip이 없으면 null을 반환하고 이벤트를 생성하지 않는다', async () => {
@@ -152,6 +144,60 @@ describe('createTripEvent', () => {
 
     expect(result).toBeNull();
     expect(tripEventCreateMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+  it('TRIP_COMPLETED 이벤트 생성 시 Trip 상태를 COMPLETED로 변경한다', async () => {
+    const event = {
+      id: 2,
+      tripId: 5,
+      eventType: TripEventType.TRIP_COMPLETED,
+    };
+
+    tripFindUniqueMock.mockResolvedValue({ id: 5 });
+    tripEventCreateMock.mockResolvedValue(event);
+
+    const result = await createTripEvent(5, {
+      eventType: TripEventType.TRIP_COMPLETED,
+    });
+
+    expect(tripUpdateMock).toHaveBeenCalledWith({
+      where: {
+        id: 5,
+      },
+      data: {
+        status: 'COMPLETED',
+        endedAt: expect.any(Date),
+      },
+    });
+
+    expect(result).toEqual(event);
+  });
+
+  it('TRIP_CANCELLED 이벤트 생성 시 Trip 상태를 CANCELLED로 변경한다', async () => {
+    const event = {
+      id: 3,
+      tripId: 5,
+      eventType: TripEventType.TRIP_CANCELLED,
+    };
+
+    tripFindUniqueMock.mockResolvedValue({ id: 5 });
+    tripEventCreateMock.mockResolvedValue(event);
+
+    const result = await createTripEvent(5, {
+      eventType: TripEventType.TRIP_CANCELLED,
+    });
+
+    expect(tripUpdateMock).toHaveBeenCalledWith({
+      where: {
+        id: 5,
+      },
+      data: {
+        status: 'CANCELLED',
+        endedAt: expect.any(Date),
+      },
+    });
+
+    expect(result).toEqual(event);
   });
 });
 

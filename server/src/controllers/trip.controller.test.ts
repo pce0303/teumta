@@ -156,41 +156,35 @@ describe('createTripController', () => {
 
 describe('createTripEventController', () => {
   it('정상적인 이벤트를 생성하고 201을 반환한다', async () => {
-    const event = {
-      id: 1,
-      tripId: 5,
-      placeId: 3,
-      eventType: TripEventType.PLACE_ARRIVED,
-      metadata: {},
-    };
+  const event = {
+    id: 1,
+    tripId: 5,
+    eventType: TripEventType.TRIP_STARTED,
+  };
 
-    createTripEventMock.mockResolvedValue(event);
+  createTripEventMock.mockResolvedValue(event);
 
-    const { res } = await runController(
-      createTripEventController,
-      makeReq(
-        { tripId: '5' },
-        {
-          eventType: 'PLACE_ARRIVED',
-          placeId: 3,
-          metadata: {},
-        },
-      ),
-    );
+  const { res } = await runController(
+    createTripEventController,
+    makeReq(
+      { tripId: '5' },
+      {
+        eventType: 'TRIP_STARTED',
+      },
+    ),
+  );
 
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toEqual({
-      success: true,
-      data: event,
-      error: null,
-    });
-
-    expect(createTripEventMock).toHaveBeenCalledWith(5, {
-      eventType: TripEventType.PLACE_ARRIVED,
-      placeId: 3,
-      metadata: {},
-    });
+  expect(res.statusCode).toBe(201);
+  expect(res.body).toEqual({
+    success: true,
+    data: event,
+    error: null,
   });
+
+  expect(createTripEventMock).toHaveBeenCalledWith(5, {
+    eventType: TripEventType.TRIP_STARTED,
+  });
+});
 
   it('잘못된 eventType은 400 INVALID_EVENT_TYPE', async () => {
     const { res } = await runController(
@@ -236,22 +230,6 @@ describe('createTripEventController', () => {
       makeReq(
         { tripId: 'abc' },
         { eventType: 'TRIP_STARTED' },
-      ),
-    );
-
-    expect(res.statusCode).toBe(400);
-    expect(createTripEventMock).not.toHaveBeenCalled();
-  });
-
-  it('잘못된 placeId는 400', async () => {
-    const { res } = await runController(
-      createTripEventController,
-      makeReq(
-        { tripId: '5' },
-        {
-          eventType: 'PLACE_ARRIVED',
-          placeId: 0,
-        },
       ),
     );
 

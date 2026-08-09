@@ -1,4 +1,5 @@
 import { prisma } from '../utils/prisma';
+import { transformPlace } from './place.service';
 
 export async function getRoutesByPlaceId(placeId: number) {
   return prisma.route.findMany({
@@ -12,7 +13,7 @@ export async function getRoutesByPlaceId(placeId: number) {
 }
 
 export async function getRouteById(routeId: number) {
-  return prisma.route.findUnique({
+  const route = await prisma.route.findUnique({
     where: {
       id: routeId,
     },
@@ -21,7 +22,30 @@ export async function getRouteById(routeId: number) {
         orderBy: {
           stopOrder: 'asc',
         },
+        include: {
+          place: {
+            include: {
+              placeTags: {
+                include: {
+                  tag: true,
+                },
+              },
+            },
+          },
+        },
       },
     },
   });
+
+  if (!route) {
+    return null;
+  }
+
+  return {
+    ...route,
+    stops: route.stops.map((stop) => ({
+      ...stop,
+      place: transformPlace(stop.place),
+    })),
+  };
 }

@@ -40,7 +40,7 @@ function calculateDistanceMeters(
   return Math.round(EARTH_RADIUS_METERS * centralAngle);
 }
 
-function transformPlace(place: any) {
+export function transformPlace(place: any) {
   const {
     placeTags,
     latitude,

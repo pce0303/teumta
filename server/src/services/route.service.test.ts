@@ -61,7 +61,7 @@ describe('getRoutesByPlaceId', () => {
 });
 
 describe('getRouteById', () => {
-  it('routeId로 코스를 조회하고 stops를 stopOrder 오름차순으로 포함한다', async () => {
+  it('routeId로 코스를 조회하고 stops를 Place 정보와 함께 stopOrder 오름차순으로 포함한다', async () => {
     const route = {
       id: 1,
       name: '서촌 우회 코스',
@@ -70,10 +70,26 @@ describe('getRouteById', () => {
         {
           id: 1,
           stopOrder: 1,
+          place: {
+            id: 20,
+            name: '로컬 장소 1',
+            latitude: 37.1,
+            longitude: 126.1,
+            tourApiContentId: null,
+            placeTags: [],
+          },
         },
         {
           id: 2,
           stopOrder: 2,
+          place: {
+            id: 21,
+            name: '로컬 장소 2',
+            latitude: 37.2,
+            longitude: 126.2,
+            tourApiContentId: null,
+            placeTags: [],
+          },
         },
       ],
     };
@@ -91,11 +107,48 @@ describe('getRouteById', () => {
           orderBy: {
             stopOrder: 'asc',
           },
+          include: {
+            place: {
+              include: {
+                placeTags: {
+                  include: {
+                    tag: true,
+                  },
+                },
+              },
+            },
+          },
         },
       },
     });
 
-    expect(result).toEqual(route);
+    expect(result).toEqual({
+      ...route,
+      stops: [
+        {
+          id: 1,
+          stopOrder: 1,
+          place: {
+            id: 20,
+            name: '로컬 장소 1',
+            latitude: 37.1,
+            longitude: 126.1,
+            tags: [],
+          },
+        },
+        {
+          id: 2,
+          stopOrder: 2,
+          place: {
+            id: 21,
+            name: '로컬 장소 2',
+            latitude: 37.2,
+            longitude: 126.2,
+            tags: [],
+          },
+        },
+      ],
+    });
   });
 
   it('존재하지 않는 코스는 null을 반환한다', async () => {

@@ -21,10 +21,18 @@ function parsePositiveInt(value: string | string[]) {
   return parsed;
 }
 
+const SERVER_ALLOWED_TRIP_EVENT_TYPES = [
+  TripEventType.TRIP_STARTED,
+  TripEventType.TRIP_COMPLETED,
+  TripEventType.TRIP_CANCELLED,
+] as const;
+
 function isTripEventType(value: unknown): value is TripEventType {
   return (
     typeof value === 'string' &&
-    Object.values(TripEventType).includes(value as TripEventType)
+    SERVER_ALLOWED_TRIP_EVENT_TYPES.includes(
+      value as (typeof SERVER_ALLOWED_TRIP_EVENT_TYPES)[number],
+    )
   );
 }
 
@@ -89,7 +97,7 @@ export async function createTripEventController(
       });
     }
 
-    const { eventType, placeId, metadata } = req.body ?? {};
+    const { eventType } = req.body ?? {};
 
     if (!isTripEventType(eventType)) {
       return res.status(400).json({
@@ -102,29 +110,10 @@ export async function createTripEventController(
       });
     }
 
-    if (
-      placeId !== undefined &&
-      parsePositiveInt(placeId) === null
-    ) {
-      return res.status(400).json({
-        success: false,
-        data: null,
-        error: {
-          code: 'INVALID_PLACE_ID',
-          message: '장소 ID는 양의 정수여야 합니다.',
-        },
-      });
-    }
-
+  
     const event = await createTripEvent(tripId, {
-      eventType,
-      ...(placeId !== undefined
-        ? { placeId: Number(placeId) }
-        : {}),
-      ...(metadata !== undefined
-        ? { metadata }
-        : {}),
-    });
+  eventType,
+});
 
     if (!event) {
       return res.status(404).json({
