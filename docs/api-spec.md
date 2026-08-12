@@ -172,7 +172,8 @@ Query (모두 optional):
 
 200: `data`는 `Place[]`.
 
-> 향후 확장(선택): 위치 기반 검색 `?lat=&lng=&radiusMeters=` — "근처 빈 시간 관광지" 핵심 시나리오. v1에서는 보류 가능.
+> 향후 확장(선택): 위치 기반 검색 `?lat=&lng=&radiusMeters=` — "근처 덜 붐비는 관광지" 시나리오. v1에서는 보류 가능.
+> 단, 좌표 입력은 location-privacy 원칙과 충돌하므로 도입 시 별도 검토 필요.
 
 ---
 

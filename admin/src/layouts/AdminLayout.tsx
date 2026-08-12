@@ -80,12 +80,6 @@ export function AdminLayout() {
       <div className="main">
         <header className="header">
           <h1 className="header-title">{currentPageTitle(location.pathname)}</h1>
-          <span
-            className="header-warning"
-            title="서버 /api/admin/* 엔드포인트에 아직 인증이 없습니다. 인증 적용 전까지 외부 공개 배포 금지."
-          >
-            관리자 인증 미적용 — 내부용
-          </span>
         </header>
         <main className="content">
           <Outlet />
