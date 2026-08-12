@@ -210,17 +210,6 @@ a {
   letter-spacing: -0.01em;
 }
 
-.header-warning {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--color-warning-soft);
-  color: var(--color-warning-text);
-  border: 1px solid #f0dcae;
-  cursor: help;
-  white-space: nowrap;
-}
-
 .content {
   padding: 24px 28px 48px;
   max-width: 1280px;
