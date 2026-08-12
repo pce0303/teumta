@@ -1,12 +1,17 @@
 import { Image } from 'expo-image';
 import { Link, type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { getNearbyLocalPlaces, getRealtimeCongestion } from '@/api/places';
 import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
-import { getMockPlaceById, getNearbyLocalPlaces } from '@/mocks/places';
-import type { CongestionLevel } from '@/types/place';
+import type {
+  CongestionLevel,
+  NearbyLocalPlaceResult,
+  RealtimeCongestion,
+} from '@/types/place';
 
 const STATUS_BAR_TINT = '#CCE8DB';
 const HERO_BAND = '#1C4738';
@@ -15,12 +20,35 @@ const CONGESTION_HEADLINE: Record<CongestionLevel, { title: string; subtitle: st
   low: { title: '지금은 여유로운 편이에요', subtitle: '현재 혼잡도가 낮은 상태예요.' },
   medium: { title: '지금은 무난한 편이에요', subtitle: '현재 혼잡도가 보통 상태예요.' },
   high: { title: '지금은 붐비는 편이에요', subtitle: '현재 혼잡도가 높은 상태예요.' },
+  veryHigh: { title: '지금은 매우 붐벼요', subtitle: '현재 혼잡도가 매우 높은 상태예요.' },
 };
 
 const CONGESTION_BAR_RATIO: Record<CongestionLevel, number> = {
   low: 0.33,
   medium: 0.62,
   high: 0.79,
+  veryHigh: 0.95,
+};
+
+const CONGESTION_MESSAGE: Record<CongestionLevel, string> = {
+  low: '주변이 여유로운 편이에요. 지금 방문하기 좋아요.',
+  medium: '무난한 편이지만, 여유를 원한다면 주변 로컬 장소를 먼저 둘러보는 것도 좋아요.',
+  high: '혼잡한 편이에요. 아래 근처 로컬 장소로 잠시 우회했다가 다시 방문해 보세요.',
+  veryHigh: '매우 혼잡해요. 지금은 근처 로컬 장소를 먼저 둘러보는 걸 추천해요.',
+};
+
+const REALTIME_LEVEL_TO_CONGESTION_LEVEL: Record<RealtimeCongestion['level'], CongestionLevel> = {
+  RELAXED: 'low',
+  NORMAL: 'medium',
+  CROWDED: 'high',
+  VERY_CROWDED: 'veryHigh',
+};
+
+const REALTIME_LEVEL_LABEL: Record<RealtimeCongestion['level'], string> = {
+  RELAXED: '여유',
+  NORMAL: '보통',
+  CROWDED: '혼잡',
+  VERY_CROWDED: '매우 혼잡',
 };
 
 const LEGEND_STEPS = [
@@ -30,14 +58,59 @@ const LEGEND_STEPS = [
   { key: 'veryHigh', label: '매우 혼잡' },
 ] as const;
 
+type Status = 'idle' | 'loading' | 'error' | 'unavailable';
+
+type PlaceDetailParams = {
+  id: string;
+  source: 'TOUR' | 'TMAP';
+  name?: string;
+  address?: string;
+  imageUrl?: string;
+  latitude?: string;
+  longitude?: string;
+};
+
 export default function PlaceDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, source, name, address, imageUrl } = useLocalSearchParams<PlaceDetailParams>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isPlaceBookmarked, togglePlaceBookmark } = useBookmarks();
-  const place = getMockPlaceById(id);
 
-  if (!place) {
+  const [congestion, setCongestion] = useState<RealtimeCongestion | null>(null);
+  const [congestionStatus, setCongestionStatus] = useState<Status>('idle');
+
+  const [nearby, setNearby] = useState<NearbyLocalPlaceResult[]>([]);
+  const [nearbyStatus, setNearbyStatus] = useState<Status>('loading');
+
+  const bookmarkId = `${source}-${id}`;
+
+  useEffect(() => {
+    if (!id || !source) return;
+
+    if (source === 'TMAP') {
+      setCongestionStatus('loading');
+      getRealtimeCongestion(id)
+        .then((data) => {
+          setCongestion(data);
+          setCongestionStatus('idle');
+        })
+        .catch(() => setCongestionStatus('error'));
+    } else {
+      // TourAPI 결과는 tmapPoiId가 없어 실시간 혼잡도를 조회할 수 없음
+      setCongestionStatus('unavailable');
+    }
+
+    setNearbyStatus('loading');
+    const identifier = source === 'TOUR' ? { contentId: id } : { poiId: id };
+    getNearbyLocalPlaces(identifier)
+      .then((data) => {
+        setNearby(data);
+        setNearbyStatus('idle');
+      })
+      .catch(() => setNearbyStatus('error'));
+  }, [id, source]);
+
+  if (!id || !source || !name) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>관광지를 찾을 수 없습니다.</Text>
@@ -45,9 +118,9 @@ export default function PlaceDetailScreen() {
     );
   }
 
-  const palette = Teumta.congestion[place.congestionLevel];
-  const headline = CONGESTION_HEADLINE[place.congestionLevel];
-  const nearbyPlaces = getNearbyLocalPlaces(place.id);
+  const congestionLevel = congestion ? REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level] : null;
+  const palette = congestionLevel ? Teumta.congestion[congestionLevel] : null;
+  const headline = congestionLevel ? CONGESTION_HEADLINE[congestionLevel] : null;
 
   return (
     <View style={styles.screen}>
@@ -63,8 +136,8 @@ export default function PlaceDetailScreen() {
             />
           </Pressable>
           <Pressable
-            style={[styles.heroButton, isPlaceBookmarked(place.id) && styles.heroButtonSaved]}
-            onPress={() => togglePlaceBookmark(place.id)}>
+            style={[styles.heroButton, isPlaceBookmarked(bookmarkId) && styles.heroButtonSaved]}
+            onPress={() => togglePlaceBookmark(bookmarkId)}>
             <Image
               source={require('@/assets/images/icons/bookmark.svg')}
               style={styles.heroButtonIcon}
@@ -72,103 +145,130 @@ export default function PlaceDetailScreen() {
             />
           </Pressable>
         </View>
-        <View style={styles.heroImage} />
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.heroImage} contentFit="cover" />
+        ) : (
+          <View style={styles.heroImage} />
+        )}
         <View style={styles.heroTitleBand}>
-          <Text style={styles.heroTitle}>{place.name}</Text>
-          <Text style={styles.heroSubtitle}>{place.area} · 실시간 혼잡도 기준</Text>
+          <Text style={styles.heroTitle}>{name}</Text>
+          {address && <Text style={styles.heroSubtitle}>{address}</Text>}
         </View>
 
         <View style={styles.content}>
           <View style={styles.congestionCard}>
-            <View style={styles.congestionHeader}>
-              <View style={styles.congestionTexts}>
-                <Text style={styles.congestionTitle}>{headline.title}</Text>
-                <Text style={styles.congestionSubtitle}>{headline.subtitle}</Text>
-              </View>
-              <Text style={[styles.congestionLevel, { color: palette.text }]}>
-                {place.congestionLabel}
+            {congestionStatus === 'loading' && <ActivityIndicator />}
+
+            {congestionStatus === 'unavailable' && (
+              <Text style={styles.congestionSubtitle}>
+                이 장소는 실시간 혼잡도를 제공하지 않아요.
               </Text>
-            </View>
-            <View style={styles.congestionTrack}>
-              <View
-                style={[
-                  styles.congestionFill,
-                  {
-                    backgroundColor: palette.dot,
-                    width: `${Math.round(CONGESTION_BAR_RATIO[place.congestionLevel] * 100)}%`,
-                  },
-                ]}
-              />
-            </View>
-            <View style={styles.congestionBanner}>
-              <Image
-                source={require('@/assets/images/icons/info.svg')}
-                style={styles.bannerIcon}
-                contentFit="contain"
-              />
-              <Text style={styles.bannerText}>{place.congestionMessage}</Text>
-            </View>
-          </View>
+            )}
 
-          <View style={styles.sectionRow}>
-            <Text style={styles.sectionTitle}>혼잡도 단계</Text>
-            <Text style={styles.sectionAction}>4단계 기준</Text>
-          </View>
+            {congestionStatus === 'error' && (
+              <Text style={styles.congestionSubtitle}>혼잡도 정보를 불러오지 못했어요.</Text>
+            )}
 
-          <View style={styles.legendRow}>
-            {LEGEND_STEPS.map((step) => {
-              const stepPalette = Teumta.congestion[step.key];
-              const active = step.key === place.congestionLevel;
-              return (
-                <View
-                  key={step.key}
-                  style={[
-                    styles.legendCard,
-                    active && {
-                      backgroundColor: stepPalette.background,
-                      borderColor: stepPalette.text,
-                    },
-                  ]}>
-                  <View style={[styles.legendDot, { backgroundColor: stepPalette.dot }]} />
-                  <Text style={[styles.legendLabel, active && { color: stepPalette.text }]}>
-                    {step.label}
+            {congestionStatus === 'idle' && congestion && congestionLevel && palette && headline && (
+              <>
+                <View style={styles.congestionHeader}>
+                  <View style={styles.congestionTexts}>
+                    <Text style={styles.congestionTitle}>{headline.title}</Text>
+                    <Text style={styles.congestionSubtitle}>{headline.subtitle}</Text>
+                  </View>
+                  <Text style={[styles.congestionLevel, { color: palette.text }]}>
+                    {REALTIME_LEVEL_LABEL[congestion.level]}
                   </Text>
                 </View>
-              );
-            })}
+                <View style={styles.congestionTrack}>
+                  <View
+                    style={[
+                      styles.congestionFill,
+                      {
+                        backgroundColor: palette.dot,
+                        width: `${Math.round(CONGESTION_BAR_RATIO[congestionLevel] * 100)}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <View style={styles.congestionBanner}>
+                  <Image
+                    source={require('@/assets/images/icons/info.svg')}
+                    style={styles.bannerIcon}
+                    contentFit="contain"
+                  />
+                  <Text style={styles.bannerText}>{CONGESTION_MESSAGE[congestionLevel]}</Text>
+                </View>
+              </>
+            )}
           </View>
+
+          {congestionStatus === 'idle' && congestionLevel && (
+            <>
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionTitle}>혼잡도 단계</Text>
+                <Text style={styles.sectionAction}>4단계 기준</Text>
+              </View>
+
+              <View style={styles.legendRow}>
+                {LEGEND_STEPS.map((step) => {
+                  const stepPalette = Teumta.congestion[step.key];
+                  const active = step.key === congestionLevel;
+                  return (
+                    <View
+                      key={step.key}
+                      style={[
+                        styles.legendCard,
+                        active && {
+                          backgroundColor: stepPalette.background,
+                          borderColor: stepPalette.text,
+                        },
+                      ]}>
+                      <View style={[styles.legendDot, { backgroundColor: stepPalette.dot }]} />
+                      <Text style={[styles.legendLabel, active && { color: stepPalette.text }]}>
+                        {step.label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          )}
 
           <View style={styles.sectionRow}>
             <Text style={styles.sectionTitle}>근처에서 잠깐 둘러볼 곳</Text>
-            <Link href={`/course-map?placeId=${place.id}` as Href} asChild>
-              <Pressable>
-                <Text style={styles.sectionAction}>지도 보기</Text>
-              </Pressable>
-            </Link>
           </View>
 
+          {nearbyStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
+          {nearbyStatus === 'error' && (
+            <Text style={styles.stateText}>주변 장소를 불러오지 못했어요.</Text>
+          )}
+          {nearbyStatus === 'idle' && nearby.length === 0 && (
+            <Text style={styles.stateText}>주변에 추천할 로컬 장소가 없어요.</Text>
+          )}
+
           <View style={styles.nearbyList}>
-            {nearbyPlaces.map((nearby) => (
-              <Link key={nearby.id} href={`/local-places/${nearby.id}` as Href} asChild>
-                <Pressable style={styles.nearbyCard}>
+            {nearby.map((place) => (
+              <View key={`${place.name}-${place.latitude}-${place.longitude}`} style={styles.nearbyCard}>
+                {place.imageUrl ? (
+                  <Image source={{ uri: place.imageUrl }} style={styles.nearbyThumb} />
+                ) : (
                   <View style={styles.nearbyThumb} />
-                  <View style={styles.nearbyTexts}>
-                    <Text style={styles.nearbyName}>{nearby.name}</Text>
-                    <Text style={styles.nearbyMeta}>
-                      도보 {nearby.walkMinutes}분 · 권장 체류 {nearby.stayMinutes}분 ·{' '}
-                      {nearby.congestionLabel}
-                    </Text>
-                  </View>
-                  <Text style={styles.nearbyChevron}>›</Text>
-                </Pressable>
-              </Link>
+                )}
+                <View style={styles.nearbyTexts}>
+                  <Text style={styles.nearbyName}>{place.name}</Text>
+                  <Text style={styles.nearbyMeta}>
+                    도보 {place.travelTimeMinutes}분 · {place.distanceMeters}m
+                  </Text>
+                </View>
+              </View>
             ))}
           </View>
         </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
-        <Link href={`/detours?placeId=${place.id}` as Href} asChild>
+        <Link href={`/detours?placeId=${bookmarkId}` as Href} asChild>
           <Pressable style={styles.ctaButton}>
             <Text style={styles.ctaLabel}>틈타 코스 보기</Text>
           </Pressable>
@@ -354,6 +454,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
+  stateBox: {
+    marginTop: 4,
+  },
+  stateText: {
+    color: Teumta.textSecondary,
+    fontSize: 12,
+  },
   nearbyList: {
     gap: 8,
   },
@@ -389,12 +496,6 @@ const styles = StyleSheet.create({
     color: Teumta.textSecondary,
     fontSize: 9,
     lineHeight: 13,
-  },
-  nearbyChevron: {
-    color: Teumta.textTertiary,
-    fontSize: 20,
-    fontWeight: '500',
-    lineHeight: 28,
   },
   footer: {
     backgroundColor: Teumta.surface,

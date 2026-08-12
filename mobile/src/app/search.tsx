@@ -1,53 +1,106 @@
-import { Link, type Href } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Link } from 'expo-router';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
-import { featuredPlaces } from '@/mocks/places';
+import { searchPlaces } from '@/api/places';
+import type { SearchPlaceResult } from '@/types/place';
+
+type SearchStatus = 'idle' | 'loading' | 'error';
 
 export default function SearchScreen() {
+  const [keyword, setKeyword] = useState('');
+  const [results, setResults] = useState<SearchPlaceResult[]>([]);
+  const [status, setStatus] = useState<SearchStatus>('idle');
+
+  async function handleSearch() {
+    const trimmed = keyword.trim();
+    if (!trimmed) return;
+
+    setStatus('loading');
+    try {
+      const data = await searchPlaces(trimmed);
+      setResults(data);
+      setStatus('idle');
+    } catch {
+      setResults([]);
+      setStatus('error');
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <TextInput
-        placeholder="관광지, 지역, 테마 검색"
-        placeholderTextColor="#7b8490"
-        style={styles.searchInput}
-      />
+      <View style={styles.searchRow}>
+        <TextInput
+          value={keyword}
+          onChangeText={setKeyword}
+          onSubmitEditing={handleSearch}
+          returnKeyType="search"
+          placeholder="관광지, 지역, 테마 검색"
+          placeholderTextColor="#7b8490"
+          style={styles.searchInput}
+        />
+        <Pressable style={styles.searchButton} onPress={handleSearch}>
+          <Text style={styles.searchButtonText}>검색</Text>
+        </Pressable>
+      </View>
+
+      {status === 'loading' && <ActivityIndicator style={styles.stateBox} />}
+
+      {status === 'error' && (
+        <Text style={styles.stateText}>검색 중 문제가 발생했습니다. 다시 시도해 주세요.</Text>
+      )}
+
+      {status === 'idle' && results.length === 0 && keyword.trim().length > 0 && (
+        <Text style={styles.stateText}>검색 결과가 없습니다.</Text>
+      )}
 
       <View style={styles.list}>
-        {featuredPlaces.map((place) => (
-          <Link key={place.id} href={`/places/${place.id}` as Href} asChild>
-            <Pressable style={styles.card}>
-              <View style={styles.cardHeader}>
+        {results.map((place, index) => {
+          const id = place.tourApiContentId ?? place.tmapPoiId ?? place.name;
+          return (
+            <Link
+              key={`${place.source}-${id}-${index}`}
+              href={{
+                pathname: '/places/[id]',
+                params: {
+                  id,
+                  source: place.source,
+                  name: place.name,
+                  ...(place.address && { address: place.address }),
+                  ...(place.imageUrl && { imageUrl: place.imageUrl }),
+                  ...(place.latitude != null && { latitude: String(place.latitude) }),
+                  ...(place.longitude != null && { longitude: String(place.longitude) }),
+                },
+              }}
+              asChild>
+              <Pressable style={styles.card}>
                 <Text style={styles.placeName}>{place.name}</Text>
-                <Text style={[styles.badge, congestionStyles[place.congestionLevel]]}>
-                  {place.congestionLabel}
-                </Text>
-              </View>
-              <Text style={styles.location}>{place.area}</Text>
-              <Text style={styles.description}>{place.shortDescription}</Text>
-            </Pressable>
-          </Link>
-        ))}
+                {place.address && <Text style={styles.location}>{place.address}</Text>}
+              </Pressable>
+            </Link>
+          );
+        })}
       </View>
     </ScrollView>
   );
 }
 
-const congestionStyles = StyleSheet.create({
-  low: {
-    color: '#1f7a68',
-  },
-  medium: {
-    color: '#9a6400',
-  },
-  high: {
-    color: '#b42318',
-  },
-});
-
 const styles = StyleSheet.create({
   container: {
     gap: 18,
     padding: 20,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   searchInput: {
     backgroundColor: '#ffffff',
@@ -55,9 +108,29 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     color: '#111827',
+    flex: 1,
     fontSize: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
+  },
+  searchButton: {
+    alignItems: 'center',
+    backgroundColor: '#1f7a68',
+    borderRadius: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  searchButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  stateBox: {
+    marginTop: 8,
+  },
+  stateText: {
+    color: '#687384',
+    fontSize: 14,
   },
   list: {
     gap: 12,
@@ -70,29 +143,13 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 16,
   },
-  cardHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
   placeName: {
     color: '#121417',
-    flex: 1,
     fontSize: 18,
-    fontWeight: '800',
-  },
-  badge: {
-    fontSize: 13,
     fontWeight: '800',
   },
   location: {
     color: '#687384',
     fontSize: 14,
-  },
-  description: {
-    color: '#4a5563',
-    fontSize: 15,
-    lineHeight: 22,
   },
 });
