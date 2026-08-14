@@ -497,3 +497,81 @@ DELETE /api/admin/concentration-matching/aliases/:id
 - preview/ingest는 KTO 쿼터(일 1,000)를 소모하므로 관리자 화면에서 버튼 클릭 시에만 호출(자동 폴링 금지).
 - 적재 조회 행 수는 5,000(`FORECAST_FETCH_NUM_OF_ROWS`) — 행 수 = 관광지 수 × 30일이라
   구 기본값(100)은 지역당 2~3곳만 담겼음. 호출 수는 동일 1회.
+
+### 6.5 코스 관리 — **초안 (미구현, A 합의 필요)**
+
+> 작성: B (2026-08-14) / 구현 예정: A / 소비: 관리자 웹 "코스 관리" 화면(B)
+> 관련 기준: [route-data-rules.md](./route-data-rules.md) — 저장형 Route, 복귀 구간 포함 원칙.
+> 인증: 기존 `/api/admin/*` Bearer 규약(6.1) 그대로.
+
+#### 스키마 확장 제안 (A 오너 — 마이그레이션 필요)
+
+복귀 구간(마지막 stop → mainPlace)을 저장할 필드가 현재 없음
+(route-data-rules §9 "추후 확정" 항목). `Route`에 추가 제안:
+
+```prisma
+// 마지막 RouteStop → mainPlace 복귀 구간(TMAP Place↔Place 고정 경로).
+// null이면 복귀 미포함 코스. privacy: 사용자 GPS 아님(RouteStop.pathFromPrevious와 동일 성격).
+returnTravelMinutes  Int?
+returnDistanceMeters Int?
+returnPath           Json?
+```
+
+`Route.estimatedTotalDurationMinutes` = 구간 이동시간 합 + `stayMinutes` 합 + (복귀 포함 시) 복귀 이동시간.
+
+#### 6.5.1 코스 생성
+
+```
+POST /api/admin/routes
+```
+Body:
+```jsonc
+{
+  "name": "경복궁 60분 우회 코스",       // 필수
+  "mainPlaceId": 1,                      // 필수 — 내부 Place(관광지)
+  "description": "서촌 골목 산책 코스",   // optional
+  "includeReturn": true,                  // optional, 기본 true — 복귀 구간 계산·저장 여부
+  "stops": [                              // 필수, 1개 이상, 방문 순서대로
+    { "placeId": 12, "stayMinutes": 20 },
+    { "placeId": 34, "stayMinutes": 15 }
+  ]
+}
+```
+
+- `stopOrder`는 배열 순서로 서버가 부여(1부터). 클라이언트가 별도 전달하지 않는다.
+- **이동시간·거리·경로는 클라이언트 입력이 아니라 서버 계산** —
+  `route-calculation.service.calculateWalkingRoute(mainPlace → stop1 → … → stopN [→ mainPlace])`(B 제공)로
+  `estimatedTravelMinutesFromPrevious`/`estimatedDistanceMetersFromPrevious`/`pathFromPrevious`와
+  `Route.estimatedTotal*`, 복귀 필드를 채운다.
+- TMAP 호출: 저장 1회당 구간 수(stops + 복귀 1) — 관리자 수동 작업이라 쿼터 영향 미미.
+- `400` — name/stops 누락, stops 빈 배열, `stayMinutes`가 양의 정수 아님, `mainPlaceId`/`placeId` 미존재,
+  stop에 mainPlace 자신 포함, 좌표 없는 Place 포함.
+- `502 EXTERNAL_API_UNAVAILABLE` — TMAP 구간 계산 실패. **부분 저장 없이 전체 실패**(all-or-nothing) —
+  경로 미검증 Route는 추천 후보로 쓸 수 없으므로(route-data-rules §13) 미완성 상태로 저장하지 않는다.
+- `201` — `data`는 3.6과 동일한 Route 상세(stops 포함).
+
+#### 6.5.2 코스 수정
+
+```
+PATCH /api/admin/routes/:id
+```
+- 부분 수정 — 전달한 필드만 반영(장소 PATCH와 동일 규약).
+- `stops` 전달 시 **전체 교체**(tagIds 패턴) + 전 구간 TMAP 재계산. `includeReturn` 변경 시도 재계산.
+- `name`/`description`만 변경 시 재계산 없음.
+- `404 ROUTE_NOT_FOUND`, 나머지 오류 규약은 6.5.1과 동일.
+
+#### 6.5.3 코스 삭제
+
+```
+DELETE /api/admin/routes/:id
+```
+- `RouteStop`은 연쇄 삭제(스키마 `onDelete: Cascade` 기존 설정).
+- **Trip이 참조 중이면 `409 ROUTE_IN_USE`** — 방문 기록 보호(장소 삭제의 `PLACE_IN_USE`와 동일 패턴).
+- `404 ROUTE_NOT_FOUND`.
+
+#### 논의 필요 (A와 확정)
+
+1. 복귀 구간 저장 위치 — 위 제안(Route 필드) vs RouteStop 가상 행. B는 Route 필드 권장(조회 API 하위호환).
+2. Trip 참조 Route의 PATCH 허용 여부 — 진행 중 Trip이 있는 Route의 stops 교체는 이력 왜곡 소지.
+   B 제안: `IN_PROGRESS` Trip 존재 시 stops 교체만 `409`.
+3. mainPlace의 `TOURIST_SPOT` 타입 강제 여부.
