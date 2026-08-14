@@ -1,8 +1,10 @@
 import { CongestionType, type CongestionLevel } from '@prisma/client';
 
 import { KTO_CONCENTRATION_FORECAST_SOURCE } from '../dtos';
+import { ExternalApiNotFoundError } from '../external/common';
 import { fetchRealtimeCongestion, mapSkCongestionToCongestionData } from '../external/congestion';
 import { prisma } from '../utils/prisma';
+import { resolveTmapPoiId } from './poi-matching.service';
 
 /**
  * 혼잡도 조회 서비스.
@@ -120,4 +122,25 @@ export async function getRealtimeCongestion(poiId: string): Promise<RealtimeCong
   };
   realtimeCache.set(key, { view, expiresAt: Date.now() + REALTIME_CONGESTION_CACHE_TTL_MS });
   return view;
+}
+
+/**
+ * TourAPI 목적지(contentId)의 실시간 혼잡도.
+ * SK는 TMAP poiId로만 조회되므로 먼저 관광지↔POI를 매칭한다(poi-matching.service, 결과 캐시).
+ * 대응하는 POI를 못 찾으면 "이 장소는 실시간 혼잡도를 제공하지 않는다"와 같은 상황이라 404로 알린다.
+ */
+export async function getRealtimeCongestionByContentId(
+  contentId: string,
+): Promise<RealtimeCongestionView> {
+  const poiId = await resolveTmapPoiId(contentId);
+
+  if (poiId === null) {
+    throw new ExternalApiNotFoundError(
+      'congestion',
+      'No TMAP POI matched for this TourAPI content',
+      { code: 'CONGESTION_DATA_NOT_FOUND' },
+    );
+  }
+
+  return getRealtimeCongestion(poiId);
 }

@@ -3,8 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /** 실시간 혼잡도 캐시 테스트. 외부 API는 mock. */
 
-const { fetchRealtimeCongestionMock } = vi.hoisted(() => ({
+const { fetchRealtimeCongestionMock, resolveTmapPoiIdMock } = vi.hoisted(() => ({
   fetchRealtimeCongestionMock: vi.fn(),
+  resolveTmapPoiIdMock: vi.fn(),
+}));
+
+vi.mock('./poi-matching.service', () => ({
+  resolveTmapPoiId: resolveTmapPoiIdMock,
 }));
 
 vi.mock('../external/congestion', async (importOriginal) => {
@@ -14,9 +19,11 @@ vi.mock('../external/congestion', async (importOriginal) => {
 
 vi.mock('../utils/prisma', () => ({ prisma: {} }));
 
+import { ExternalApiNotFoundError } from '../external/common/external-api.error';
 import {
   clearRealtimeCongestionCache,
   getRealtimeCongestion,
+  getRealtimeCongestionByContentId,
   REALTIME_CONGESTION_CACHE_TTL_MS,
 } from './congestion.service';
 
@@ -77,5 +84,27 @@ describe('getRealtimeCongestion', () => {
     fetchRealtimeCongestionMock.mockResolvedValue(rawResponse);
     await getRealtimeCongestion('362105');
     expect(fetchRealtimeCongestionMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('getRealtimeCongestionByContentId', () => {
+  it('TourAPI 관광지를 TMAP POI로 매칭한 뒤 혼잡도를 조회한다', async () => {
+    resolveTmapPoiIdMock.mockResolvedValue('362105');
+
+    const view = await getRealtimeCongestionByContentId('126508');
+
+    expect(resolveTmapPoiIdMock).toHaveBeenCalledWith('126508');
+    expect(fetchRealtimeCongestionMock).toHaveBeenCalledWith('362105');
+    expect(view.poiId).toBe('362105');
+  });
+
+  it('대응하는 POI가 없으면 404로 내려갈 NotFound 오류', async () => {
+    resolveTmapPoiIdMock.mockResolvedValue(null);
+
+    const caught = await getRealtimeCongestionByContentId('999').catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(ExternalApiNotFoundError);
+    expect((caught as ExternalApiNotFoundError).code).toBe('CONGESTION_DATA_NOT_FOUND');
+    expect(fetchRealtimeCongestionMock).not.toHaveBeenCalled();
   });
 });

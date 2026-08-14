@@ -321,10 +321,27 @@ GET /api/places/:placeId/congestion
 
 ### 3.4a 실시간 혼잡도 — [B] (SK 퍼즐, 구현됨)
 ```
-GET /api/congestion?poiId=362105
+GET /api/congestion?poiId=362105      # TMAP 목적지 — 검색 결과의 tmapPoiId
+GET /api/congestion?contentId=126508  # TourAPI 목적지 — 검색 결과의 tourApiContentId
 ```
-SK 지오비전 퍼즐 "실시간 장소 혼잡도". `poiId`는 검색 결과(3.3a)의 `tmapPoiId`.
-서버 5분 캐시(해커톤 요금제 월 3,000건 쿼터 절약). DB 미저장.
+SK 지오비전 퍼즐 "실시간 장소 혼잡도". 서버 5분 캐시(해커톤 요금제 월 3,000건 쿼터 절약). DB 미저장.
+
+**식별자 규칙:** `poiId`/`contentId` 중 **정확히 하나**(둘 다/둘 다 없음 → `400 INVALID_IDENTIFIER`).
+3.3b(주변 로컬 장소)와 같은 규칙이다.
+
+**TourAPI 목적지 처리:** SK는 TMAP `poiId`로만 조회되는데 검색은 TourAPI를 우선하므로
+**유명 관광지일수록 `tmapPoiId`가 없다** — 혼잡이 가장 문제되는 곳에서 실시간 혼잡도를 못 보여주는
+구멍이라 서버가 관광지↔POI를 매칭해 잇는다(`poi-matching.service`).
+
+- 매칭: TourAPI `detailCommon2`로 이름·좌표를 얻고 → TMAP POI 검색(상위 5) → **이름 일치도 우선,
+  거리로 동점 처리**, 반경 300m 밖은 매칭하지 않는다.
+- 이름을 먼저 보는 이유: TMAP은 본 시설과 부속 시설을 각각 POI로 주는데(예: "경복궁"/"경복궁 주차장",
+  id가 다르다) 부속 시설이 더 가까운 경우가 있고 SK는 본 시설만 커버한다.
+- 결과는 24시간 캐시(실패도 캐시 — 같은 장소로 쿼터를 반복 소모하지 않는다).
+  최초 1회만 외부 호출 2건(TourAPI 상세 1 + TMAP POI 검색 1)이 발생한다.
+- 검색 응답에 `tmapPoiId`를 미리 붙이지 않는 이유: 결과 20건마다 매칭하면 호출량·응답시간이 20배가 된다.
+  사용자가 실제로 여는 목적지는 하나이므로 조회 시점에 해석한다.
+- 대응 POI를 못 찾으면 `404 CONGESTION_DATA_NOT_FOUND`(억지 매칭 금지).
 ```jsonc
 {
   "success": true,
