@@ -5,6 +5,7 @@ import tripRouter from './routes/trip.routes';
 import { healthRouter } from './routes/health.routes';
 import {
   adminLoginRouter,
+  adminRouteRouter,
   concentrationMatchingRouter,
   tagRouter,
 } from './routes/admin.routes';
@@ -29,6 +30,7 @@ app.use('/api/admin', adminAuthMiddleware);
 
 app.use('/api', tagRouter);
 app.use('/api', concentrationMatchingRouter);
+app.use('/api', adminRouteRouter);
 app.use('/api', placeRouter);
 app.use('/api', routeRouter);
 app.use('/api', tripRouter);

@@ -141,6 +141,15 @@ model Route {
   description          String?  @db.Text
   estimatedTotalDurationMinutes Int?
   estimatedTotalDistanceMeters  Int?
+
+  // 마지막 RouteStop → mainPlace 복귀 구간. RouteStop의 경로 필드는 모두 "이전 장소 → 현재 정류지"
+  // 기준이라 복귀 구간을 담을 자리가 없어 Route에 둔다(api-spec §6.5).
+  // 전부 null이면 복귀 미포함 코스다.
+  // privacy: RouteStop.pathFromPrevious와 동일하게 Place↔Place 고정 경로이며 사용자 GPS가 아니다.
+  returnTravelMinutes  Int?
+  returnDistanceMeters Int?
+  returnPath           Json?
+
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

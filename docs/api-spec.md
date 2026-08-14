@@ -508,16 +508,17 @@ DELETE /api/admin/concentration-matching/aliases/:id
 - 적재 조회 행 수는 5,000(`FORECAST_FETCH_NUM_OF_ROWS`) — 행 수 = 관광지 수 × 30일이라
   구 기본값(100)은 지역당 2~3곳만 담겼음. 호출 수는 동일 1회.
 
-### 6.5 코스 관리 — **초안 (미구현, A 합의 필요)**
+### 6.5 코스 관리 — [B] (구현됨, 2026-08-14)
 
-> 작성: B (2026-08-14) / 구현 예정: A / 소비: 관리자 웹 "코스 관리" 화면(B)
+> 작성·구현: B / 소비: 관리자 웹 "코스 관리" 화면
 > 관련 기준: [route-data-rules.md](./route-data-rules.md) — 저장형 Route, 복귀 구간 포함 원칙.
 > 인증: 기존 `/api/admin/*` Bearer 규약(6.1) 그대로.
+> 소스: `server/src/controllers/admin-route.controller.ts`, `services/route.service.ts`.
 
-#### 스키마 확장 제안 (A 오너 — 마이그레이션 필요)
+#### 스키마 확장 (적용됨 — `20260814070000_add_route_return_segment`)
 
-복귀 구간(마지막 stop → mainPlace)을 저장할 필드가 현재 없음
-(route-data-rules §9 "추후 확정" 항목). `Route`에 추가 제안:
+복귀 구간(마지막 stop → mainPlace)을 저장할 필드가 없었다
+(route-data-rules §9 "추후 확정" 항목 해소). `Route`에 추가:
 
 ```prisma
 // 마지막 RouteStop → mainPlace 복귀 구간(TMAP Place↔Place 고정 경로).
@@ -606,9 +607,19 @@ DELETE /api/admin/routes/:id
 - **Trip이 참조 중이면 `409 ROUTE_IN_USE`** — 방문 기록 보호(장소 삭제의 `PLACE_IN_USE`와 동일 패턴).
 - `404 ROUTE_NOT_FOUND`.
 
-#### 논의 필요 (A와 확정)
+#### 확정된 결정 (구현 반영)
 
-1. 복귀 구간 저장 위치 — 위 제안(Route 필드) vs RouteStop 가상 행. B는 Route 필드 권장(조회 API 하위호환).
-2. Trip 참조 Route의 PATCH 허용 여부 — 진행 중 Trip이 있는 Route의 stops 교체는 이력 왜곡 소지.
-   B 제안: `IN_PROGRESS` Trip 존재 시 stops 교체만 `409`.
-3. mainPlace의 `TOURIST_SPOT` 타입 강제 여부.
+1. **복귀 구간은 `Route` 필드로 저장** — RouteStop에 mainPlace를 가상 행으로 넣는 대안은
+   기존 조회 API(3.6) 응답에서 "마지막 stop이 방문지인지 복귀인지" 구분이 불가능해 채택하지 않았다.
+2. **진행 중 방문이 있으면 구성 변경 불가** — `IN_PROGRESS` Trip이 있는 코스에 `stops`/`includeReturn`/
+   `mainPlaceId` 변경을 시도하면 `409 ROUTE_TRIP_IN_PROGRESS`. 이름·설명 수정은 허용된다.
+3. **mainPlace는 `TOURIST_SPOT`만** — 우회 코스의 기준은 원래 관광지라는 도메인 정의를 따른다.
+   아니면 `400`.
+
+#### 검증된 동작 (route.service.write.test.ts)
+
+- 구간 배분: `segments[i]`가 i번째 정류지의 진입 구간, 복귀 포함 시 마지막 1개가 복귀 구간
+- 총 소요시간 = 모든 구간 이동시간(복귀 포함) + 체류시간 합
+- `includeReturn: false`면 복귀 좌표를 waypoints에 넣지 않는다(TMAP 호출 1회 절약)
+- 좌표가 없거나 `(0, 0)`인 장소는 계산 전에 `400` — TourAPI 적재 경로와 동일하게 0을 무효 좌표로 본다
+- 이름·설명만 수정하면 TMAP을 호출하지 않는다
