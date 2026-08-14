@@ -1,40 +1,60 @@
 import { Image } from 'expo-image';
-import { Link, type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
-import { getLocalPlaceById } from '@/mocks/places';
 import { openDirections } from '@/utils/directions';
 
 const STATUS_BAR_TINT = '#CCE8DB';
 const HERO_BAND = '#1C4738';
 
-/** 혼잡 라벨 문자열 → 혼잡도 팔레트 키 (로컬 장소 목데이터는 라벨만 가진다). */
-const LABEL_LEVEL: Record<string, keyof typeof Teumta.congestion> = {
-  여유: 'low',
-  보통: 'medium',
-  혼잡: 'high',
-  '매우 혼잡': 'veryHigh',
+/**
+ * 주변 로컬 장소 상세.
+ *
+ * 이 장소들은 요청 시점에 외부 API로 조회한 결과라 서버에 id가 없다(api-spec 3.3b).
+ * 그래서 목록 화면에서 표시에 필요한 값을 그대로 넘겨받아 보여준다.
+ */
+type LocalPlaceParams = {
+  name?: string;
+  address?: string;
+  latitude?: string;
+  longitude?: string;
+  /** TMAP 실제 보행거리(m). 직선거리가 아니다. */
+  distanceMeters?: string;
+  travelTimeMinutes?: string;
+  imageUrl?: string;
+  /** 어느 목적지 주변에서 찾은 장소인지(표시용). */
+  destinationName?: string;
 };
 
+function formatDistance(meters: number) {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${meters}m`;
+}
+
 export default function LocalPlaceDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<LocalPlaceParams>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const found = getLocalPlaceById(id);
 
-  if (!found) {
+  const latitude = Number(params.latitude);
+  const longitude = Number(params.longitude);
+  const hasCoordinate = Number.isFinite(latitude) && Number.isFinite(longitude);
+
+  if (!params.name || !hasCoordinate) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>장소를 찾을 수 없습니다.</Text>
+        <Text style={styles.emptyText}>장소 정보를 불러올 수 없습니다.</Text>
+        <Pressable style={styles.emptyButton} onPress={() => router.back()}>
+          <Text style={styles.emptyButtonLabel}>돌아가기</Text>
+        </Pressable>
       </View>
     );
   }
 
-  const { local, parent } = found;
-  const palette = Teumta.congestion[LABEL_LEVEL[local.congestionLabel] ?? 'low'];
-  const relatedDetours = parent.detours.filter((detour) => local.detourIds.includes(detour.id));
+  const distanceMeters = Number(params.distanceMeters);
+  const travelMinutes = Number(params.travelTimeMinutes);
 
   return (
     <View style={styles.screen}>
@@ -50,61 +70,46 @@ export default function LocalPlaceDetailScreen() {
             />
           </Pressable>
         </View>
-        <View style={styles.heroImage} />
+        {params.imageUrl ? (
+          <Image source={{ uri: params.imageUrl }} style={styles.heroImage} contentFit="cover" />
+        ) : (
+          <View style={styles.heroImage} />
+        )}
         <View style={styles.heroTitleBand}>
-          <Text style={styles.heroTitle}>{local.name}</Text>
-          <Text style={styles.heroSubtitle}>
-            {parent.name}에서 도보 {local.walkMinutes}분
-          </Text>
+          <Text style={styles.heroTitle}>{params.name}</Text>
+          {params.destinationName && Number.isFinite(travelMinutes) && (
+            <Text style={styles.heroSubtitle}>
+              {params.destinationName}에서 도보 {travelMinutes}분
+            </Text>
+          )}
         </View>
 
         <View style={styles.content}>
           <View style={styles.statsRow}>
             <View style={styles.statTile}>
               <Text style={styles.statLabel}>도보</Text>
-              <Text style={styles.statValue}>{local.walkMinutes}분</Text>
+              <Text style={styles.statValue}>
+                {Number.isFinite(travelMinutes) ? `${travelMinutes}분` : '—'}
+              </Text>
             </View>
             <View style={styles.statTile}>
-              <Text style={styles.statLabel}>권장 체류</Text>
-              <Text style={styles.statValue}>{local.stayMinutes}분</Text>
-            </View>
-            <View style={styles.statTile}>
-              <Text style={styles.statLabel}>혼잡도</Text>
-              <Text style={[styles.statValue, { color: palette.text }]}>
-                {local.congestionLabel}
+              <Text style={styles.statLabel}>걷는 거리</Text>
+              <Text style={styles.statValue}>
+                {Number.isFinite(distanceMeters) ? formatDistance(distanceMeters) : '—'}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>소개</Text>
-          <Text style={styles.description}>{local.description}</Text>
+          <Text style={styles.sectionTitle}>주소</Text>
+          <Text style={styles.description}>{params.address ?? '주소 정보가 없어요.'}</Text>
 
-          <Text style={styles.sectionTitle}>이 장소를 지나는 틈타 코스</Text>
-          {relatedDetours.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyBoxText}>아직 이 장소를 지나는 코스가 없어요.</Text>
-            </View>
-          ) : (
-            <View style={styles.courseList}>
-              {relatedDetours.map((detour) => (
-                <Link
-                  key={detour.id}
-                  href={`/course-map?placeId=${parent.id}&detourId=${detour.id}` as Href}
-                  asChild>
-                  <Pressable style={styles.courseCard}>
-                    <View style={styles.courseThumb} />
-                    <View style={styles.courseTexts}>
-                      <Text style={styles.courseName}>{detour.name}</Text>
-                      <Text style={styles.courseMeta}>
-                        약 {detour.durationMinutes}분 · 도보 {detour.distanceKm}km
-                      </Text>
-                    </View>
-                    <Text style={styles.courseChevron}>›</Text>
-                  </Pressable>
-                </Link>
-              ))}
-            </View>
-          )}
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyBoxText}>
+              걷는 거리와 시간은 실제 보행 경로로 계산한 값이에요.
+            </Text>
+          </View>
+
+          <TourApiAttribution style={styles.attribution} />
         </View>
       </ScrollView>
 
@@ -113,9 +118,9 @@ export default function LocalPlaceDetailScreen() {
           style={styles.ctaButton}
           onPress={() =>
             openDirections({
-              name: local.name,
-              latitude: local.latitude,
-              longitude: local.longitude,
+              name: params.name as string,
+              latitude,
+              longitude,
             })
           }>
           <Text style={styles.ctaLabel}>길찾기 열기</Text>
@@ -138,6 +143,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: 24,
+  },
+  emptyButton: {
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 999,
+    marginTop: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  emptyButtonLabel: {
+    color: Teumta.greenDark,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  attribution: {
+    marginTop: 8,
   },
   emptyText: {
     color: Teumta.textSecondary,

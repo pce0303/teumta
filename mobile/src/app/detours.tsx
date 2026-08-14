@@ -1,40 +1,69 @@
 import { Image } from 'expo-image';
-import { Link, type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { Fragment, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Fragment, useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { fetchCourses } from '@/api/courses';
+import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
-import { getMockPlaceById } from '@/mocks/places';
-import type { DetourCourse, Place } from '@/types/place';
+import { setSelectedCourse } from '@/stores/selected-course';
+import {
+  courseDistanceMeters,
+  courseStayMinutes,
+  type CourseDestination,
+  type DestinationIdentifier,
+  type GeneratedCourse,
+} from '@/types/course';
 import { withRoJosa } from '@/utils/text';
+import { timeLabelAfter } from '@/utils/time';
 
-const DURATION_FILTERS = ['30분', '60분', '90분'] as const;
+/** 서버가 지원하는 가용 시간 선택지(api-spec 3.10). */
+const DURATION_OPTIONS = [30, 60, 90] as const;
 const HEADER_TINTS = ['#A8D6C2', '#D6C7AB'];
 
-function formatReturnTime(durationMinutes: number) {
-  const returnAt = new Date(Date.now() + durationMinutes * 60 * 1000);
-  const hours = String(returnAt.getHours()).padStart(2, '0');
-  const minutes = String(returnAt.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
+type Status = 'loading' | 'idle' | 'error';
+
+type DetoursParams = {
+  /** 목적지 식별자 — 검색 결과의 tourApiContentId 또는 tmapPoiId 중 하나. */
+  contentId?: string;
+  poiId?: string;
+  name?: string;
+};
+
+function formatKilometers(meters: number) {
+  return `${(meters / 1000).toFixed(1)}km`;
+}
+
+/** 코스 이름은 서버가 주지 않으므로 정류지 이름을 이어 붙여 만든다. */
+function courseTitle(course: GeneratedCourse) {
+  return course.stops.map((stop) => stop.name).join(' · ');
 }
 
 type RouteCardProps = {
-  detour: DetourCourse;
-  place: Place;
+  course: GeneratedCourse;
+  destination: CourseDestination;
   headerTint: string;
   badgeLabel: string;
   selected: boolean;
   onSelect: () => void;
 };
 
-function RouteCard({ detour, place, headerTint, badgeLabel, selected, onSelect }: RouteCardProps) {
-  const stayMinutes = detour.stayMinutes ?? Math.round(detour.durationMinutes * 0.7);
+function RouteCard({
+  course,
+  destination,
+  headerTint,
+  badgeLabel,
+  selected,
+  onSelect,
+}: RouteCardProps) {
+  const distanceLabel = formatKilometers(courseDistanceMeters(course));
   const stats = [
-    { value: formatReturnTime(detour.durationMinutes), label: '예상 복귀' },
-    { value: `${stayMinutes}분`, label: '추천 체류' },
-    { value: `${detour.distanceKm}km`, label: '걷는 거리' },
+    { value: timeLabelAfter(course.totalMinutes), label: '예상 복귀' },
+    { value: `${courseStayMinutes(course)}분`, label: '추천 체류' },
+    { value: distanceLabel, label: '걷는 거리' },
   ];
+  const stopNames = [...course.stops.map((stop) => stop.name), `${destination.name} 복귀`];
 
   return (
     <Pressable
@@ -52,40 +81,39 @@ function RouteCard({ detour, place, headerTint, badgeLabel, selected, onSelect }
         {selected ? (
           <View style={styles.summaryPill}>
             <Text style={styles.summaryText}>
-              약 {detour.durationMinutes}분 · 도보 {detour.distanceKm}km · {withRoJosa(place.name)}{' '}
-              복귀
+              약 {course.totalMinutes}분 · 도보 {distanceLabel} · {withRoJosa(destination.name)} 복귀
             </Text>
           </View>
         ) : (
-          <Text style={styles.headerDuration}>약 {detour.durationMinutes}분 코스</Text>
+          <Text style={styles.headerDuration}>약 {course.totalMinutes}분 코스</Text>
         )}
       </View>
 
       <View style={[styles.cardBody, selected ? styles.cardBodySelected : styles.cardBodyAlternative]}>
         <View style={styles.cardTitleRow}>
           <View style={selected ? styles.cardTexts : styles.cardTextsAlternative}>
-            <Text style={selected ? styles.cardName : styles.cardNameAlternative}>
-              {detour.name}
+            <Text
+              numberOfLines={1}
+              style={selected ? styles.cardName : styles.cardNameAlternative}>
+              {courseTitle(course)}
             </Text>
             <Text
               numberOfLines={1}
               style={selected ? styles.cardDescription : styles.cardDescriptionAlternative}>
-              {detour.description}
+              로컬 {course.stops.length}곳을 들르고 돌아오는 코스예요.
             </Text>
           </View>
           <View style={selected ? styles.radioOn : styles.radioOff} />
         </View>
 
-        {detour.stops && (
-          <View style={styles.stopsRow}>
-            {detour.stops.map((stop, index) => (
-              <Fragment key={stop}>
-                {index > 0 && <Text style={styles.stopArrow}>→</Text>}
-                <Text style={styles.stopName}>{stop}</Text>
-              </Fragment>
-            ))}
-          </View>
-        )}
+        <View style={styles.stopsRow}>
+          {stopNames.map((stop, index) => (
+            <Fragment key={`${stop}-${index}`}>
+              {index > 0 && <Text style={styles.stopArrow}>→</Text>}
+              <Text style={styles.stopName}>{stop}</Text>
+            </Fragment>
+          ))}
+        </View>
 
         <View style={styles.statsRow}>
           {stats.map((stat) => (
@@ -107,20 +135,76 @@ function RouteCard({ detour, place, headerTint, badgeLabel, selected, onSelect }
 }
 
 export default function DetoursScreen() {
-  const { placeId } = useLocalSearchParams<{ placeId?: string }>();
+  const { contentId, poiId, name } = useLocalSearchParams<DetoursParams>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const place = getMockPlaceById(placeId) ?? getMockPlaceById('gyeongbokgung');
-  const [selectedId, setSelectedId] = useState(place?.detours[0]?.id);
-  const [duration, setDuration] = useState<(typeof DURATION_FILTERS)[number]>('60분');
 
-  if (!place) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>코스를 찾을 수 없습니다.</Text>
-      </View>
-    );
-  }
+  const [availableMinutes, setAvailableMinutes] =
+    useState<(typeof DURATION_OPTIONS)[number]>(60);
+  const [destination, setDestination] = useState<CourseDestination | null>(null);
+  const [courses, setCourses] = useState<GeneratedCourse[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [status, setStatus] = useState<Status>('loading');
+
+  const identifier: DestinationIdentifier | null = contentId
+    ? { contentId }
+    : poiId
+      ? { poiId }
+      : null;
+
+  const load = useCallback(async () => {
+    if (!identifier) {
+      setStatus('error');
+      return;
+    }
+
+    setStatus('loading');
+    try {
+      const result = await fetchCourses(identifier, availableMinutes);
+      setDestination(result.destination);
+      setCourses(result.courses);
+      setSelectedIndex(0);
+      setStatus('idle');
+    } catch {
+      setCourses([]);
+      setStatus('error');
+    }
+    // identifier는 매 렌더 새 객체라 의존성에 넣지 않고 원본 파라미터를 본다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentId, poiId, availableMinutes]);
+
+  useEffect(() => {
+    let ignored = false;
+
+    // 코스 생성은 외부 API를 여러 번 호출한다. 화면 전환 중 응답이 늦게 와도 상태를 덮어쓰지 않는다.
+    void (async () => {
+      if (ignored) {
+        return;
+      }
+      await load();
+    })();
+
+    return () => {
+      ignored = true;
+    };
+  }, [load]);
+
+  const handleStart = () => {
+    const course = courses[selectedIndex];
+    if (!destination || !course || !identifier) {
+      return;
+    }
+
+    setSelectedCourse({
+      destination,
+      course,
+      availableMinutes,
+      destinationParams: identifier,
+    });
+    router.push('/course-map');
+  };
+
+  const destinationName = destination?.name ?? name ?? '목적지';
 
   return (
     <View style={styles.screen}>
@@ -139,50 +223,90 @@ export default function DetoursScreen() {
           </Pressable>
           <View style={styles.headerTexts}>
             <Text style={styles.headerTitle}>틈타 코스</Text>
-            <Text style={styles.headerSubtitle}>남는 시간에 맞춰 골라보세요.</Text>
+            <Text style={styles.headerSubtitle}>
+              {destinationName} 주변에서 남는 시간에 맞춰 골라보세요.
+            </Text>
           </View>
         </View>
 
         <View style={styles.chipRow}>
-          {DURATION_FILTERS.map((item) => {
-            const chipSelected = item === duration;
+          {DURATION_OPTIONS.map((minutes) => {
+            const chipSelected = minutes === availableMinutes;
             return (
               <Pressable
-                key={item}
-                onPress={() => setDuration(item)}
+                key={minutes}
+                onPress={() => setAvailableMinutes(minutes)}
+                disabled={status === 'loading'}
                 style={[styles.chip, chipSelected && styles.chipSelected]}>
                 <Text style={[styles.chipLabel, chipSelected && styles.chipLabelSelected]}>
-                  {item}
+                  {minutes}분
                 </Text>
               </Pressable>
             );
           })}
         </View>
 
-        {place.detours.map((detour, index) => (
-          <RouteCard
-            key={detour.id}
-            detour={detour}
-            place={place}
-            headerTint={HEADER_TINTS[index % HEADER_TINTS.length]}
-            badgeLabel={index === 0 ? '가장 알맞아요' : '조금 더 여유롭게'}
-            selected={detour.id === selectedId}
-            onSelect={() => setSelectedId(detour.id)}
-          />
-        ))}
+        {status === 'loading' && (
+          <View style={styles.stateBox}>
+            <ActivityIndicator />
+            <Text style={styles.stateText}>걷는 시간을 계산하고 있어요…</Text>
+          </View>
+        )}
 
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>추천 기준</Text>
-          <Text style={styles.infoBody}>
-            이동시간과 체류시간을 합쳐 계산하고, 복귀 전 최신 혼잡도를 다시 확인해요.
-          </Text>
-        </View>
+        {status === 'error' && (
+          <View style={styles.stateBox}>
+            <Text style={styles.stateText}>
+              {identifier
+                ? '코스를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+                : '목적지 정보가 없어 코스를 만들 수 없어요.'}
+            </Text>
+            {identifier && (
+              <Pressable style={styles.retryButton} onPress={() => void load()}>
+                <Text style={styles.retryLabel}>다시 시도</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
 
-        <Link href={`/course-map?placeId=${place.id}&detourId=${selectedId}` as Href} asChild>
-          <Pressable style={styles.ctaButton}>
-            <Text style={styles.ctaLabel}>선택한 코스 자세히 보기</Text>
-          </Pressable>
-        </Link>
+        {status === 'idle' && courses.length === 0 && (
+          <View style={styles.stateBox}>
+            <Text style={styles.stateText}>
+              {availableMinutes}분 안에 다녀올 수 있는 코스가 없어요. 더 긴 시간을 골라보세요.
+            </Text>
+          </View>
+        )}
+
+        {status === 'idle' &&
+          destination &&
+          courses.map((course, index) => (
+            <RouteCard
+              key={`${index}-${courseTitle(course)}`}
+              course={course}
+              destination={destination}
+              headerTint={HEADER_TINTS[index % HEADER_TINTS.length]}
+              badgeLabel={index === 0 ? '가장 알맞아요' : '조금 더 여유롭게'}
+              selected={index === selectedIndex}
+              onSelect={() => setSelectedIndex(index)}
+            />
+          ))}
+
+        {status === 'idle' && courses.length > 0 && (
+          <>
+            <View style={styles.infoBox}>
+              <Text style={styles.infoTitle}>추천 기준</Text>
+              <Text style={styles.infoBody}>
+                걷는 시간은 실제 보행 경로로 계산했어요. 체류시간은 장소 유형을 기준으로 한 예상값이라
+                실제와 다를 수 있어요.
+              </Text>
+            </View>
+
+            <TourApiAttribution style={styles.attribution} />
+
+            <Pressable style={styles.ctaButton} onPress={handleStart}>
+              <Text style={styles.ctaLabel}>선택한 코스 자세히 보기</Text>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -462,6 +586,30 @@ const styles = StyleSheet.create({
   infoBody: {
     color: Teumta.textSecondary,
     fontSize: 10,
+  },
+  stateBox: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 24,
+  },
+  stateText: {
+    color: Teumta.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  retryLabel: {
+    color: Teumta.greenDark,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  attribution: {
+    marginTop: 2,
   },
   ctaButton: {
     alignItems: 'center',

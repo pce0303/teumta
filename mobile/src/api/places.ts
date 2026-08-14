@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import type {
+  ConcentrationForecast,
   NearbyLocalPlaceResult,
   Place,
   RealtimeCongestion,
@@ -18,10 +19,31 @@ export async function searchPlaces(keyword: string, pageNo = 1): Promise<SearchP
   return response.data.data;
 }
 
-export async function getRealtimeCongestion(poiId: string): Promise<RealtimeCongestion> {
+/**
+ * GET /api/congestion — 목적지의 실시간 혼잡도.
+ * TMAP 목적지는 poiId, TourAPI 목적지는 contentId를 쓴다(서버가 TMAP POI로 매칭해 조회).
+ * SK가 다루지 않는 장소는 404 CONGESTION_DATA_NOT_FOUND.
+ */
+export async function getRealtimeCongestion(
+  identifier: { poiId: string } | { contentId: string },
+): Promise<RealtimeCongestion> {
   const response = await apiClient.get<{ data: RealtimeCongestion }>('/congestion', {
-    params: { poiId },
+    params: identifier,
   });
+  return response.data.data;
+}
+
+/**
+ * GET /api/concentration-forecast — 향후 30일 날짜별 집중률 예측(전국).
+ * 실시간 혼잡도가 아니라 "이 날 붐빌지"를 보는 값이다. 데이터가 없으면 404.
+ */
+export async function getConcentrationForecast(
+  contentId: string,
+): Promise<ConcentrationForecast> {
+  const response = await apiClient.get<{ data: ConcentrationForecast }>(
+    '/concentration-forecast',
+    { params: { contentId } },
+  );
   return response.data.data;
 }
 

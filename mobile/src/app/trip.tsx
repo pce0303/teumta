@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,7 +8,9 @@ import { CourseMapView } from '@/components/course-map-view';
 import { Teumta } from '@/constants/theme';
 import { useCourseProgress, type CourseStop } from '@/hooks/use-course-progress';
 import { useCurrentLocation } from '@/hooks/use-current-location';
-import { getMockPlaceById } from '@/mocks/places';
+import { getRealtimeCongestion } from '@/api/places';
+import { getSelectedCourse } from '@/stores/selected-course';
+import type { RealtimeCongestion } from '@/types/place';
 import { openDirections } from '@/utils/directions';
 import { distanceInMeters } from '@/utils/distance';
 import { withRoJosa } from '@/utils/text';
@@ -21,25 +23,41 @@ function formatDistance(meters: number) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`;
 }
 
+/** SK 혼잡도 단계 → 화면 문구. */
+const CONGESTION_LABEL: Record<RealtimeCongestion['level'], string> = {
+  RELAXED: '여유',
+  NORMAL: '보통',
+  CROWDED: '혼잡',
+  VERY_CROWDED: '매우 혼잡',
+};
+
 export default function TripScreen() {
-  const { placeId, detourId } = useLocalSearchParams<{ placeId?: string; detourId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const place = getMockPlaceById(placeId) ?? getMockPlaceById('gyeongbokgung');
-  const detour = place?.detours.find((item) => item.id === detourId) ?? place?.detours[0];
+  const selected = getSelectedCourse();
+  const course = selected?.course;
+  const destination = selected?.destination;
 
-  // 경유지 이름과 경로 좌표를 도착 판정용 목적지 목록으로 결합한다.
-  // coordinates[0]은 출발지(관광지)라서 목적지는 다음 좌표부터 순환 매핑한다(마지막 = 복귀 지점).
-  const stopNames = detour?.stops ?? [];
-  const coordinates = detour?.coordinates ?? [];
+  // 도착 판정 목적지 목록: 정류지들 + 마지막에 목적지(복귀).
   const courseStops: CourseStop[] =
-    coordinates.length > 0
-      ? stopNames.map((name, index) => ({
-          id: `${detour?.id}-${index}`,
-          name,
-          ...coordinates[(index + 1) % coordinates.length],
-        }))
+    course && destination
+      ? [
+          ...course.stops.map((stop, index) => ({
+            id: `stop-${index}`,
+            name: stop.name,
+            latitude: stop.latitude,
+            longitude: stop.longitude,
+          })),
+          {
+            id: 'return',
+            name: destination.name,
+            latitude: destination.latitude,
+            longitude: destination.longitude,
+          },
+        ]
       : [];
+
+  const [congestion, setCongestion] = useState<RealtimeCongestion | null>(null);
 
   const { location, status, start: startLocation } = useCurrentLocation({ watch: true });
   const { phase, currentIndex, nextStop, start, updateWithLocation } =
@@ -56,10 +74,36 @@ export default function TripScreen() {
     }
   }, [location, updateWithLocation]);
 
-  if (!place || !detour) {
+  const destinationParams = selected?.destinationParams;
+  useEffect(() => {
+    if (!destinationParams) {
+      return;
+    }
+    let ignored = false;
+
+    // 복귀 판단에 쓰는 목적지 혼잡도. 진입 시 1회만 본다(서버 5분 캐시).
+    getRealtimeCongestion(destinationParams)
+      .then((data) => {
+        if (!ignored) {
+          setCongestion(data);
+        }
+      })
+      .catch(() => {
+        // 혼잡도를 못 가져와도 코스 진행 자체는 계속된다.
+      });
+
+    return () => {
+      ignored = true;
+    };
+  }, [destinationParams]);
+
+  if (!course || !destination) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>진행 중인 코스가 없습니다.</Text>
+        <Pressable style={styles.emptyButton} onPress={() => router.back()}>
+          <Text style={styles.emptyButtonLabel}>코스 고르러 가기</Text>
+        </Pressable>
       </View>
     );
   }
@@ -70,12 +114,13 @@ export default function TripScreen() {
   const walkMinutes =
     distanceToNext !== null ? Math.max(1, Math.round(distanceToNext / WALK_METERS_PER_MINUTE)) : null;
 
+  // 남은 시간 = 아직 안 들른 정류지의 이동+체류 + 복귀 이동.
   const remainingMinutes = completed
     ? 0
-    : Math.round(
-        (detour.durationMinutes * (courseStops.length - currentIndex)) /
-          Math.max(courseStops.length, 1),
-      );
+    : course.stops
+        .slice(Math.min(currentIndex, course.stops.length))
+        .reduce((total, stop) => total + stop.travelMinutesFromPrevious + stop.stayMinutes, 0) +
+      course.returnTravelMinutes;
 
   const statusTitle = completed
     ? '코스를 모두 마쳤어요'
@@ -115,7 +160,29 @@ export default function TripScreen() {
       </View>
 
       <View style={styles.mapArea}>
-        <CourseMapView detour={detour} showsUserLocation={status === 'granted'} />
+        <CourseMapView
+          detour={{
+            id: 'generated',
+            name: destination.name,
+            durationMinutes: course.totalMinutes,
+            distanceKm: 0,
+            description: '',
+            coordinates: [
+              { latitude: destination.latitude, longitude: destination.longitude },
+              ...course.stops.map((stop) => ({
+                latitude: stop.latitude,
+                longitude: stop.longitude,
+              })),
+              { latitude: destination.latitude, longitude: destination.longitude },
+            ],
+            stops: [
+              destination.name,
+              ...course.stops.map((stop) => stop.name),
+              `${destination.name} 복귀`,
+            ],
+          }}
+          showsUserLocation={status === 'granted'}
+        />
       </View>
 
       <View style={[styles.sheet, { paddingBottom: 18 + insets.bottom }]}>
@@ -146,9 +213,9 @@ export default function TripScreen() {
             <Text style={styles.statValue}>{timeLabelAfter(remainingMinutes)}</Text>
           </View>
           <View style={styles.statTile}>
-            <Text style={styles.statLabel}>현재 혼잡</Text>
+            <Text style={styles.statLabel}>목적지 혼잡</Text>
             <Text style={[styles.statValue, styles.statValueCongestion]}>
-              {place.congestionLabel}
+              {congestion ? CONGESTION_LABEL[congestion.level] : '확인 중'}
             </Text>
           </View>
           <View style={styles.statTile}>
@@ -194,6 +261,18 @@ const styles = StyleSheet.create({
   emptyText: {
     color: Teumta.textSecondary,
     fontSize: 16,
+  },
+  emptyButton: {
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 999,
+    marginTop: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  emptyButtonLabel: {
+    color: Teumta.greenDark,
+    fontSize: 13,
+    fontWeight: '700',
   },
   topBar: {
     alignItems: 'center',

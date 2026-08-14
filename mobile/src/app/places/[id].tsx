@@ -83,7 +83,6 @@ export default function PlaceDetailScreen() {
   const [nearby, setNearby] = useState<NearbyLocalPlaceResult[]>([]);
   const [nearbyStatus, setNearbyStatus] = useState<Status>('loading');
 
-  const bookmarkId = `${source}-${id}`;
 
   useEffect(() => {
     if (!id || !source) return;
@@ -93,22 +92,20 @@ export default function PlaceDetailScreen() {
     setCongestion(null);
     setNearby([]);
 
-    if (source === 'TMAP') {
-      setCongestionStatus('loading');
-      getRealtimeCongestion(id)
-        .then((data) => {
-          if (ignored) return;
-          setCongestion(data);
-          setCongestionStatus('idle');
-        })
-        .catch(() => {
-          if (ignored) return;
-          setCongestionStatus('error');
-        });
-    } else {
-      // TourAPI 결과는 tmapPoiId가 없어 실시간 혼잡도를 조회할 수 없음
-      setCongestionStatus('unavailable');
-    }
+    // TOUR 목적지도 서버가 TMAP POI로 매칭해 조회해 준다(api-spec 3.4a).
+    setCongestionStatus('loading');
+    getRealtimeCongestion(source === 'TOUR' ? { contentId: id } : { poiId: id })
+      .then((data) => {
+        if (ignored) return;
+        setCongestion(data);
+        setCongestionStatus('idle');
+      })
+      .catch((error: unknown) => {
+        if (ignored) return;
+        // 404는 SK가 다루지 않는 장소 — 장애가 아니라 원래 제공되지 않는 데이터다.
+        const status = (error as { response?: { status?: number } }).response?.status;
+        setCongestionStatus(status === 404 ? 'unavailable' : 'error');
+      });
 
     setNearbyStatus('loading');
     const identifier = source === 'TOUR' ? { contentId: id } : { poiId: id };
@@ -154,8 +151,10 @@ export default function PlaceDetailScreen() {
             />
           </Pressable>
           <Pressable
-            style={[styles.heroButton, isPlaceBookmarked(bookmarkId) && styles.heroButtonSaved]}
-            onPress={() => togglePlaceBookmark(bookmarkId)}>
+            style={[styles.heroButton, isPlaceBookmarked(source, id) && styles.heroButtonSaved]}
+            onPress={() =>
+              togglePlaceBookmark({ id, source, name, address: address ?? null })
+            }>
             <Image
               source={require('@/assets/images/icons/bookmark.svg')}
               style={styles.heroButtonIcon}
@@ -267,7 +266,25 @@ export default function PlaceDetailScreen() {
 
           <View style={styles.nearbyList}>
             {nearby.map((place) => (
-              <View key={`${place.name}-${place.latitude}-${place.longitude}`} style={styles.nearbyCard}>
+              <Pressable
+                key={`${place.name}-${place.latitude}-${place.longitude}`}
+                style={styles.nearbyCard}
+                onPress={() =>
+                  router.push({
+                    pathname: '/local-places/[id]',
+                    params: {
+                      id: place.name,
+                      name: place.name,
+                      latitude: String(place.latitude),
+                      longitude: String(place.longitude),
+                      distanceMeters: String(place.distanceMeters),
+                      travelTimeMinutes: String(place.travelTimeMinutes),
+                      destinationName: name,
+                      ...(place.address ? { address: place.address } : {}),
+                      ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
+                    },
+                  })
+                }>
                 {place.imageUrl ? (
                   <Image source={{ uri: place.imageUrl }} style={styles.nearbyThumb} />
                 ) : (
@@ -279,17 +296,30 @@ export default function PlaceDetailScreen() {
                     도보 {place.travelTimeMinutes}분 · {place.distanceMeters}m
                   </Text>
                 </View>
-              </View>
+              </Pressable>
             ))}
           </View>
 
-          {source === 'TOUR' && <TourApiAttribution style={styles.attribution} />}
+          {/* 주변 로컬 장소 목록도 TourAPI 데이터라 목적지 출처와 무관하게 표기한다. */}
+          {(source === 'TOUR' || nearby.length > 0) && (
+            <TourApiAttribution style={styles.attribution} />
+          )}
         </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
-        <Pressable style={[styles.ctaButton, styles.ctaButtonDisabled]} disabled>
-          <Text style={styles.ctaLabel}>틈타 코스 준비 중이에요</Text>
+        <Pressable
+          style={styles.ctaButton}
+          onPress={() =>
+            router.push({
+              pathname: '/detours',
+              params: {
+                ...(source === 'TOUR' ? { contentId: id } : { poiId: id }),
+                name,
+              },
+            })
+          }>
+          <Text style={styles.ctaLabel}>틈타 코스 보기</Text>
         </Pressable>
       </View>
     </View>
@@ -529,9 +559,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     height: 50,
     justifyContent: 'center',
-  },
-  ctaButtonDisabled: {
-    backgroundColor: Teumta.textTertiary,
   },
   ctaLabel: {
     color: Teumta.surface,
