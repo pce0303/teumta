@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { getErrorMessage } from '../api/client';
 import { fetchPlace } from '../api/places';
-import { fetchRoute } from '../api/routes';
+import { deleteRoute, fetchRoute } from '../api/routes';
 import { ErrorState, LoadingState } from '../components/Feedback';
 import { PlaceTypeBadge } from '../components/PlaceTypeBadge';
 import type { Place } from '../types/place';
@@ -11,6 +11,7 @@ import type { RouteDetail } from '../types/route';
 import { formatDistance, formatDuration } from '../utils/format';
 
 export function RouteDetailPage() {
+  const navigate = useNavigate();
   const { routeId: routeIdParam } = useParams();
   const parsed = Number(routeIdParam);
   const routeId = Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -19,6 +20,8 @@ export function RouteDetailPage() {
   const [mainPlace, setMainPlace] = useState<Place | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (routeId === null) {
@@ -51,6 +54,26 @@ export function RouteDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const handleDelete = async () => {
+    if (routeId === null || route === null) {
+      return;
+    }
+    if (!window.confirm(`"${route.name}" 코스를 삭제할까요? 되돌릴 수 없습니다.`)) {
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteRoute(routeId);
+      void navigate('/routes', { replace: true });
+    } catch (caught) {
+      setDeleteError(getErrorMessage(caught));
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) {
     return <LoadingState label="코스를 불러오는 중…" />;
@@ -90,6 +113,12 @@ export function RouteDetailPage() {
       stop.stayMinutes === null,
   );
 
+  const computedTotalMinutes =
+    travelMinutesSum + stayMinutesSum + (route.returnTravelMinutes ?? 0);
+  const totalMismatch =
+    route.estimatedTotalDurationMinutes !== null &&
+    route.estimatedTotalDurationMinutes !== computedTotalMinutes;
+
   return (
     <div className="stack">
       <div className="form-page-top">
@@ -98,10 +127,31 @@ export function RouteDetailPage() {
         </Link>
       </div>
 
+      {deleteError && (
+        <div className="banner banner-error" role="alert">
+          삭제에 실패했습니다: {deleteError}
+        </div>
+      )}
+
       <section className="panel">
         <div className="panel-header">
           <h2 className="panel-title">{route.name}</h2>
-          <span className="cell-muted">#{route.id}</span>
+          <span className="toolbar-actions">
+            <Link
+              to={`/routes/${route.id}/edit`}
+              className="button button-secondary button-small"
+            >
+              수정
+            </Link>
+            <button
+              type="button"
+              className="button button-danger button-small"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+            >
+              {deleting ? '삭제 중…' : '삭제'}
+            </button>
+          </span>
         </div>
         <p className="panel-caption">{route.description ?? '설명이 없습니다.'}</p>
 
@@ -117,15 +167,25 @@ export function RouteDetailPage() {
             <span className="stat-value">{route.stops.length}</span>
           </div>
           <div className="stat">
-            <span className="stat-label">저장된 총 소요시간</span>
+            <span className="stat-label">총 소요시간</span>
             <span className="stat-value stat-value-small">
               {formatDuration(route.estimatedTotalDurationMinutes)}
             </span>
           </div>
           <div className="stat">
-            <span className="stat-label">저장된 총 이동거리</span>
+            <span className="stat-label">총 이동거리</span>
             <span className="stat-value stat-value-small">
               {formatDistance(route.estimatedTotalDistanceMeters)}
+            </span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">복귀 구간</span>
+            <span className="stat-value stat-value-small">
+              {route.returnTravelMinutes === null
+                ? '미포함'
+                : `${formatDuration(route.returnTravelMinutes)} · ${formatDistance(
+                  route.returnDistanceMeters,
+                )}`}
             </span>
           </div>
         </div>
@@ -191,16 +251,52 @@ export function RouteDetailPage() {
                 </td>
               </tr>
             ))}
+            {route.returnTravelMinutes !== null && (
+              <tr>
+                <td className="cell-number">
+                  <span className="badge badge-neutral">복귀</span>
+                </td>
+                <td>
+                  {mainPlace ? (
+                    <Link to={`/places/${route.mainPlaceId}`} className="table-link">
+                      {mainPlace.name}
+                    </Link>
+                  ) : (
+                    <span className="cell-muted">#{route.mainPlaceId}</span>
+                  )}
+                </td>
+                <td>{mainPlace ? <PlaceTypeBadge type={mainPlace.type} /> : '—'}</td>
+                <td className="cell-number cell-muted">
+                  {formatDuration(route.returnTravelMinutes)}
+                </td>
+                <td className="cell-number cell-muted">
+                  {formatDistance(route.returnDistanceMeters)}
+                </td>
+                <td className="cell-number cell-muted">—</td>
+                <td className="cell-muted">
+                  {Array.isArray(route.returnPath)
+                    ? `${route.returnPath.length}개 좌표`
+                    : '—'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
         <p className="table-footnote">
-          정류지 구간 합계: 이동 {formatDuration(travelMinutesSum)} + 체류{' '}
-          {formatDuration(stayMinutesSum)} ={' '}
-          {formatDuration(travelMinutesSum + stayMinutesSum)} ·{' '}
-          {formatDistance(distanceSum)}. 마지막 정류지에서 기준 관광지로 돌아오는
-          복귀 구간은 현재 스키마에 저장 필드가 없어 합계에 포함되지 않습니다
-          (api-spec §6.5에서 논의 중).
+          구간 합계: 이동 {formatDuration(travelMinutesSum)} + 체류{' '}
+          {formatDuration(stayMinutesSum)}
+          {route.returnTravelMinutes !== null &&
+            ` + 복귀 ${formatDuration(route.returnTravelMinutes)}`}{' '}
+          = {formatDuration(computedTotalMinutes)} ·{' '}
+          {formatDistance(distanceSum + (route.returnDistanceMeters ?? 0))}
         </p>
+        {totalMismatch && (
+          <p className="table-footnote">
+            ⚠ 저장된 총 소요시간(
+            {formatDuration(route.estimatedTotalDurationMinutes)})이 구간 합계와
+            다릅니다. 코스를 다시 저장하면 재계산됩니다.
+          </p>
+        )}
         {hasIncompleteStop && (
           <p className="table-footnote">
             ⚠ 이동시간 또는 체류시간이 비어 있는 정류지가 있습니다. 소요시간을

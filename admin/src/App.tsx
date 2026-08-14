@@ -9,6 +9,7 @@ import { MatchingPage } from './pages/MatchingPage';
 import { PlaceFormPage } from './pages/PlaceFormPage';
 import { PlacesPage } from './pages/PlacesPage';
 import { RouteDetailPage } from './pages/RouteDetailPage';
+import { RouteFormPage } from './pages/RouteFormPage';
 import { RoutesPage } from './pages/RoutesPage';
 
 export default function App() {
@@ -29,7 +30,12 @@ export default function App() {
         <Route path="/places/:id" element={<PlaceFormPage mode="edit" />} />
         <Route path="/matching" element={<MatchingPage />} />
         <Route path="/routes" element={<RoutesPage />} />
+        <Route path="/routes/new" element={<RouteFormPage mode="create" />} />
         <Route path="/routes/:routeId" element={<RouteDetailPage />} />
+        <Route
+          path="/routes/:routeId/edit"
+          element={<RouteFormPage mode="edit" />}
+        />
         <Route
           path="/analytics"
           element={

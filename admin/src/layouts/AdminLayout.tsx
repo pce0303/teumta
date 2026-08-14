@@ -22,6 +22,9 @@ function currentPageTitle(pathname: string): string {
   if (pathname === '/places/new') {
     return '새 장소 등록';
   }
+  if (pathname === '/routes/new') {
+    return '새 코스 등록';
+  }
   const item = NAV_ITEMS.find(
     (navItem) =>
       pathname === navItem.to || pathname.startsWith(`${navItem.to}/`),
