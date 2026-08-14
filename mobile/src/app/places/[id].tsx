@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
-import { Link, type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getNearbyLocalPlaces, getRealtimeCongestion } from '@/api/places';
+import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import type {
@@ -87,14 +88,23 @@ export default function PlaceDetailScreen() {
   useEffect(() => {
     if (!id || !source) return;
 
+    let ignored = false;
+
+    setCongestion(null);
+    setNearby([]);
+
     if (source === 'TMAP') {
       setCongestionStatus('loading');
       getRealtimeCongestion(id)
         .then((data) => {
+          if (ignored) return;
           setCongestion(data);
           setCongestionStatus('idle');
         })
-        .catch(() => setCongestionStatus('error'));
+        .catch(() => {
+          if (ignored) return;
+          setCongestionStatus('error');
+        });
     } else {
       // TourAPI 결과는 tmapPoiId가 없어 실시간 혼잡도를 조회할 수 없음
       setCongestionStatus('unavailable');
@@ -104,10 +114,18 @@ export default function PlaceDetailScreen() {
     const identifier = source === 'TOUR' ? { contentId: id } : { poiId: id };
     getNearbyLocalPlaces(identifier)
       .then((data) => {
+        if (ignored) return;
         setNearby(data);
         setNearbyStatus('idle');
       })
-      .catch(() => setNearbyStatus('error'));
+      .catch(() => {
+        if (ignored) return;
+        setNearbyStatus('error');
+      });
+
+    return () => {
+      ignored = true;
+    };
   }, [id, source]);
 
   if (!id || !source || !name) {
@@ -264,15 +282,15 @@ export default function PlaceDetailScreen() {
               </View>
             ))}
           </View>
+
+          {source === 'TOUR' && <TourApiAttribution style={styles.attribution} />}
         </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
-        <Link href={`/detours?placeId=${bookmarkId}` as Href} asChild>
-          <Pressable style={styles.ctaButton}>
-            <Text style={styles.ctaLabel}>틈타 코스 보기</Text>
-          </Pressable>
-        </Link>
+        <Pressable style={[styles.ctaButton, styles.ctaButtonDisabled]} disabled>
+          <Text style={styles.ctaLabel}>틈타 코스 준비 중이에요</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -497,6 +515,9 @@ const styles = StyleSheet.create({
     fontSize: 9,
     lineHeight: 13,
   },
+  attribution: {
+    marginTop: 4,
+  },
   footer: {
     backgroundColor: Teumta.surface,
     paddingHorizontal: 20,
@@ -508,6 +529,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     height: 50,
     justifyContent: 'center',
+  },
+  ctaButtonDisabled: {
+    backgroundColor: Teumta.textTertiary,
   },
   ctaLabel: {
     color: Teumta.surface,

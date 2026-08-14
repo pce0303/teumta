@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { searchPlaces } from '@/api/places';
+import { TourApiAttribution } from '@/components/tour-api-attribution';
 import type { SearchPlaceResult } from '@/types/place';
 
 type SearchStatus = 'idle' | 'loading' | 'error';
@@ -19,6 +20,12 @@ export default function SearchScreen() {
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<SearchPlaceResult[]>([]);
   const [status, setStatus] = useState<SearchStatus>('idle');
+  const [hasSearched, setHasSearched] = useState(false);
+
+  function handleChangeKeyword(text: string) {
+    setKeyword(text);
+    setHasSearched(false);
+  }
 
   async function handleSearch() {
     const trimmed = keyword.trim();
@@ -32,6 +39,8 @@ export default function SearchScreen() {
     } catch {
       setResults([]);
       setStatus('error');
+    } finally {
+      setHasSearched(true);
     }
   }
 
@@ -40,7 +49,7 @@ export default function SearchScreen() {
       <View style={styles.searchRow}>
         <TextInput
           value={keyword}
-          onChangeText={setKeyword}
+          onChangeText={handleChangeKeyword}
           onSubmitEditing={handleSearch}
           returnKeyType="search"
           placeholder="관광지, 지역, 테마 검색"
@@ -58,13 +67,23 @@ export default function SearchScreen() {
         <Text style={styles.stateText}>검색 중 문제가 발생했습니다. 다시 시도해 주세요.</Text>
       )}
 
-      {status === 'idle' && results.length === 0 && keyword.trim().length > 0 && (
+      {status === 'idle' && hasSearched && results.length === 0 && (
         <Text style={styles.stateText}>검색 결과가 없습니다.</Text>
       )}
 
       <View style={styles.list}>
         {results.map((place, index) => {
-          const id = place.tourApiContentId ?? place.tmapPoiId ?? place.name;
+          const id = place.tourApiContentId ?? place.tmapPoiId;
+
+          if (!id) {
+            return (
+              <View key={`${place.source}-${place.name}-${index}`} style={[styles.card, styles.cardDisabled]}>
+                <Text style={styles.placeName}>{place.name}</Text>
+                {place.address && <Text style={styles.location}>{place.address}</Text>}
+              </View>
+            );
+          }
+
           return (
             <Link
               key={`${place.source}-${id}-${index}`}
@@ -89,6 +108,10 @@ export default function SearchScreen() {
           );
         })}
       </View>
+
+      {results.some((place) => place.source === 'TOUR') && (
+        <TourApiAttribution style={styles.attribution} />
+      )}
     </ScrollView>
   );
 }
@@ -135,6 +158,9 @@ const styles = StyleSheet.create({
   list: {
     gap: 12,
   },
+  attribution: {
+    marginTop: 4,
+  },
   card: {
     backgroundColor: '#ffffff',
     borderColor: '#e2e6ea',
@@ -142,6 +168,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 8,
     padding: 16,
+  },
+  cardDisabled: {
+    opacity: 0.5,
   },
   placeName: {
     color: '#121417',

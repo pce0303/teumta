@@ -47,10 +47,10 @@ export type SearchPlaceResult = {
 /** GET /api/congestion?poiId= 응답. tmapPoiId가 있는(TMAP) 장소만 조회 가능. */
 export type RealtimeCongestion = {
   poiId: string;
-  poiName: string;
+  poiName: string | null;
   level: 'RELAXED' | 'NORMAL' | 'CROWDED' | 'VERY_CROWDED';
   source: string;
-  measuredAt: string;
+  measuredAt: string | null;
   fetchedAt: string;
   isRealtime: boolean;
 };
