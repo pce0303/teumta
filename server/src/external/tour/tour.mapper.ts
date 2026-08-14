@@ -143,6 +143,8 @@ export function mapSearchResultList(response: TourApiListResponse): DestinationS
     latitude: safeCoordinate(item.mapy),
     longitude: safeCoordinate(item.mapx),
     imageUrl: item.firstimage || item.firstimage2 || null,
+    // 매퍼는 DB를 모른다. 내부 Place 매칭은 place-search.service에서 붙인다.
+    placeId: null,
   }));
 }
 
