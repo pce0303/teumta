@@ -203,8 +203,10 @@ export default function TripScreen() {
         </View>
 
         <View style={styles.noticeBox}>
-          <Text style={styles.noticeTitle}>복귀 타이밍도 놓치지 않게 알려드려요</Text>
-          <Text style={styles.noticeBody}>복귀 10분 전, 최신 혼잡도를 다시 확인해 알려드려요.</Text>
+          <Text style={styles.noticeTitle}>돌아갈 시간을 계산해 뒀어요</Text>
+          <Text style={styles.noticeBody}>
+            복귀 예정 시각을 기준으로 코스를 구성했어요. 목적지 혼잡도는 위에서 다시 확인할 수 있어요.
+          </Text>
         </View>
 
         <View style={styles.statsRow}>
