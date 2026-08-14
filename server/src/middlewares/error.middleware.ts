@@ -3,6 +3,7 @@ import type { ErrorRequestHandler } from 'express';
 import {
   ExternalApiAuthError,
   ExternalApiError,
+  ExternalApiNotFoundError,
   ExternalApiRateLimitError,
   ExternalApiTimeoutError,
 } from '../external/common/external-api.error';
@@ -31,6 +32,11 @@ function statusForExternalError(error: ExternalApiError): number {
   // 서버 설정/미구현 문제는 우리 측 오류이므로 500.
   if (error.code === 'CONFIG_MISSING' || error.code === 'NOT_IMPLEMENTED') {
     return 500;
+  }
+  // 외부 API가 "해당 데이터 없음"을 알린 경우는 연동 장애가 아니다.
+  // 재시도해도 소용없으므로 클라이언트가 구분할 수 있게 404로 내린다.
+  if (error instanceof ExternalApiNotFoundError) {
+    return 404;
   }
   if (error instanceof ExternalApiTimeoutError) {
     return 504; // Gateway Timeout

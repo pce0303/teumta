@@ -36,6 +36,14 @@ export interface RequestJsonOptions {
   body?: unknown;
   /** 미지정 시 externalConfig.timeoutMs 사용. */
   timeoutMs?: number;
+  /**
+   * 2xx가 아니어도 본문을 파싱해 그대로 반환할 상태 코드 목록.
+   *
+   * 외부 API가 "해당 리소스 없음" 같은 정상적인 결과를 4xx로 표현할 때만 쓴다
+   * (예: SK 퍼즐은 커버리지 밖 POI에 400 + `{"error":{"message":"NOT_FOUND_POI"}}`를 준다).
+   * 판단은 호출부(클라이언트)가 하고, 본문을 오류 계층으로 바꾸는 책임도 호출부에 있다.
+   */
+  acceptStatuses?: number[];
 }
 
 export async function requestJson<T = unknown>(options: RequestJsonOptions): Promise<T> {
@@ -70,7 +78,7 @@ export async function requestJson<T = unknown>(options: RequestJsonOptions): Pro
     clearTimeout(timer);
   }
 
-  if (!response.ok) {
+  if (!response.ok && !(options.acceptStatuses ?? []).includes(response.status)) {
     throw classifyHttpError(service, response.status);
   }
 

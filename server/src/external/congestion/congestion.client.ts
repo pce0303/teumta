@@ -1,4 +1,10 @@
-import { ExternalApiError, ExternalApiResponseError, externalConfig, requestJson } from '../common';
+import {
+  ExternalApiError,
+  ExternalApiNotFoundError,
+  ExternalApiResponseError,
+  externalConfig,
+  requestJson,
+} from '../common';
 import type { SkCongestionResponse } from './congestion.dto';
 
 /**
@@ -36,13 +42,35 @@ export async function fetchRealtimeCongestion(
     service: SERVICE,
     url,
     headers: { appKey: apiKey },
+    // 커버리지 밖 POI를 400으로 알려주므로 본문을 읽어 "없음"과 실제 장애를 구분한다.
+    acceptStatuses: [400, 404],
   });
   assertPuzzleOk(response);
   return response;
 }
 
-/** 퍼즐 API는 HTTP 200이어도 status.code로 논리 오류를 알린다. 정상 코드는 '00'. */
+/** SK가 "이 POI는 다루지 않는다"고 알릴 때 쓰는 오류 메시지. */
+const NOT_FOUND_POI_MESSAGE = 'NOT_FOUND_POI';
+
+/**
+ * 퍼즐 API는 HTTP 200이어도 status.code로 논리 오류를 알리고(정상 '00'),
+ * 커버리지 밖 POI는 400 + error 봉투로 알린다.
+ * 후자는 연동 장애가 아니라 "데이터 없음"이므로 404로 내려야 한다(502 아님).
+ */
 function assertPuzzleOk(response: SkCongestionResponse): void {
+  const error = response.error;
+  if (error) {
+    if (error.message === NOT_FOUND_POI_MESSAGE || error.code === '404') {
+      throw new ExternalApiNotFoundError(SERVICE, 'Puzzle API has no data for this POI', {
+        code: 'CONGESTION_DATA_NOT_FOUND',
+      });
+    }
+    throw new ExternalApiResponseError(
+      SERVICE,
+      `Puzzle API returned error ${error.code ?? 'UNKNOWN'}`,
+    );
+  }
+
   const code = response.status?.code;
   if (code === '00') {
     return;
