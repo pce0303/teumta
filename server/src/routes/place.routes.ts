@@ -3,7 +3,9 @@ import { Router } from 'express';
 import {
   getConcentrationForecastController,
   getRealtimeCongestionController,
+  getConcentrationForecastByContentIdController,
 } from '../controllers/congestion.controller';
+import { generateCoursesController } from '../controllers/course.controller';
 import {
   createPlaceController,
   deletePlaceController,
@@ -22,6 +24,9 @@ export const placeRouter = Router();
 placeRouter.get('/search/places', searchPlacesController);
 placeRouter.get('/local-places', getNearbyLocalPlacesByContentIdController);
 placeRouter.get('/congestion', getRealtimeCongestionController);
+// 집중률 예측 실시간 조회(전국, DB 미사용). 적재된 Place 기준 조회는 아래 /places/:id/... 유지.
+placeRouter.get('/concentration-forecast', getConcentrationForecastByContentIdController);
+placeRouter.get('/courses', generateCoursesController);
 
 placeRouter.get('/places', getPlacesController);
 

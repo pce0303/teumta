@@ -122,6 +122,7 @@ export function mapNearbyCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCand
   const tourDistance = Number(item.dist);
   return {
     tourApiContentId: String(item.contentid),
+    contentTypeId: item.contenttypeid === undefined ? null : String(item.contenttypeid),
     name: item.title,
     address: buildAddress(item.addr1, item.addr2),
     latitude,

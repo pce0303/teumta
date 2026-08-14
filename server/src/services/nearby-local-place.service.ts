@@ -48,14 +48,12 @@ export async function getNearbyLocalPlacesByContentId(
   contentId: string,
   radiusMeters: number = DEFAULT_RADIUS_METERS,
 ): Promise<NearbyLocalPlacesResult> {
-  const detail = await fetchTourPlaceDetail(contentId);
-  const coordinate = extractDetailCoordinate(detail);
-  if (!coordinate) {
+  const base = await resolveDestinationByContentId(contentId);
+  if (!base) {
     return { status: 'NOT_FOUND' };
   }
-  const name = extractDetailItem(detail)?.title ?? '목적지';
 
-  const places = await findNearbyLocalPlaces({ ...coordinate, name, contentId }, radiusMeters);
+  const places = await findNearbyLocalPlaces(base, radiusMeters);
   return { status: 'SUCCESS', places };
 }
 
@@ -67,14 +65,13 @@ export async function getNearbyLocalPlacesByPoiId(
   poiId: string,
   radiusMeters: number = DEFAULT_RADIUS_METERS,
 ): Promise<NearbyLocalPlacesResult> {
-  const detail = await fetchPoiDetail(poiId);
-  const base = extractPoiBase(detail);
+  // TMAP POI 목적지는 TourAPI contentId가 없어 자기 자신 제외 키가 없다('' = 제외 없음).
+  const base = await resolveDestinationByPoiId(poiId);
   if (!base) {
     return { status: 'NOT_FOUND' };
   }
 
-  // TMAP POI 목적지는 TourAPI contentId가 없어 자기 자신 제외 키가 없다('' = 제외 없음).
-  const places = await findNearbyLocalPlaces({ ...base, contentId: '' }, radiusMeters);
+  const places = await findNearbyLocalPlaces(base, radiusMeters);
   return { status: 'SUCCESS', places };
 }
 
@@ -117,17 +114,74 @@ export async function getNearbyLocalPlacesRealtime(
   return { status: 'SUCCESS', places };
 }
 
-/** 공용 코어: 기준 좌표 → 후보 수집 → 선별 → TMAP 보행거리 → 필터·정렬. */
-async function findNearbyLocalPlaces(
-  base: { latitude: number; longitude: number; name: string; contentId: string },
+/** 목적지 기준점. 좌표는 서버가 식별자로 해석한 값이다(사용자 GPS 아님). */
+export interface DestinationBase {
+  latitude: number;
+  longitude: number;
+  name: string;
+  /** 후보에서 자기 자신을 빼기 위한 키. TMAP POI 목적지는 ''(제외 없음). */
+  contentId: string;
+}
+
+/** 후보 + 목적지로부터의 TMAP 실측 보행 거리·시간. 코스 조합에 쓰려고 원본 후보를 함께 남긴다. */
+export interface MeasuredNearbyPlace {
+  candidate: NearbyLocalPlaceCandidate;
+  /** TMAP 보행거리(m). 직선거리 아님. */
+  distanceMeters: number;
+  /** TMAP 보행시간(분, ceil). */
+  travelMinutes: number;
+}
+
+/** 목적지 상세를 해석해 기준점을 만든다. 좌표가 없으면 null. */
+export async function resolveDestinationByContentId(
+  contentId: string,
+): Promise<DestinationBase | null> {
+  const detail = await fetchTourPlaceDetail(contentId);
+  const coordinate = extractDetailCoordinate(detail);
+  if (!coordinate) {
+    return null;
+  }
+  return {
+    ...coordinate,
+    name: extractDetailItem(detail)?.title ?? '목적지',
+    contentId,
+  };
+}
+
+/** TMAP POI 목적지 해석. 좌표를 API 입력으로 받지 않기 위한 서버측 해석이다. */
+export async function resolveDestinationByPoiId(poiId: string): Promise<DestinationBase | null> {
+  const base = extractPoiBase(await fetchPoiDetail(poiId));
+  if (!base) {
+    return null;
+  }
+  return { ...base, contentId: '' };
+}
+
+/**
+ * 공용 코어: 후보 수집 → 선별 → TMAP 보행거리 측정.
+ * 주변 장소 응답(3.3b)과 코스 생성이 같은 후보 집합을 공유한다.
+ */
+export async function measureNearbyLocalPlaces(
+  base: DestinationBase,
   radiusMeters: number,
-): Promise<NearbyLocalPlaceDto[]> {
+): Promise<MeasuredNearbyPlace[]> {
   const candidates = await fetchNearbyCandidates(base, radiusMeters, base.contentId);
   if (candidates.length === 0) {
     return [];
   }
   const selected = selectClosestCandidates(candidates, base, MAX_TOUR_CANDIDATES);
   return resolveWalkingDistances(base, selected, radiusMeters);
+}
+
+/** 공용 코어 결과를 3.3b 응답 형태로 변환. */
+async function findNearbyLocalPlaces(
+  base: DestinationBase,
+  radiusMeters: number,
+): Promise<NearbyLocalPlaceDto[]> {
+  const measured = await measureNearbyLocalPlaces(base, radiusMeters);
+  return measured.map((entry) =>
+    toNearbyLocalPlaceDto(entry.candidate, entry.distanceMeters, entry.travelMinutes),
+  );
 }
 
 /** 기준 좌표는 detailCommon2 실시간 조회 우선, 실패·누락 시에만 DB 좌표 fallback. */
@@ -216,7 +270,7 @@ async function resolveWalkingDistances(
   base: { latitude: number; longitude: number; name: string },
   candidates: NearbyLocalPlaceCandidate[],
   radiusMeters: number,
-): Promise<NearbyLocalPlaceDto[]> {
+): Promise<MeasuredNearbyPlace[]> {
   const settled = await mapWithConcurrency(candidates, TMAP_CONCURRENCY, async (candidate) => {
     const route = await fetchPedestrianRoute({
       start: { latitude: base.latitude, longitude: base.longitude },
@@ -225,10 +279,14 @@ async function resolveWalkingDistances(
       endName: candidate.name,
     });
     const { distanceMeters, totalSeconds } = extractRouteTotals(route);
-    return toNearbyLocalPlaceDto(candidate, distanceMeters, totalSeconds);
+    return {
+      candidate,
+      distanceMeters,
+      travelMinutes: Math.ceil(totalSeconds / 60),
+    };
   });
 
-  const succeeded = settled.filter((entry): entry is NearbyLocalPlaceDto => entry !== null);
+  const succeeded = settled.filter((entry): entry is MeasuredNearbyPlace => entry !== null);
   if (succeeded.length === 0 && candidates.length > 0) {
     throw new ExternalApiError('tmap', 'All TMAP pedestrian route requests failed', {
       code: 'EXTERNAL_API_UNAVAILABLE',
@@ -236,7 +294,7 @@ async function resolveWalkingDistances(
   }
 
   return succeeded
-    .filter((place) => place.distanceMeters <= radiusMeters)
+    .filter((entry) => entry.distanceMeters <= radiusMeters)
     .sort((a, b) => a.distanceMeters - b.distanceMeters);
 }
 
@@ -244,7 +302,7 @@ async function resolveWalkingDistances(
 export function toNearbyLocalPlaceDto(
   candidate: NearbyLocalPlaceCandidate,
   distanceMeters: number,
-  totalSeconds: number,
+  travelTimeMinutes: number,
 ): NearbyLocalPlaceDto {
   return {
     name: candidate.name,
@@ -253,7 +311,7 @@ export function toNearbyLocalPlaceDto(
     longitude: candidate.longitude,
     imageUrl: candidate.imageUrl,
     distanceMeters,
-    travelTimeMinutes: Math.ceil(totalSeconds / 60),
+    travelTimeMinutes,
   };
 }
 
