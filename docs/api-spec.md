@@ -397,6 +397,93 @@ GET /api/places/:id/concentration-forecast
 - 적재는 `npm run ingest:prediction -- --areaCd=11 --signguCd=11110 [--name=경복궁]` 수동 실행(조회 API는 DB만 바라봄).
 - 집중률 API에는 TourAPI contentid가 없어, 지역(법정동) + 정규화된 관광지명이 정확히 일치하는 경우에만 저장한다(UNMATCHED/AMBIGUOUS는 저장하지 않고 집계만).
 
+### 3.4c 집중률 예측 실시간 조회 — [B] (구현됨, 2026-08-14, **전국**)
+```
+GET /api/concentration-forecast?contentId=126081
+```
+3.4b는 적재된 내부 Place만 조회할 수 있어 **적재 지역(현재 종로구) 밖에서는 집중률을 볼 수 없다.**
+KTO 집중률은 전국 시군구를 커버하므로, 목적지의 지역 코드와 이름을 실시간으로 해석해 바로 조회한다 —
+**적재 없이 전국이 된다**(공모전 FAQ의 "로컬 DB 저장 대신 실시간 호출 권고"와도 맞다).
+
+```jsonc
+{
+  "success": true,
+  "data": {
+    "destinationName": "해운대해수욕장",   // TourAPI 기준 이름
+    "matchedName": "해운대해수욕장",        // 실제 매칭된 KTO 관광지명(표기가 다를 수 있음)
+    "areaCd": "26",
+    "signguCd": "26350",
+    "isRealtime": false,
+    "forecasts": [
+      { "forecastDate": "2026-08-14", "concentrationRate": 87.89,
+        "source": "KTO_CONCENTRATION_FORECAST", "isRealtime": false }
+    ]
+  },
+  "error": null
+}
+```
+
+**동작:** `detailCommon2`로 이름·법정동 코드 → KTO 지역 조회 → 이름 매칭(공백 제거 후 정확 일치 →
+부분 일치 시 가장 짧은 이름).
+- ⚠️ **시군구 코드는 5자리 전체 코드로 만들어 넘겨야 한다.** TourAPI는 3자리로 준다
+  (서울 종로구 11/110, 부산 해운대구 26/350). 접두사 검사로 판단하면 안 된다 —
+  `"110".startsWith("11")`이 참이라 종로구가 그대로 넘어가 조회가 0건이 된다(실제로 겪음). 길이로 판단한다.
+- **지역 단위 캐시(6시간)** — 같은 시군구의 여러 목적지가 KTO 호출 1건을 공유한다.
+- `400 INVALID_IDENTIFIER` — contentId 누락. `404 FORECAST_NOT_FOUND` — 지역 해석 실패 또는
+  해당 관광지의 예측 데이터 없음.
+
+---
+
+### 3.10 우회 코스 실시간 생성 — [B] (구현됨, 2026-08-14, **전국**)
+```
+GET /api/courses?contentId=126508&availableMinutes=60
+GET /api/courses?poiId=10817049&availableMinutes=30
+```
+저장형 Route(3.5/3.6)는 내부 Place만 참조할 수 있어 적재 지역에서만 코스가 나온다.
+이 API는 주변 로컬 장소 조회(3.3b)가 이미 구한 **TMAP 실측 보행거리**를 재활용해
+사용자의 가용 시간 안에 다녀올 수 있는 조합을 즉석에서 만든다. **저장하지 않는다.**
+
+- `contentId`/`poiId` 중 **정확히 하나**(3.3b와 같은 규칙, 위반 시 `400 INVALID_IDENTIFIER`).
+- `availableMinutes`: 10~240 정수(앱은 30/60/90을 쓴다). 범위 밖 → `400 INVALID_AVAILABLE_MINUTES`.
+- `404 DESTINATION_NOT_FOUND` — 목적지를 좌표로 해석하지 못함.
+
+```jsonc
+{
+  "success": true,
+  "data": {
+    "destination": { "name": "경복궁", "latitude": 37.5796, "longitude": 126.977 },
+    "availableMinutes": 60,
+    "courses": [
+      {
+        "totalMinutes": 60,          // 이동 + 체류 + 복귀
+        "returnTravelMinutes": 7,    // 마지막 정류지 → 목적지
+        "returnDistanceMeters": 520,
+        "verified": true,            // 정류지 사이 구간이 TMAP 실측이면 true(추정이면 false)
+        "stops": [
+          { "name": "대한민국역사박물관", "address": "...", "latitude": 37.57, "longitude": 126.97,
+            "imageUrl": null, "travelMinutesFromPrevious": 5, "distanceMetersFromPrevious": 380,
+            "stayMinutes": 20 }
+        ]
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+**계산 구조:** 목적지 → 정류지1 → … → 정류지N → 목적지(복귀). 정류지 최대 3곳, 코스 최대 3개.
+- 목적지↔정류지 구간은 3.3b가 구한 **TMAP 실측값**(복귀는 대칭으로 간주해 재사용).
+- 정류지 사이 구간은 직선거리 × 1.3 ÷ 67m/분으로 **추정해 후보를 좁힌 뒤**, 반환할 코스에 한해
+  TMAP으로 실측한다(호출량 절약). 실측 후 가용 시간을 넘기면 그 코스는 뺀다.
+- **체류시간은 가용 시간에 맞춰 조정한다.** 분류별 기본값(14 문화시설 40분 / 38 쇼핑 30분 /
+  39 음식점 40분)에서 비율로 줄이되 **최소 15분**은 지킨다. 기본값 고정이면 30분 코스가 아예
+  만들어지지 않는다(걷는 시간만 더해도 초과). 같은 장소라도 코스 제한시간에 따라 체류시간을 달리 두는 것은
+  [route-data-rules §6](./route-data-rules.md)이 정한 방식이다.
+- ⚠️ 분류별 기본 체류시간은 **공식 통계가 없는 팀 합의값**이다. 방문 로그가 쌓이면 실측으로 보정한다.
+- 정렬: 가용 시간을 알차게 쓰는 순(남는 시간이 적은 순) → 같으면 정류지가 많은 순(분산 효과).
+
+**호출량:** 목적지 해석 1 + TourAPI 목록 3 + TMAP 보행자 최대 10(3.3b와 동일) + 검증 최대 6.
+
 ---
 
 ### 3.5 장소별 코스 목록 — [A] (이동시간/거리: B/TMAP 계산)

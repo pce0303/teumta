@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express';
 
+import { getConcentrationForecastByContentId } from '../services/concentration-forecast.service';
 import {
   getConcentrationForecasts,
   getRealtimeCongestion,
@@ -40,6 +41,57 @@ export const getRealtimeCongestionController: RequestHandler = async (req, res, 
     res.status(200).json({
       success: true,
       data: view,
+      error: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 집중률 예측 실시간 조회(향후 30일 날짜별, DB 미사용, 전국).
+ * 적재된 내부 Place가 아니어도 목적지 contentId만으로 조회된다.
+ */
+export const getConcentrationForecastByContentIdController: RequestHandler = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const contentId = nonEmptyString(req.query.contentId);
+
+    if (contentId === null) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'INVALID_IDENTIFIER',
+          message: 'contentId는 비어 있지 않은 문자열이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const result = await getConcentrationForecastByContentId(contentId);
+
+    if (result.status !== 'SUCCESS') {
+      res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'FORECAST_NOT_FOUND',
+          message:
+            result.status === 'DESTINATION_NOT_RESOLVED'
+              ? '목적지의 지역 정보를 확인할 수 없습니다.'
+              : '이 장소의 집중률 예측 데이터가 없습니다.',
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { ...result.data, isRealtime: false },
       error: null,
     });
   } catch (error) {

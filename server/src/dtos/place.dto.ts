@@ -39,6 +39,8 @@ export interface PlaceData {
 export interface NearbyLocalPlaceCandidate {
   /** 중복 제거·자기 자신 제외용. 응답에는 미노출. */
   tourApiContentId: string;
+  /** TourAPI 분류(14 문화시설 / 38 쇼핑 / 39 음식점). 코스 체류시간 기본값 산정에 쓴다. */
+  contentTypeId: string | null;
   name: string;
   address: string | null;
   latitude: number;

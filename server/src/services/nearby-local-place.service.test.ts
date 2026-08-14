@@ -440,6 +440,7 @@ describe('selectClosestCandidates', () => {
   const base = { latitude: 37.5788, longitude: 126.977 };
   const candidate = (id: string, dist: number | null, latitude = 37.58) => ({
     tourApiContentId: id,
+    contentTypeId: '39',
     name: id,
     address: null,
     latitude,
