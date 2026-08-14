@@ -1,0 +1,186 @@
+/* 틈타 지원·개인정보 페이지. 앱 디자인 토큰(mobile/src/constants/theme.ts)과 같은 색을 쓴다. */
+
+:root {
+  --background: #fafaf7;
+  --surface: #ffffff;
+  --border: #e5eae6;
+  --text-primary: #202522;
+  --text-secondary: #737b76;
+  --green: #55c89a;
+  --green-light: #eaf8f2;
+  --green-dark: #24966d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text-primary);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR',
+    system-ui, sans-serif;
+  line-height: 1.7;
+  -webkit-text-size-adjust: 100%;
+}
+
+.wrap {
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 0 20px;
+}
+
+.hero {
+  background: var(--green-light);
+  border-bottom: 1px solid var(--border);
+  padding: 40px 0 36px;
+}
+
+.brand {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.brand-logo {
+  height: 28px;
+  width: 28px;
+}
+
+.brand-name {
+  color: var(--green-dark);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.hero h1 {
+  font-size: 26px;
+  line-height: 1.4;
+  margin: 0 0 10px;
+}
+
+.hero-sub {
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 34em;
+}
+
+main {
+  padding: 8px 20px 24px;
+}
+
+section {
+  border-bottom: 1px solid var(--border);
+  padding: 28px 0;
+}
+
+section:last-of-type {
+  border-bottom: 0;
+}
+
+h2 {
+  font-size: 19px;
+  margin: 0 0 12px;
+}
+
+h3 {
+  font-size: 16px;
+  margin: 24px 0 8px;
+}
+
+p {
+  margin: 0 0 12px;
+}
+
+ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+li {
+  margin-bottom: 6px;
+}
+
+a {
+  color: var(--green-dark);
+}
+
+.contact a {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.button {
+  background: var(--green-dark);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-block;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 11px 20px;
+  text-decoration: none;
+}
+
+details {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  padding: 14px 16px;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+details p {
+  color: var(--text-secondary);
+  margin: 10px 0 0;
+}
+
+table {
+  border-collapse: collapse;
+  font-size: 15px;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+footer {
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 24px 20px 40px;
+}
+
+.muted {
+  color: var(--text-secondary);
+}
+
+.updated {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.back {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-decoration: none;
+}
