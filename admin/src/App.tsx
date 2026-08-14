@@ -8,6 +8,8 @@ import { LoginPage } from './pages/LoginPage';
 import { MatchingPage } from './pages/MatchingPage';
 import { PlaceFormPage } from './pages/PlaceFormPage';
 import { PlacesPage } from './pages/PlacesPage';
+import { RouteDetailPage } from './pages/RouteDetailPage';
+import { RoutesPage } from './pages/RoutesPage';
 
 export default function App() {
   return (
@@ -26,16 +28,8 @@ export default function App() {
         <Route path="/places/new" element={<PlaceFormPage mode="create" />} />
         <Route path="/places/:id" element={<PlaceFormPage mode="edit" />} />
         <Route path="/matching" element={<MatchingPage />} />
-        <Route
-          path="/routes"
-          element={
-            <ComingSoonPage
-              title="코스 관리"
-              description="관광지별 우회 코스(Route/RouteStop)를 구성하고 관리하는 도구입니다."
-              blockedBy="Route API를 다른 팀원이 구현 중입니다. API 완성 후 연동합니다."
-            />
-          }
-        />
+        <Route path="/routes" element={<RoutesPage />} />
+        <Route path="/routes/:routeId" element={<RouteDetailPage />} />
         <Route
           path="/analytics"
           element={

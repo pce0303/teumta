@@ -27,6 +27,16 @@ export function formatDuration(minutes: number | null): string {
   return `${minutes}분`;
 }
 
+export function formatDistance(meters: number | null): string {
+  if (meters === null) {
+    return '—';
+  }
+  if (meters >= 1000) {
+    return `${(meters / 1000).toFixed(1)}km`;
+  }
+  return `${meters}m`;
+}
+
 export function formatOperatingHours(
   openingTime: string | null,
   closingTime: string | null,

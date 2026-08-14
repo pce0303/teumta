@@ -14,7 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: '대시보드', ready: true },
   { to: '/places', label: '장소 관리', ready: true },
   { to: '/matching', label: '데이터 매칭', ready: true },
-  { to: '/routes', label: '코스 관리', ready: false },
+  { to: '/routes', label: '코스 관리', ready: true },
   { to: '/analytics', label: '성과 분석', ready: false },
 ];
 
