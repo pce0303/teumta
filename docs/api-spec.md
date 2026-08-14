@@ -519,6 +519,33 @@ returnPath           Json?
 
 `Route.estimatedTotalDurationMinutes` = 구간 이동시간 합 + `stayMinutes` 합 + (복귀 포함 시) 복귀 이동시간.
 
+#### 6.5.0 코스 전체 목록 — 관리자 화면 필수
+
+```
+GET /api/admin/routes
+```
+현재 코스 조회는 `GET /api/places/:placeId/routes`(3.5)뿐이라 **mainPlace를 미리 알아야만** 조회할 수 있다.
+관리자는 "어느 관광지에 코스가 등록돼 있는지"를 먼저 알아야 하는데, 장소가 528곳이라
+하나씩 눌러 확인하는 것은 불가능하다(관리자 웹 코스 관리 화면 구현 중 확인된 갭).
+
+`data`: `Route[]` + 화면 표시에 필요한 최소 필드 2개.
+```jsonc
+{
+  "id": 10,
+  "name": "경복궁 60분 우회 코스",
+  "mainPlaceId": 1,
+  "mainPlaceName": "경복궁",   // 조인 — 목록에서 관광지명 표시용
+  "stopCount": 3,               // 정류지 수 — 상세 진입 전 코스 규모 파악용
+  "description": "...",
+  "estimatedTotalDurationMinutes": 55,
+  "estimatedTotalDistanceMeters": 1800,
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+```
+- 정렬: `mainPlaceId` → `id` 오름차순. 코스 수가 수십 건 규모라 페이지네이션은 두지 않는다.
+- optional query `?mainPlaceId=` 로 필터 가능하게 하면 3.5와 중복 없이 화면 재사용이 쉬움.
+
 #### 6.5.1 코스 생성
 
 ```
