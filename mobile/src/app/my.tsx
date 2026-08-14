@@ -1,30 +1,17 @@
 import Constants from 'expo-constants';
-import { Link, type Href } from 'expo-router';
+import { Link } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
-import { getMockPlaceById } from '@/mocks/places';
 
 export default function MyScreen() {
-  const { placeIds, courses, clearBookmarks } = useBookmarks();
-
-  const savedPlaces = placeIds
-    .map((placeId) => getMockPlaceById(placeId))
-    .filter((place) => place !== undefined);
-
-  const savedCourses = courses
-    .map(({ placeId, detourId }) => {
-      const place = getMockPlaceById(placeId);
-      const detour = place?.detours.find((item) => item.id === detourId);
-      return place && detour ? { place, detour } : null;
-    })
-    .filter((entry) => entry !== null);
+  const { places: savedPlaces, clearBookmarks } = useBookmarks();
 
   const confirmClear = () => {
-    Alert.alert('저장 데이터 삭제', '저장한 장소와 코스가 모두 삭제됩니다.', [
+    Alert.alert('저장 데이터 삭제', '저장한 장소가 모두 삭제됩니다.', [
       { text: '취소', style: 'cancel' },
       { text: '삭제', style: 'destructive', onPress: clearBookmarks },
     ]);
@@ -51,42 +38,24 @@ export default function MyScreen() {
         ) : (
           <View style={styles.list}>
             {savedPlaces.map((place) => (
-              <Link key={place.id} href={`/places/${place.id}` as Href} asChild>
-                <Pressable style={styles.rowCard}>
-                  <View style={styles.rowThumb} />
-                  <View style={styles.rowTexts}>
-                    <Text style={styles.rowName}>{place.name}</Text>
-                    <Text style={styles.rowMeta}>
-                      {place.area} · {place.congestionLabel}
-                    </Text>
-                  </View>
-                  <Text style={styles.rowChevron}>›</Text>
-                </Pressable>
-              </Link>
-            ))}
-          </View>
-        )}
-
-        <Text style={styles.sectionTitle}>저장한 코스</Text>
-        {savedCourses.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>
-              아직 저장한 코스가 없어요.{'\n'}코스 상세 화면의 북마크 버튼으로 저장할 수 있어요.
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.list}>
-            {savedCourses.map(({ place, detour }) => (
               <Link
-                key={`${place.id}-${detour.id}`}
-                href={`/course-map?placeId=${place.id}&detourId=${detour.id}` as Href}
+                key={`${place.source}-${place.id}`}
+                href={{
+                  pathname: '/places/[id]',
+                  params: {
+                    id: place.id,
+                    source: place.source,
+                    name: place.name,
+                    ...(place.address ? { address: place.address } : {}),
+                  },
+                }}
                 asChild>
                 <Pressable style={styles.rowCard}>
                   <View style={styles.rowThumb} />
                   <View style={styles.rowTexts}>
-                    <Text style={styles.rowName}>{detour.name}</Text>
-                    <Text style={styles.rowMeta}>
-                      {place.name} · 약 {detour.durationMinutes}분 · {detour.distanceKm}km
+                    <Text style={styles.rowName}>{place.name}</Text>
+                    <Text style={styles.rowMeta} numberOfLines={1}>
+                      {place.address ?? '주소 정보 없음'}
                     </Text>
                   </View>
                   <Text style={styles.rowChevron}>›</Text>
@@ -100,7 +69,7 @@ export default function MyScreen() {
         <View style={styles.infoCard}>
           <Text style={styles.infoCardTitle}>위치는 기기 안에서만 처리돼요</Text>
           <Text style={styles.infoCardBody}>
-            현재 위치와 이동 경로는 서버로 전송하지 않아요. 저장한 장소와 코스도 이 기기 안에만
+            현재 위치와 이동 경로는 서버로 전송하지 않아요. 저장한 장소도 이 기기 안에만
             보관됩니다.
           </Text>
           <Pressable onPress={confirmClear} hitSlop={8}>

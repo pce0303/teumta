@@ -54,8 +54,17 @@ export default function CourseMapScreen() {
     ],
   };
 
-  // 각 지점 도착 시각 = 그때까지의 이동 + 체류 누적.
-  let elapsed = 0;
+  // 각 정류지 도착까지 걸리는 시간 = 앞선 정류지들의 (이동 + 체류) + 이번 구간 이동.
+  const arrivalMinutes = course.stops.map(
+    (stop, index) =>
+      course.stops
+        .slice(0, index)
+        .reduce(
+          (total, previous) => total + previous.travelMinutesFromPrevious + previous.stayMinutes,
+          0,
+        ) + stop.travelMinutesFromPrevious,
+  );
+
   const timeline = [
     {
       key: 'start',
@@ -66,18 +75,13 @@ export default function CourseMapScreen() {
         : '코스를 따라 이동',
       time: timeLabelAfter(0),
     },
-    ...course.stops.map((stop) => {
-      elapsed += stop.travelMinutesFromPrevious;
-      const arriveAt = timeLabelAfter(elapsed);
-      elapsed += stop.stayMinutes;
-      return {
-        key: `${stop.name}-${stop.latitude}`,
-        dot: Teumta.green,
-        title: stop.name,
-        subtitle: `권장 체류 ${stop.stayMinutes}분${stop.address ? ` · ${stop.address}` : ''}`,
-        time: arriveAt,
-      };
-    }),
+    ...course.stops.map((stop, index) => ({
+      key: `${stop.name}-${stop.latitude}`,
+      dot: Teumta.green,
+      title: stop.name,
+      subtitle: `권장 체류 ${stop.stayMinutes}분${stop.address ? ` · ${stop.address}` : ''}`,
+      time: timeLabelAfter(arrivalMinutes[index]),
+    })),
     {
       key: 'return',
       dot: Teumta.greenDark,

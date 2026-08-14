@@ -5,27 +5,32 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
+import { TourApiAttribution } from '@/components/tour-api-attribution';
+import {
+  destinationsInRegion,
+  HOME_REGIONS,
+  type FeaturedDestination,
+  type HomeRegion,
+} from '@/constants/destinations';
 import { Teumta } from '@/constants/theme';
-import { featuredPlaces } from '@/mocks/places';
-import type { Place } from '@/types/place';
 
-const REGIONS = ['전체', '서울', '부산', '전주', '제주'] as const;
-
-type Region = (typeof REGIONS)[number];
-
-function CongestionBadge({ place }: { place: Place }) {
-  const palette = Teumta.congestion[place.congestionLevel];
-  return (
-    <View style={[styles.badge, { backgroundColor: palette.background }]}>
-      <Text style={[styles.badgeText, { color: palette.text }]}>{place.congestionLabel}</Text>
-    </View>
-  );
+/** 목적지 상세로 넘길 파라미터. 상세 화면이 이 식별자로 실시간 정보를 조회한다. */
+function detailHref(destination: FeaturedDestination) {
+  return {
+    pathname: '/places/[id]' as const,
+    params: {
+      id: destination.tourApiContentId,
+      source: 'TOUR',
+      name: destination.name,
+    },
+  };
 }
 
 export default function HomeScreen() {
-  const [region, setRegion] = useState<Region>('전체');
-  const [featured, ...restPlaces] = featuredPlaces;
-  const regionPlaces = restPlaces.slice(0, 2);
+  const [region, setRegion] = useState<HomeRegion>('전체');
+  const destinations = destinationsInRegion(region);
+  const [featured, ...restDestinations] = destinations;
+  const regionDestinations = restDestinations.slice(0, 2);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -60,7 +65,7 @@ export default function HomeScreen() {
         </Link>
 
         <View style={styles.chipRow}>
-          {REGIONS.map((item) => {
+          {HOME_REGIONS.map((item) => {
             const selected = item === region;
             return (
               <Pressable
@@ -82,41 +87,41 @@ export default function HomeScreen() {
           </Link>
         </View>
 
-        <Link href={`/places/${featured.id}` as Href} asChild>
-          <Pressable style={styles.featuredCard}>
-            <View style={styles.featuredImage} />
-            <View style={styles.featuredBody}>
-              <View style={styles.featuredTexts}>
-                <Text style={styles.featuredName}>{featured.name}</Text>
-                <Text style={styles.featuredMeta}>
-                  {featured.area} · 주변 틈타 코스 {featured.detours.length}개
-                </Text>
+        {featured && (
+          <Link href={detailHref(featured)} asChild>
+            <Pressable style={styles.featuredCard}>
+              <View style={styles.featuredImage} />
+              <View style={styles.featuredBody}>
+                <View style={styles.featuredTexts}>
+                  <Text style={styles.featuredName}>{featured.name}</Text>
+                  <Text style={styles.featuredMeta}>
+                    {featured.areaLabel} · 혼잡도와 우회 코스 확인
+                  </Text>
+                </View>
               </View>
-              <CongestionBadge place={featured} />
-            </View>
-          </Pressable>
-        </Link>
+            </Pressable>
+          </Link>
+        )}
 
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>다른 지역도 둘러보기</Text>
-          <Text style={styles.sectionAction}>추천 기준</Text>
         </View>
 
         <View style={styles.regionRow}>
-          {regionPlaces.map((place) => (
-            <Link key={place.id} href={`/places/${place.id}` as Href} asChild>
+          {regionDestinations.map((destination) => (
+            <Link key={destination.tourApiContentId} href={detailHref(destination)} asChild>
               <Pressable style={styles.regionCard}>
                 <View style={styles.regionImage} />
                 <View style={styles.regionBody}>
-                  <Text style={styles.regionName}>{place.name}</Text>
-                  <Text style={styles.regionMeta}>
-                    {place.area} · {place.congestionLabel}
-                  </Text>
+                  <Text style={styles.regionName}>{destination.name}</Text>
+                  <Text style={styles.regionMeta}>{destination.areaLabel}</Text>
                 </View>
               </Pressable>
             </Link>
           ))}
         </View>
+
+        <TourApiAttribution style={styles.attribution} />
       </ScrollView>
 
       <TeumtaTabBar active="home" />
@@ -266,6 +271,9 @@ const styles = StyleSheet.create({
     color: Teumta.textSecondary,
     fontSize: 10,
     lineHeight: 14,
+  },
+  attribution: {
+    marginTop: 4,
   },
   badge: {
     borderRadius: 999,
