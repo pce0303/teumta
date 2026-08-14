@@ -9,10 +9,16 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://port-0-teumta-server-msh476v8e47b3c7e.sel3.cloudtype.app"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://port-0-teumta-server-msh476v8e47b3c7e.sel3.cloudtype.app"
+      }
     }
   },
   "submit": {
