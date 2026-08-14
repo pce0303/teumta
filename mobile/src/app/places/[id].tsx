@@ -93,22 +93,20 @@ export default function PlaceDetailScreen() {
     setCongestion(null);
     setNearby([]);
 
-    if (source === 'TMAP') {
-      setCongestionStatus('loading');
-      getRealtimeCongestion(id)
-        .then((data) => {
-          if (ignored) return;
-          setCongestion(data);
-          setCongestionStatus('idle');
-        })
-        .catch(() => {
-          if (ignored) return;
-          setCongestionStatus('error');
-        });
-    } else {
-      // TourAPI 결과는 tmapPoiId가 없어 실시간 혼잡도를 조회할 수 없음
-      setCongestionStatus('unavailable');
-    }
+    // TOUR 목적지도 서버가 TMAP POI로 매칭해 조회해 준다(api-spec 3.4a).
+    setCongestionStatus('loading');
+    getRealtimeCongestion(source === 'TOUR' ? { contentId: id } : { poiId: id })
+      .then((data) => {
+        if (ignored) return;
+        setCongestion(data);
+        setCongestionStatus('idle');
+      })
+      .catch((error: unknown) => {
+        if (ignored) return;
+        // 404는 SK가 다루지 않는 장소 — 장애가 아니라 원래 제공되지 않는 데이터다.
+        const status = (error as { response?: { status?: number } }).response?.status;
+        setCongestionStatus(status === 404 ? 'unavailable' : 'error');
+      });
 
     setNearbyStatus('loading');
     const identifier = source === 'TOUR' ? { contentId: id } : { poiId: id };
@@ -288,8 +286,18 @@ export default function PlaceDetailScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
-        <Pressable style={[styles.ctaButton, styles.ctaButtonDisabled]} disabled>
-          <Text style={styles.ctaLabel}>틈타 코스 준비 중이에요</Text>
+        <Pressable
+          style={styles.ctaButton}
+          onPress={() =>
+            router.push({
+              pathname: '/detours',
+              params: {
+                ...(source === 'TOUR' ? { contentId: id } : { poiId: id }),
+                name,
+              },
+            })
+          }>
+          <Text style={styles.ctaLabel}>틈타 코스 보기</Text>
         </Pressable>
       </View>
     </View>
@@ -529,9 +537,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     height: 50,
     justifyContent: 'center',
-  },
-  ctaButtonDisabled: {
-    backgroundColor: Teumta.textTertiary,
   },
   ctaLabel: {
     color: Teumta.surface,

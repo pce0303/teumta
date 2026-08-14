@@ -66,3 +66,22 @@ export type NearbyLocalPlaceResult = {
   distanceMeters: number;
   travelTimeMinutes: number;
 };
+
+/** GET /api/concentration-forecast 응답. 날짜별 예측이며 실시간 혼잡도가 아니다. */
+export type ConcentrationForecastEntry = {
+  /** "YYYY-MM-DD" (KST). */
+  forecastDate: string;
+  concentrationRate: number;
+  source: string;
+  isRealtime: false;
+};
+
+export type ConcentrationForecast = {
+  destinationName: string;
+  /** 실제로 매칭된 KTO 관광지명(표기가 다를 수 있음). */
+  matchedName: string;
+  areaCd: string;
+  signguCd: string;
+  isRealtime: false;
+  forecasts: ConcentrationForecastEntry[];
+};

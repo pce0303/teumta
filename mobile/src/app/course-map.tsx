@@ -1,12 +1,13 @@
 import { Image } from 'expo-image';
-import { Link, type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
+import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
-import { useBookmarks } from '@/hooks/use-bookmarks';
-import { getMockPlaceById } from '@/mocks/places';
+import { getSelectedCourse } from '@/stores/selected-course';
+import { courseDistanceMeters, courseStayMinutes } from '@/types/course';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
 
@@ -14,56 +15,75 @@ const SHEET_OVERLAP = 26;
 const DOT_START = '#FF9175';
 
 export default function CourseMapScreen() {
-  const { placeId, detourId } = useLocalSearchParams<{ placeId?: string; detourId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isCourseBookmarked, toggleCourseBookmark } = useBookmarks();
-  const place = getMockPlaceById(placeId) ?? getMockPlaceById('gyeongbokgung');
-  const detour = place?.detours.find((item) => item.id === detourId) ?? place?.detours[0];
+  const selected = getSelectedCourse();
 
-  if (!place || !detour) {
+  if (!selected) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>코스를 찾을 수 없습니다.</Text>
+        <Text style={styles.emptyText}>선택한 코스 정보가 없어요.</Text>
+        <Pressable style={styles.emptyButton} onPress={() => router.back()}>
+          <Text style={styles.emptyButtonLabel}>코스 다시 고르기</Text>
+        </Pressable>
       </View>
     );
   }
 
-  const palette = Teumta.congestion[place.congestionLevel];
-  const returnTimeLabel = timeLabelAfter(detour.durationMinutes);
+  const { course, destination } = selected;
+  const distanceLabel = `${(courseDistanceMeters(course) / 1000).toFixed(1)}km`;
+  const returnTimeLabel = timeLabelAfter(course.totalMinutes);
+  const courseName = course.stops.map((stop) => stop.name).join(' · ');
 
-  const stops = detour.stops ?? [];
-  const middleStops = stops.slice(0, -1);
-  const returnPlaceName = stops[stops.length - 1] ?? place.name;
-  const stayTotal = detour.stayMinutes ?? Math.round(detour.durationMinutes * 0.7);
-  const stayPerStop =
-    middleStops.length > 0 ? Math.round(stayTotal / middleStops.length) : stayTotal;
+  // 지도용 경로: 목적지 → 정류지들 → 목적지(복귀).
+  const mapDetour = {
+    id: 'generated',
+    name: courseName,
+    durationMinutes: course.totalMinutes,
+    distanceKm: courseDistanceMeters(course) / 1000,
+    description: '',
+    coordinates: [
+      { latitude: destination.latitude, longitude: destination.longitude },
+      ...course.stops.map((stop) => ({ latitude: stop.latitude, longitude: stop.longitude })),
+      { latitude: destination.latitude, longitude: destination.longitude },
+    ],
+    stops: [
+      destination.name,
+      ...course.stops.map((stop) => stop.name),
+      `${destination.name} 복귀`,
+    ],
+  };
 
-  const rowCount = middleStops.length + 2;
-  const timeAtRow = (index: number) =>
-    timeLabelAfter(Math.round((detour.durationMinutes * index) / (rowCount - 1)));
-
+  // 각 지점 도착 시각 = 그때까지의 이동 + 체류 누적.
+  let elapsed = 0;
   const timeline = [
     {
       key: 'start',
       dot: DOT_START,
-      title: `${place.name} 앞 출발`,
-      subtitle: middleStops[0] ? `${middleStops[0]}까지 도보 이동` : '코스를 따라 이동',
-      time: timeAtRow(0),
+      title: `${destination.name} 앞 출발`,
+      subtitle: course.stops[0]
+        ? `${course.stops[0].name}까지 도보 ${course.stops[0].travelMinutesFromPrevious}분`
+        : '코스를 따라 이동',
+      time: timeLabelAfter(0),
     },
-    ...middleStops.map((stop, index) => ({
-      key: stop,
-      dot: Teumta.green,
-      title: stop,
-      subtitle: `권장 체류 ${stayPerStop}분`,
-      time: timeAtRow(index + 1),
-    })),
+    ...course.stops.map((stop) => {
+      elapsed += stop.travelMinutesFromPrevious;
+      const arriveAt = timeLabelAfter(elapsed);
+      elapsed += stop.stayMinutes;
+      return {
+        key: `${stop.name}-${stop.latitude}`,
+        dot: Teumta.green,
+        title: stop.name,
+        subtitle: `권장 체류 ${stop.stayMinutes}분${stop.address ? ` · ${stop.address}` : ''}`,
+        time: arriveAt,
+      };
+    }),
     {
       key: 'return',
       dot: Teumta.greenDark,
-      title: `${withRoJosa(returnPlaceName)} 복귀`,
-      subtitle: '복귀 전에 최신 혼잡도 확인',
-      time: timeAtRow(rowCount - 1),
+      title: `${withRoJosa(destination.name)} 복귀`,
+      subtitle: `도보 ${course.returnTravelMinutes}분 · 복귀 전 최신 혼잡도 확인`,
+      time: returnTimeLabel,
     },
   ];
 
@@ -79,22 +99,10 @@ export default function CourseMapScreen() {
             contentFit="contain"
           />
         </Pressable>
-        <Pressable
-          style={[
-            styles.topButton,
-            isCourseBookmarked(place.id, detour.id) && styles.topButtonSaved,
-          ]}
-          onPress={() => toggleCourseBookmark(place.id, detour.id)}>
-          <Image
-            source={require('@/assets/images/icons/bookmark.svg')}
-            style={styles.topButtonIcon}
-            contentFit="contain"
-          />
-        </Pressable>
       </View>
 
       <View style={styles.mapArea}>
-        <CourseMapView detour={detour} />
+        <CourseMapView detour={mapDetour} />
       </View>
 
       <ScrollView
@@ -105,9 +113,11 @@ export default function CourseMapScreen() {
 
         <View style={styles.sheetHeader}>
           <View style={styles.sheetTitleTexts}>
-            <Text style={styles.sheetTitle}>{detour.name}</Text>
+            <Text style={styles.sheetTitle} numberOfLines={1}>
+              {courseName}
+            </Text>
             <Text style={styles.sheetSubtitle}>
-              총 약 {detour.durationMinutes}분 · 도보 약 {detour.distanceKm}km
+              총 약 {course.totalMinutes}분 · 도보 약 {distanceLabel}
             </Text>
           </View>
           <View style={styles.returnPill}>
@@ -122,7 +132,9 @@ export default function CourseMapScreen() {
               <View style={[styles.timelineDot, { backgroundColor: entry.dot }]} />
               <View style={styles.timelineTexts}>
                 <Text style={styles.timelineTitle}>{entry.title}</Text>
-                <Text style={styles.timelineSubtitle}>{entry.subtitle}</Text>
+                <Text style={styles.timelineSubtitle} numberOfLines={1}>
+                  {entry.subtitle}
+                </Text>
               </View>
               <Text style={styles.timelineTime}>{entry.time}</Text>
             </View>
@@ -131,29 +143,29 @@ export default function CourseMapScreen() {
 
         <View style={styles.statusStrip}>
           <View style={styles.statusColumn}>
-            <Text style={styles.statusLabel}>현재 상태</Text>
-            <Text style={[styles.statusNow, { color: palette.text }]}>{place.congestionLabel}</Text>
+            <Text style={styles.statusLabel}>들르는 곳</Text>
+            <Text style={styles.statusNow}>{course.stops.length}곳</Text>
           </View>
-          <Text style={styles.statusArrow}>→</Text>
+          <Text style={styles.statusArrow}>·</Text>
           <View style={[styles.statusColumn, styles.statusColumnEnd]}>
-            <Text style={styles.statusLabel}>복귀 전</Text>
-            <Text style={styles.statusRecheck}>재확인</Text>
+            <Text style={styles.statusLabel}>머무는 시간</Text>
+            <Text style={styles.statusRecheck}>{courseStayMinutes(course)}분</Text>
           </View>
         </View>
 
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>복귀 안내</Text>
           <Text style={styles.infoBody}>
-            {returnTimeLabel} 복귀를 기준으로 코스를 구성했어요. 복귀 전 최신 혼잡도를 다시 확인해
-            알려드려요.
+            {returnTimeLabel} 복귀를 기준으로 코스를 구성했어요. 걷는 시간은 실제 보행 경로로
+            계산했고, 체류시간은 장소 유형을 기준으로 한 예상값이에요.
           </Text>
         </View>
 
-        <Link href={`/trip?placeId=${place.id}&detourId=${detour.id}` as Href} asChild>
-          <Pressable style={styles.ctaButton}>
-            <Text style={styles.ctaLabel}>이 코스로 출발하기</Text>
-          </Pressable>
-        </Link>
+        <TourApiAttribution style={styles.attribution} />
+
+        <Pressable style={styles.ctaButton} onPress={() => router.push('/trip')}>
+          <Text style={styles.ctaLabel}>이 코스로 출발하기</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -173,6 +185,21 @@ const styles = StyleSheet.create({
   emptyText: {
     color: Teumta.textSecondary,
     fontSize: 16,
+  },
+  emptyButton: {
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 999,
+    marginTop: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  emptyButtonLabel: {
+    color: Teumta.greenDark,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  attribution: {
+    marginTop: 2,
   },
   topBar: {
     alignItems: 'center',
@@ -313,6 +340,7 @@ const styles = StyleSheet.create({
     lineHeight: 11,
   },
   statusNow: {
+    color: Teumta.greenDark,
     fontSize: 17,
     fontWeight: '700',
     lineHeight: 24,
