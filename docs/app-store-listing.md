@@ -74,6 +74,66 @@
 
 > 앱 이름(틈타)과 카테고리명은 키워드에 넣지 않는다 — 이미 검색에 반영된다.
 
+## 앱 심사 정보 (App Review Information)
+
+이용자에게 보이지 않는 **심사팀 내부용** 정보다.
+
+| 항목 | 입력 |
+|---|---|
+| 로그인 필요 | 아니오(회원가입 없음) |
+| 연락처 이름 | **로마자 표기**(여권 표기 기준). 리뷰어가 한국 담당이 아닐 수 있다 |
+| 연락처 전화 | **국가번호 포함** `+82 10-XXXX-XXXX` |
+| 연락처 이메일 | 지원 페이지와 같은 주소 |
+
+### 메모(Notes) — 영어로 작성
+
+리뷰어가 기능을 오해해 리젝하는 것을 막는 칸이다. 특히 **실시간 혼잡도가 일부 장소에만 표시되는 것**을
+고장으로 볼 수 있어 미리 설명한다. 아래를 그대로 붙여 넣는다.
+
+```
+Teumta helps travelers avoid overcrowded tourist attractions in South Korea.
+When a destination is busy, the app suggests nearby local places you can walk to
+within your available time, and tells you when to head back.
+
+NO ACCOUNT NEEDED
+The app has no sign-up or login. All features are available immediately.
+
+HOW TO TEST
+1. Open the app and tap the search field.
+2. Search for "경복궁" (Gyeongbokgung Palace) or "해운대해수욕장" (Haeundae Beach).
+   Note: search covers South Korean tourist attractions only, so Korean keywords
+   work best. Tap the search button (there is no auto-complete, by design, to
+   limit external API usage).
+3. Tap a result to see the destination detail: real-time crowd level and a
+   30-day daily concentration forecast.
+4. Tap "틈타 코스 보기" (View courses) and choose 30 / 60 / 90 minutes.
+   The server generates walking courses in real time; this takes a few seconds.
+5. Tap a course, then "이 코스로 출발하기" (Start this course) to see the map and
+   progress screen.
+
+ABOUT REAL-TIME CROWD LEVELS
+Real-time crowd data is provided by a third-party service that covers only a
+subset of places. When a place is not covered, the app shows "이 장소는 실시간
+혼잡도를 제공하지 않아요" (real-time crowd level is not available here). This is
+expected behavior, not an error. The 30-day forecast is available nationwide.
+
+LOCATION PERMISSION
+Location is optional. Search, crowd levels, forecasts and course generation all
+work without granting it. Location is only used during an active course to
+detect arrival at a stop, and it is processed on the device only — it is never
+sent to our servers. We do not use background location.
+
+DATA SOURCES
+Tourism data is provided by the Korea Tourism Organization (public open data).
+Walking routes and real-time crowd levels come from SK Telecom open APIs.
+Attribution "출처: ⓒ한국관광공사" (Source: © Korea Tourism Organization) is shown
+on screens that display this data.
+
+PRIVACY
+No user accounts, no analytics, no advertising identifiers. We do not collect
+personal data. Saved places are stored on the device only.
+```
+
 ## 그 외 입력 항목
 
 | 항목 | 값 |
