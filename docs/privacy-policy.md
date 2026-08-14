@@ -91,5 +91,6 @@
 
 ## 9. 문의처
 
-<!-- 제출 전 팀 대표 이메일로 교체할 것. App Store Connect에도 같은 주소를 사용한다. -->
-이메일: `TODO@example.com`
+이메일: `ivychoen@gmail.com`
+
+> 웹 공개본: [web/privacy.html](../web/privacy.html) — 내용을 고칠 때 두 파일을 함께 맞춘다.

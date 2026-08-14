@@ -11,44 +11,31 @@ App Store Connect가 **필수로 요구하는 두 URL**을 이 정적 페이지 
 
 ---
 
-## 배포 전에 반드시 할 것
+## 배포 — GitHub Pages
 
-**문의 이메일을 바꾼다.** `index.html`과 `privacy.html`에 `TODO@example.com`이 각각 한 번씩 들어 있다.
-App Store Connect에 입력하는 지원 이메일과 같은 주소를 쓴다.
-
-```sh
-grep -rn "TODO@example.com" web/
-```
-
-> 개인 계정보다 팀이 함께 볼 수 있는 주소를 권한다. 이 페이지는 공개되고, 앱 심사·이용자 문의가 이리로 온다.
-
----
-
-## 배포 방법 (둘 중 하나)
-
-### 1) GitHub Pages — 저장소 설정만 바꾸면 끝
-
-워크플로(`.github/workflows/pages.yml`)가 이미 있다. 저장소에서 한 번만 설정하면 된다.
+워크플로(`.github/workflows/pages.yml`)가 `web/` 아래 변경을 감지해 자동 배포한다.
+저장소에서 **한 번만** 설정하면 된다.
 
 1. 저장소 **Settings → Pages**
 2. **Source**를 `GitHub Actions`로 변경
-3. `web/` 아래 파일이 `main`에 머지되면 자동 배포
 
-주소: `https://saesgil-yulamdan.github.io/teumta/` · `.../teumta/privacy.html`
+| 용도 | 주소 |
+|---|---|
+| 지원 URL | `https://saesgil-yulamdan.github.io/teumta/` |
+| 개인정보처리방침 URL | `https://saesgil-yulamdan.github.io/teumta/privacy.html` |
 
-수동으로 돌리려면 Actions 탭 → "Deploy support site" → Run workflow.
+수동 실행: Actions 탭 → "Deploy support site" → Run workflow.
 
-### 2) Vercel — 저장소 연결 후 루트 디렉터리만 지정
+App Store Connect의 URL은 **심사 재제출 없이 바꿀 수 있는 항목**이라 나중에 다른 호스팅으로 옮겨도 된다.
 
-1. Vercel에서 **Add New → Project** → 저장소 선택
-2. **Root Directory**를 `web` 으로 지정
-3. Framework Preset은 `Other`, 빌드 명령·출력 디렉터리는 **비워 둔다**(정적 파일 그대로 서빙)
-4. Deploy
+## 문의 이메일
 
-주소: `https://<프로젝트명>.vercel.app/` · `.../privacy.html`
+`index.html`과 `privacy.html`에 각각 한 번씩 들어 있다. App Store Connect의 지원 이메일과 같은
+주소를 유지한다. `docs/privacy-policy.md`에도 같은 주소가 있으니 함께 고친다.
 
-> 둘 다 해도 상관없지만 App Store Connect에는 **한 곳의 주소만** 넣는다. 나중에 주소가 바뀌면
-> App Store Connect에서 URL을 수정하면 된다(앱 심사 재제출 없이 변경 가능한 항목이다).
+```sh
+grep -rn "mailto:" web/
+```
 
 ---
 
