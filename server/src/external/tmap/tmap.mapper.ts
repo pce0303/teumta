@@ -94,6 +94,8 @@ export function mapPoiSearchToDestinations(
       latitude,
       longitude,
       imageUrl: null,
+      // TMAP POI는 tourApiContentId가 없어 내부 Place와 이을 키가 없다.
+      placeId: null,
     });
   }
   return results;

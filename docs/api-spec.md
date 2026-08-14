@@ -200,8 +200,11 @@ GET /api/search/places?keyword=경복궁&pageNo=1
   "success": true,
   "data": [
     {
-      "tourApiContentId": "126508",
-      "contentTypeId": "12",
+      "source": "TOUR",            // TOUR | TMAP
+      "tourApiContentId": "126508", // TMAP 결과면 null
+      "tmapPoiId": null,            // TOUR 결과면 null
+      "contentTypeId": "12",        // TOUR만
+      "placeId": 7,                 // 내부 Place id — 매칭 안 되면 null (아래 참고)
       "name": "경복궁",
       "address": "서울특별시 종로구 사직로 161 (세종로)",
       "latitude": 37.5760307,     // 없으면 null
@@ -213,6 +216,13 @@ GET /api/search/places?keyword=경복궁&pageNo=1
 }
 ```
 - `400` — keyword 누락/공백, pageNo가 양의 정수 아님.
+
+**`placeId`(내부 Place 연결):** 집중률 예측(3.4b)은 내부 `placeId`로만 조회 가능한데 검색 결과는
+DB 미저장이라 두 데이터를 이을 방법이 없었다. TOUR 결과에 한해 `tourApiContentId`로 적재된 Place를
+조회(DB 1회)해 채운다.
+- 적재 안 된 관광지·TMAP 결과 → `null`. 클라이언트는 `placeId !== null`일 때만 집중률 예측을 호출한다.
+- **검색 결과를 Place에 적재하지 않는다** — 조회 전용 매칭이다(공모전 데이터 활용 기준 유지).
+- DB 조회 실패 시 검색 자체는 성공시키고 `placeId`만 `null`로 둔다(§4 부분 성공 규약).
 
 ### 3.3b 주변 로컬 장소 조회 — [B] (실시간 외부 API)
 

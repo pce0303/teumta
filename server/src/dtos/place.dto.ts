@@ -62,6 +62,12 @@ export interface DestinationSearchResult {
   latitude: number | null;
   longitude: number | null;
   imageUrl: string | null;
+  /**
+   * 내부 Place id. `tourApiContentId`가 적재된 관광지와 일치할 때만 채워지고 그 외에는 null이다.
+   * 집중률 예측 조회(`GET /api/places/:id/concentration-forecast`)가 내부 id를 요구하는데
+   * 검색 결과는 DB 미저장이라 연결 고리가 없었다 — 조회 전용 매칭이며 적재는 하지 않는다.
+   */
+  placeId: number | null;
 }
 
 /** 주변 로컬 장소 응답 항목. distanceMeters는 직선거리가 아닌 TMAP 실제 보행거리. */
