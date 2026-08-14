@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ExternalApiAuthError,
   ExternalApiError,
+  ExternalApiNotFoundError,
   ExternalApiRateLimitError,
   ExternalApiResponseError,
   ExternalApiTimeoutError,
@@ -20,6 +21,20 @@ describe('resolveErrorResponse', () => {
 
   it('timeout은 504', () => {
     expect(resolveErrorResponse(new ExternalApiTimeoutError('tour')).status).toBe(504);
+  });
+
+  it('외부 API가 데이터 없음을 알린 경우는 404(장애 아님)', () => {
+    expect(
+      resolveErrorResponse(
+        new ExternalApiNotFoundError('congestion', 'no data', {
+          code: 'CONGESTION_DATA_NOT_FOUND',
+        }),
+      ),
+    ).toEqual({
+      status: 404,
+      code: 'CONGESTION_DATA_NOT_FOUND',
+      message: 'no data',
+    });
   });
 
   it('rate limit은 503', () => {

@@ -71,12 +71,20 @@ export function extractRouteSummary(response: TmapRouteResponse): RouteSegmentDa
   };
 }
 
-/** POI 검색 응답 → 목적지 검색 결과[](source=TMAP). 좌표 없는 항목은 제외. */
+/**
+ * POI 검색 응답 → 목적지 검색 결과[](source=TMAP). 좌표 없는 항목은 제외.
+ *
+ * **id 중복 제거:** TMAP은 같은 장소의 출입구·주차장을 별도 POI로 주면서 `id`는 공유하고
+ * `pkey`로만 구분한다(예: "교보문고 강남점" / "교보문고 강남점 주차장" / "…정문" → id 736655).
+ * 우리는 `id`를 목적지 식별자(`tmapPoiId`, 혼잡도 조회 키)로 쓰므로 중복을 그대로 내보내면
+ * 목록에 같은 장소가 여러 번 뜨고 클라이언트가 항목을 구분할 수 없다. 첫 항목(대표)만 남긴다.
+ */
 export function mapPoiSearchToDestinations(
   response: TmapPoiSearchResponse,
 ): DestinationSearchResult[] {
   const pois = response.searchPoiInfo?.pois?.poi ?? [];
   const results: DestinationSearchResult[] = [];
+  const seenPoiIds = new Set<string>();
 
   for (const poi of pois) {
     const latitude = parseCoordinateOrNull(poi.noorLat ?? poi.frontLat);
@@ -84,10 +92,15 @@ export function mapPoiSearchToDestinations(
     if (latitude === null || longitude === null) {
       continue;
     }
+    const poiId = String(poi.id);
+    if (seenPoiIds.has(poiId)) {
+      continue;
+    }
+    seenPoiIds.add(poiId);
     results.push({
       source: 'TMAP',
       tourApiContentId: null,
-      tmapPoiId: String(poi.id),
+      tmapPoiId: poiId,
       contentTypeId: null,
       name: poi.name,
       address: buildPoiAddress(poi),

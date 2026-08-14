@@ -3,6 +3,7 @@ import {
   ExternalApiError,
   externalConfig,
   extractPublicDataHeader,
+  normalizeResultCode,
   normalizeServiceKey,
   requestJson,
 } from '../common';
@@ -213,10 +214,20 @@ function buildTourUrl(operation: string, params: Record<string, string>): string
   return url.toString();
 }
 
+/**
+ * 결과 없음(0003 NODATA_ERROR). 오류가 아니라 "조회 결과 0건"이다.
+ * 검색어에 해당하는 관광지가 없을 때 오므로, 이걸 오류로 던지면 TMAP 폴백이 실행되지 않고
+ * 검색 자체가 502로 죽는다(실제로 일반 상점 키워드에서 발생).
+ */
+const NODATA_RESULT_CODE = '03';
+
 /** TourAPI는 HTTP 200이어도 resultCode로 논리 오류를 알린다(중첩/flat 봉투 모두). 정상은 '0000'. */
 function assertTourApiOk(response: TourApiListResponse | TourApiDetailResponse): void {
   const header = extractPublicDataHeader(response);
   if (header?.resultCode === '0000') {
+    return;
+  }
+  if (header && normalizeResultCode(header.resultCode) === NODATA_RESULT_CODE) {
     return;
   }
   throw classifyPublicDataResultCode(

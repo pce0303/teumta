@@ -32,6 +32,7 @@ import {
   buildAreaListQuery,
   buildLocationListQuery,
   fetchTourPlacesByArea,
+  fetchTourPlacesByKeyword,
   fetchTourPlacesByLocation,
 } from './tour.client';
 
@@ -154,5 +155,51 @@ describe('fetchTourPlacesByArea', () => {
       expect((error as Error).message).not.toContain('TEST_KEY');
       expect((error as Error).message).not.toContain('serviceKey');
     }
+  });
+});
+
+describe('resultCode 처리', () => {
+  it('NODATA(0003)는 오류가 아니라 결과 0건으로 통과시킨다', async () => {
+    // 오류로 던지면 검색이 502로 죽고 TMAP 폴백이 실행되지 않는다
+    // (일반 상점 키워드처럼 관광지 검색 결과가 없을 때 실제로 발생).
+    const nodata = {
+      response: { header: { resultCode: '0003', resultMsg: 'NODATA_ERROR' } },
+    };
+    requestJsonMock.mockResolvedValue(nodata);
+
+    await expect(fetchTourPlacesByKeyword({ keyword: '교보문고 강남점' })).resolves.toEqual(nodata);
+  });
+
+  it('JSON 게이트웨이 오류 봉투(30)는 인증 오류로 분류한다', async () => {
+    requestJsonMock.mockResolvedValue({
+      OpenAPI_ServiceResponse: {
+        cmmMsgHeader: {
+          errMsg: 'SERVICE ERROR',
+          returnAuthMsg: 'SERVICE_KEY_IS_NOT_REGISTERED_ERROR',
+          returnReasonCode: '30',
+        },
+      },
+    });
+
+    const caught = await fetchTourPlacesByKeyword({ keyword: '경복궁' }).catch(
+      (error: unknown) => error,
+    );
+    expect((caught as ExternalApiError).code).toBe('AUTH_FAILED');
+  });
+
+  it('요청제한 초과(22)는 rate limit으로 분류한다', async () => {
+    requestJsonMock.mockResolvedValue({
+      OpenAPI_ServiceResponse: {
+        cmmMsgHeader: {
+          returnAuthMsg: 'LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR',
+          returnReasonCode: '22',
+        },
+      },
+    });
+
+    const caught = await fetchTourPlacesByKeyword({ keyword: '경복궁' }).catch(
+      (error: unknown) => error,
+    );
+    expect((caught as ExternalApiError).code).toBe('RATE_LIMITED');
   });
 });

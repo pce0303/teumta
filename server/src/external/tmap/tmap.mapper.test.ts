@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { ExternalApiResponseError } from '../common/external-api.error';
 import type { TmapRouteResponse } from './tmap.dto';
-import { extractRoutePath, extractRouteSummary, mapTmapRouteToRouteCalculation } from './tmap.mapper';
+import {
+  extractRoutePath,
+  extractRouteSummary,
+  mapPoiSearchToDestinations,
+  mapTmapRouteToRouteCalculation,
+} from './tmap.mapper';
 
 function routeWith(totalDistance: number | undefined, totalTime: number | undefined): TmapRouteResponse {
   return {
@@ -95,5 +100,44 @@ describe('mapTmapRouteToRouteCalculation', () => {
       totalDistanceMeters: 1250,
       segments: [{ travelMinutes: 15, distanceMeters: 1250, path: SAMPLE_PATH }],
     });
+  });
+});
+
+describe('mapPoiSearchToDestinations', () => {
+  /** TMAP은 같은 장소의 출입구·주차장을 별도 POI로 주면서 id는 공유한다(pkey로만 구분). */
+  const DUPLICATE_ID_RESPONSE = {
+    searchPoiInfo: {
+      pois: {
+        poi: [
+          { id: '736655', pkey: '73665500', name: '교보문고 강남점', noorLat: '37.5036', noorLon: '127.0242' },
+          { id: '736655', pkey: '73665501', name: '교보문고 강남점 주차장', noorLat: '37.5037', noorLon: '127.0238' },
+          { id: '736655', pkey: '73665502', name: '교보문고 강남점 정문', noorLat: '37.5038', noorLon: '127.0239' },
+          { id: '5985039', pkey: '598503901', name: '폴바셋 교보문고강남점', noorLat: '37.5035', noorLon: '127.0241' },
+        ],
+      },
+    },
+  };
+
+  it('id가 같은 POI는 첫 항목만 남긴다(목적지 식별자가 id라 중복되면 구분 불가)', () => {
+    const results = mapPoiSearchToDestinations(DUPLICATE_ID_RESPONSE);
+
+    expect(results.map((result) => result.tmapPoiId)).toEqual(['736655', '5985039']);
+    expect(results[0].name).toBe('교보문고 강남점');
+  });
+
+  it('좌표 없는 POI는 제외하고, 그 id는 중복 판정에 쓰지 않는다', () => {
+    const results = mapPoiSearchToDestinations({
+      searchPoiInfo: {
+        pois: {
+          poi: [
+            { id: '1', name: '좌표없음' },
+            { id: '1', name: '좌표있음', noorLat: '37.5', noorLon: '127.0' },
+          ],
+        },
+      },
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].name).toBe('좌표있음');
   });
 });

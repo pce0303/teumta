@@ -45,7 +45,26 @@ export function extractPublicDataHeader(payload: unknown): PublicDataResponseHea
   if (root.resultCode !== undefined) {
     return { resultCode: String(root.resultCode), resultMsg: String(root.resultMsg ?? '') };
   }
-  return null;
+  return extractGatewayErrorHeader(root);
+}
+
+/**
+ * 게이트웨이 오류 봉투(`OpenAPI_ServiceResponse.cmmMsgHeader`)에서 결과 코드를 꺼낸다.
+ *
+ * 포털은 키 오류·요청제한 초과를 XML뿐 아니라 **JSON**으로도 내려준다(실응답 확인, 2026-08-14).
+ * 이 형태를 못 읽으면 resultCode가 'UNKNOWN'이 되어 인증 실패·쿼터 초과가 전부
+ * INVALID_RESPONSE(502)로 뭉개진다 — 운영에서 원인을 못 찾는다.
+ */
+function extractGatewayErrorHeader(root: Record<string, unknown>): PublicDataResponseHeader | null {
+  const envelope = root.OpenAPI_ServiceResponse as Record<string, unknown> | undefined;
+  const header = envelope?.cmmMsgHeader as Record<string, unknown> | undefined;
+  if (header?.returnReasonCode === undefined) {
+    return null;
+  }
+  return {
+    resultCode: String(header.returnReasonCode),
+    resultMsg: String(header.returnAuthMsg ?? header.errMsg ?? 'Unknown error'),
+  };
 }
 
 /**

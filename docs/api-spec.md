@@ -216,6 +216,9 @@ GET /api/search/places?keyword=경복궁&pageNo=1
 }
 ```
 - `400` — keyword 누락/공백, pageNo가 양의 정수 아님.
+- TourAPI가 결과 없음(`0003 NODATA_ERROR`)을 주면 오류가 아니라 0건으로 보고 TMAP 폴백으로 넘어간다.
+- TMAP 폴백 결과는 **`tmapPoiId` 기준으로 중복 제거**한다 — TMAP은 같은 장소의 출입구·주차장을
+  별도 POI로 주면서 `id`를 공유하기 때문에(대표 항목만 남긴다).
 
 **`placeId`(내부 Place 연결):** 집중률 예측(3.4b)은 내부 `placeId`로만 조회 가능한데 검색 결과는
 DB 미저장이라 두 데이터를 이을 방법이 없었다. TOUR 결과에 한해 `tourApiContentId`로 적재된 Place를
@@ -337,7 +340,11 @@ SK 지오비전 퍼즐 "실시간 장소 혼잡도". `poiId`는 검색 결과(3.
   "error": null
 }
 ```
-- `400` — poiId 누락. 외부 오류 → 502/503/504.
+- `400` — poiId 누락.
+- **`404 CONGESTION_DATA_NOT_FOUND`** — SK가 다루지 않는 POI(커버리지 밖). SK는 이 경우 HTTP 400 +
+  `{"error":{"message":"NOT_FOUND_POI"}}`를 주는데, 연동 장애가 아니라 "원래 없는 데이터"이므로
+  502가 아니라 404로 내린다. **재시도해도 소용없으니 클라이언트는 "실시간 혼잡도 미제공" 안내로 처리**한다.
+- 그 외 외부 오류 → 502/503/504.
 
 ### 3.4b 장소 집중률 예측 — [B] (구현됨)
 ```

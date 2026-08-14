@@ -62,6 +62,24 @@ export class ExternalApiRateLimitError extends ExternalApiError {
 }
 
 /**
+ * 외부 API가 "해당 리소스에 대한 데이터가 없다"고 알린 경우.
+ *
+ * 연동 장애가 아니라 정상적인 "없음"이므로 502가 아니라 404로 내려야 한다
+ * (예: SK 퍼즐이 커버하지 않는 POI의 실시간 혼잡도). 클라이언트가 "일시 오류라 재시도"와
+ * "원래 제공되지 않는 데이터"를 구분할 수 있어야 해서 별도 계층으로 둔다.
+ */
+export class ExternalApiNotFoundError extends ExternalApiError {
+  constructor(
+    service: string,
+    message: string,
+    options: ExternalApiErrorOptions = {},
+  ) {
+    super(service, message, { ...options, code: options.code ?? 'NOT_FOUND' });
+    this.name = 'ExternalApiNotFoundError';
+  }
+}
+
+/**
  * 예상하지 못한 응답(4xx/5xx, 파싱 실패, 필수 필드 누락 등).
  * 구체적인 원인은 message에 담되, 원본 응답 본문은 담지 않는다.
  */

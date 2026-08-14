@@ -143,9 +143,41 @@ describe('extractPublicDataHeader', () => {
     ).toEqual({ resultCode: '10', resultMsg: 'INVALID_REQUEST_PARAMETER_ERROR(defaultYN)' });
   });
 
+  it('JSON 게이트웨이 오류 봉투(OpenAPI_ServiceResponse)도 읽는다', () => {
+    // 포털은 같은 오류를 XML뿐 아니라 JSON으로도 내려준다(실응답 확인).
+    // 이걸 못 읽으면 인증 실패가 resultCode UNKNOWN → INVALID_RESPONSE(502)로 뭉개진다.
+    expect(
+      extractPublicDataHeader({
+        OpenAPI_ServiceResponse: {
+          cmmMsgHeader: {
+            errMsg: 'SERVICE ERROR',
+            returnAuthMsg: '등록되지 않은 서비스키',
+            returnReasonCode: '30',
+          },
+        },
+      }),
+    ).toEqual({ resultCode: '30', resultMsg: '등록되지 않은 서비스키' });
+  });
+
   it('헤더가 없으면 null', () => {
     expect(extractPublicDataHeader({ foo: 1 })).toBeNull();
     expect(extractPublicDataHeader(null)).toBeNull();
+  });
+});
+
+describe('requestJson acceptStatuses', () => {
+  it('지정한 상태 코드는 본문을 파싱해 반환한다(호출부가 판단)', async () => {
+    mockFetchResponse('{"error":{"code":"404","message":"NOT_FOUND_POI"}}', 'application/json', 400);
+    await expect(
+      requestJson({ service: 'congestion', url: FAKE_URL, acceptStatuses: [400] }),
+    ).resolves.toEqual({ error: { code: '404', message: 'NOT_FOUND_POI' } });
+  });
+
+  it('지정하지 않은 상태 코드는 그대로 오류로 분류한다', async () => {
+    mockFetchResponse('{"error":{}}', 'application/json', 400);
+    await expect(
+      requestJson({ service: 'congestion', url: FAKE_URL, acceptStatuses: [404] }),
+    ).rejects.toBeInstanceOf(ExternalApiResponseError);
   });
 });
 
