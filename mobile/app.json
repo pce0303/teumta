@@ -8,7 +8,6 @@
     "scheme": "teumta",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.teumta.teumta",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -36,9 +35,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 140
         }
       ],
       [
