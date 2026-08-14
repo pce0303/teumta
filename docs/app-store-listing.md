@@ -139,7 +139,7 @@ personal data. Saved places are stored on the device only.
 | 항목 | 값 |
 |---|---|
 | 개인정보처리방침 URL | [privacy-policy.md](./privacy-policy.md)를 공개한 주소 |
-| App Privacy(수집 데이터) | **Data Not Collected** — 위치를 쓰지만 기기 밖으로 나가지 않는다 |
+| App Privacy(수집 데이터) | **Data Not Collected** (근거는 아래) |
 | 로그인 필요 여부 | 불필요(심사용 데모 계정 없음) |
 | 카테고리 | 여행(Travel) |
 
@@ -157,3 +157,30 @@ personal data. Saved places are stored on the device only.
 | 혼잡도에 "제공되는 관광지에 한해" 단서 | 모든 관광지에 실시간 혼잡도가 있지 않다. 과장하면 리젝 사유가 된다 |
 | **"복귀 10분 전에 알려드려요" 삭제** | **알림 기능이 구현돼 있지 않다.** 없는 기능을 설명에 쓰면 안 된다(앱 내 문구도 함께 수정) |
 | 로그인 불필요·위치 미전송 명시 | 심사에서 유리하고, 우리 아키텍처의 실제 강점이다 |
+
+
+---
+
+## App Privacy(수집 데이터) 신고 근거
+
+Apple 기준의 "수집(collect)"은 데이터를 기기 밖으로 보내 **요청을 실시간 처리하는 데 필요한 기간보다
+오래 접근 가능하게 두는 것**이다. 전송 자체가 아니라 **보관**이 기준이다.
+
+확인 결과(2026-08-15) 전 항목이 해당 없음이라 **"Data Not Collected"** 로 신고한다.
+
+| 확인 항목 | 상태 |
+|---|---|
+| 분석·광고·크래시 SDK | 없음(Firebase/Sentry/Amplitude/AdMob 등 0개, `expo-updates`도 미설치) |
+| 계정·기기 식별자·광고 식별자 | 없음(회원가입 자체가 없음) |
+| 위치 전송 | 없음 — 서버 API에 좌표 파라미터가 존재하지 않음 |
+| 서버로 가는 값 | 검색어·목적지 코드·가용 시간. 해당 요청 처리에만 쓰고 보관하지 않음 |
+| 요청 본문 로깅 | 없음(`error.middleware`가 sanitized message만 기록) |
+| 기기 저장 데이터 | 저장한 장소(AsyncStorage) — 기기 밖으로 나가지 않음 |
+| 추적(Tracking) | 없음 → ATT 팝업 불필요(`expo-tracking-transparency` 미설치) |
+
+### 이 신고를 반드시 다시 검토해야 하는 변경
+
+- 크래시 리포팅·분석 도구 도입(Sentry, Firebase Analytics 등)
+- 서버에서 검색어·요청 내역을 로그로 축적
+- **성과 분석을 위해 TripEvent를 실제로 기록하기 시작할 때** — 계정이 없어 개인 식별은 안 되지만
+  사용 이력을 서버에 남기는 것이라 `Usage Data` 신고 대상이 될 수 있다
