@@ -12,6 +12,8 @@ type CourseMapViewProps = {
 
 const MARKER_ANCHOR = { x: 0.5, y: 0.5 };
 const DESTINATION_COLOR = '#FF9175';
+/** 파선 14px, 간격 9px — 마커(지름 26px)보다 확실히 길어 "점"이 아니라 "선"으로 읽힌다. */
+const ROUTE_DASH_PATTERN = [14, 9];
 
 function sameCoordinate(first: Coordinate, second: Coordinate): boolean {
   return first.latitude === second.latitude && first.longitude === second.longitude;
@@ -69,12 +71,26 @@ export function CourseMapView({ detour, showsUserLocation }: CourseMapViewProps)
             </Marker>
           );
         })}
+        {/* 경로는 흰 밑선 위에 초록 파선을 겹쳐 그린다.
+            둥근 점(lineDashPattern=[0, 12])으로 그리던 때는 점 하나하나가 작은 초록 원이라
+            장소 마커와 모양이 같아 어느 것이 들르는 곳인지 구분되지 않았다.
+            밑선은 파선 사이가 끊겨 보이지 않게 경로를 이어주고, 지도 배경과도 대비를 만든다. */}
+        <Polyline
+          coordinates={coordinates}
+          strokeColor={Teumta.surface}
+          strokeWidth={9}
+          lineCap="round"
+          lineJoin="round"
+          zIndex={1}
+        />
         <Polyline
           coordinates={coordinates}
           strokeColor={Teumta.green}
-          strokeWidth={5}
-          lineCap="round"
-          lineDashPattern={[0, 12]}
+          strokeWidth={4}
+          lineCap="butt"
+          lineJoin="round"
+          lineDashPattern={ROUTE_DASH_PATTERN}
+          zIndex={2}
         />
       </MapView>
     </View>
