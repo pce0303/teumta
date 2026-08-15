@@ -85,7 +85,8 @@ export function PlaceThumbnail({ imageUrl, category, variant, style }: PlaceThum
   const label = category ? (variant === 'card' ? shortLabel(category) : category) : null;
 
   return (
-    <View style={[styles.fallback, { backgroundColor: tone.background }, style]}>
+    // 호출부 스타일(카드 썸네일 등)이 회색 배경을 갖고 있어 분류 색이 뒤에 와야 이긴다.
+    <View style={[styles.fallback, style, { backgroundColor: tone.background }]}>
       {label ? (
         <Text
           style={[

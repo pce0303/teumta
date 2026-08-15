@@ -7,6 +7,7 @@ import {
   extractItems,
   mapContentTypeIdToPlaceType,
   mapLocalPlaceDetail,
+  mapNearbyCandidateList,
   mapTourPlaceList,
   mapTourPlaceListDetailed,
   mapTourPlaceToPlaceData,
@@ -220,5 +221,44 @@ describe('mapLocalPlaceDetail', () => {
 
   it('항목이 없으면 null', () => {
     expect(mapLocalPlaceDetail(detail(null))).toBeNull();
+  });
+});
+
+describe('이미지 URL https 정규화', () => {
+  const listResponse = (items: TourApiPlaceItem[]): TourApiListResponse => ({
+    response: {
+      header: { resultCode: '0000', resultMsg: 'OK' },
+      body: { items: { item: items }, numOfRows: items.length, pageNo: 1, totalCount: items.length },
+    },
+  });
+
+  const item = (firstimage?: string, firstimage2?: string): TourApiPlaceItem => ({
+    contentid: '100',
+    contenttypeid: '39',
+    title: '통인시장',
+    mapx: '126.97',
+    mapy: '37.58',
+    ...(firstimage === undefined ? {} : { firstimage }),
+    ...(firstimage2 === undefined ? {} : { firstimage2 }),
+  });
+
+  it('http 이미지를 https로 올린다 (iOS ATS가 평문 HTTP를 막는다)', () => {
+    const [candidate] = mapNearbyCandidateList(listResponse([item('http://tong.visitkorea.or.kr/a.jpg')]));
+    expect(candidate.imageUrl).toBe('https://tong.visitkorea.or.kr/a.jpg');
+  });
+
+  it('이미 https면 그대로 둔다', () => {
+    const [candidate] = mapNearbyCandidateList(listResponse([item('https://tong.visitkorea.or.kr/a.jpg')]));
+    expect(candidate.imageUrl).toBe('https://tong.visitkorea.or.kr/a.jpg');
+  });
+
+  it('빈 문자열은 null (클라이언트가 대체 표시로 넘어가게)', () => {
+    const [candidate] = mapNearbyCandidateList(listResponse([item('', '')]));
+    expect(candidate.imageUrl).toBeNull();
+  });
+
+  it('firstimage가 비면 firstimage2로 넘어가고 그것도 https로 올린다', () => {
+    const [candidate] = mapNearbyCandidateList(listResponse([item('', 'http://tong.visitkorea.or.kr/b.jpg')]));
+    expect(candidate.imageUrl).toBe('https://tong.visitkorea.or.kr/b.jpg');
   });
 });

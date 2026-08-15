@@ -90,7 +90,7 @@ export function mapTourPlaceToPlaceData(item: TourApiPlaceItem): PlaceData {
     address: buildAddress(item.addr1, item.addr2),
     latitude: parseCoordinate(item.mapy, 'mapy', item.contentid),
     longitude: parseCoordinate(item.mapx, 'mapx', item.contentid),
-    imageUrl: item.firstimage || item.firstimage2 || null,
+    imageUrl: toSecureImageUrl(item.firstimage || item.firstimage2),
     description: null,
     openingTime: null,
     closingTime: null,
@@ -133,7 +133,7 @@ export function mapNearbyCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCand
     address: buildAddress(item.addr1, item.addr2),
     latitude,
     longitude,
-    imageUrl: item.firstimage || item.firstimage2 || null,
+    imageUrl: toSecureImageUrl(item.firstimage || item.firstimage2),
     tourDistanceMeters: Number.isFinite(tourDistance) ? tourDistance : null,
   };
 }
@@ -149,7 +149,7 @@ export function mapSearchResultList(response: TourApiListResponse): DestinationS
     address: buildAddress(item.addr1, item.addr2),
     latitude: safeCoordinate(item.mapy),
     longitude: safeCoordinate(item.mapx),
-    imageUrl: item.firstimage || item.firstimage2 || null,
+    imageUrl: toSecureImageUrl(item.firstimage || item.firstimage2),
     // 매퍼는 DB를 모름 — 내부 Place 매칭은 place-search.service 담당
     placeId: null,
   }));
@@ -236,6 +236,22 @@ function extractFirstUrl(value: string | undefined): string | null {
   }
   const bare = /https?:\/\/[^\s"'<>]+/i.exec(value);
   return bare ? bare[0] : null;
+}
+
+/**
+ * 이미지 URL을 https로 정규화.
+ *
+ * TourAPI는 대표 이미지를 `http://`로 준다. iOS는 ATS가 평문 HTTP를 막아 이미지가
+ * 조용히 로드 실패하고, 클라이언트는 `imageUrl`이 있으니 "사진 있음"으로 판단해
+ * 대체 표시(분류 라벨)도 띄우지 않는다 — 사용자 눈에는 빈 상자만 남는다.
+ * 같은 CDN이 https로도 응답하므로 스킴만 올려서 내려준다.
+ */
+function toSecureImageUrl(value: string | undefined): string | null {
+  const url = (value ?? '').trim();
+  if (url.length === 0) {
+    return null;
+  }
+  return url.startsWith('http://') ? `https://${url.slice('http://'.length)}` : url;
 }
 
 /** 좌표 문자열 → number | null. 빈 값·0·NaN은 null, throw 없음. */

@@ -114,7 +114,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '오목대와 이목대',
     region: '전라',
     areaLabel: '전북 전주시',
-    imageUrl: 'http://tong.visitkorea.or.kr/cms/resource/46/3533046_image2_1.jpg',
+    imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/46/3533046_image2_1.jpg',
   },
   {
     tourApiContentId: '126166',
@@ -135,14 +135,14 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '성산일출봉',
     region: '제주',
     areaLabel: '제주 서귀포시',
-    imageUrl: 'http://tong.visitkorea.or.kr/cms/resource/82/2944282_image2_1.bmp',
+    imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/82/2944282_image2_1.bmp',
   },
   {
     tourApiContentId: '126471',
     name: '성읍민속마을',
     region: '제주',
     areaLabel: '제주 서귀포시',
-    imageUrl: 'http://tong.visitkorea.or.kr/cms/resource/64/3551564_image2_1.jpg',
+    imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/64/3551564_image2_1.jpg',
   },
 ];
 
