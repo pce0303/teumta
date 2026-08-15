@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getLocalPlaceDetail } from '@/api/places';
+import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
 import type { LocalPlaceDetail } from '@/types/place';
@@ -102,11 +103,12 @@ export default function LocalPlaceDetailScreen() {
             />
           </Pressable>
         </View>
-        {params.imageUrl ? (
-          <Image source={{ uri: params.imageUrl }} style={styles.heroImage} contentFit="cover" />
-        ) : (
-          <View style={styles.heroImage} />
-        )}
+        <PlaceThumbnail
+          imageUrl={params.imageUrl}
+          category={params.category}
+          variant="hero"
+          style={styles.heroImage}
+        />
         <View style={styles.heroTitleBand}>
           {params.category ? <Text style={styles.heroCategory}>{params.category}</Text> : null}
           <Text style={styles.heroTitle}>{params.name}</Text>
