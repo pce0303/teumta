@@ -13,21 +13,21 @@ const HERO_BAND = '#1C4738';
 /**
  * 주변 로컬 장소 상세.
  *
- * 이 장소들은 요청 시점에 외부 API로 조회한 결과라 서버에 id가 없다(api-spec 3.3b).
- * 그래서 목록 화면에서 표시에 필요한 값을 그대로 넘겨받아 보여준다.
+ * 요청 시점 외부 API 조회 결과라 서버 id 없음(api-spec 3.3b).
+ * 목록 화면에서 표시용 값을 그대로 넘겨받아 렌더링.
  */
 type LocalPlaceParams = {
   name?: string;
   address?: string;
   latitude?: string;
   longitude?: string;
-  /** TMAP 실제 보행거리(m). 직선거리가 아니다. */
+  /** TMAP 실측 보행거리(m). 직선거리 아님. */
   distanceMeters?: string;
   travelTimeMinutes?: string;
   imageUrl?: string;
   /** 분류 라벨(문화시설/쇼핑/음식점). */
   category?: string;
-  /** 어느 목적지 주변에서 찾은 장소인지(표시용). */
+  /** 어느 목적지 주변에서 찾았는지(표시용). */
   destinationName?: string;
 };
 

@@ -6,8 +6,8 @@ import type {
 } from '../types/matching';
 
 /**
- * GET /api/admin/concentration-matching/preview — KTO 외부 API를 1회 호출한다.
- * 호출량 관리 대상이므로 버튼 클릭 시에만 부른다(자동 폴링 금지).
+ * GET /api/admin/concentration-matching/preview — KTO 외부 API 1회 호출.
+ * 호출량 관리 대상 → 버튼 클릭 시에만, 자동 폴링 금지.
  */
 export function fetchMatchingPreview(
   areaCd: string,

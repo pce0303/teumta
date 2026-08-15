@@ -10,13 +10,13 @@ import {
 } from 'react';
 
 /**
- * v2: 목적지 식별자만 저장하던 구조에서 표시용 정보까지 함께 저장하는 구조로 바꿨다.
- * 저장한 목적지는 서버 DB에 없을 수 있어(실시간 검색 결과) 이름을 다시 조회할 방법이 없기 때문이다.
- * 구 버전 값은 이름을 복원할 수 없으므로 키를 올려 버린다.
+ * v2: 식별자만 저장 → 표시용 정보까지 함께 저장.
+ * 저장한 목적지가 서버 DB에 없을 수 있어(실시간 검색 결과) 이름 재조회 불가.
+ * 구 버전 값은 이름 복원이 안 되므로 키를 올려 폐기.
  */
 const STORAGE_KEY = 'teumta:bookmarks:v2';
 
-/** 저장한 목적지. 상세 화면을 다시 열 수 있도록 식별자와 표시 정보를 함께 둔다. */
+/** 저장한 목적지. 상세 재진입용 식별자 + 표시 정보. */
 export type PlaceBookmark = {
   /** TourAPI contentId 또는 TMAP poiId. */
   id: string;
@@ -48,10 +48,10 @@ function sameBookmark(bookmark: PlaceBookmark, source: string, id: string) {
 /**
  * 북마크(저장한 목적지) 상태.
  *
- * 개인정보 최소화: 로그인 없이 단말 저장소(AsyncStorage)에만 보관하며 서버로 전송하지 않는다.
+ * 개인정보 최소화: 로그인 없이 단말 저장소(AsyncStorage)에만 보관, 서버 전송 없음.
  *
- * 코스는 저장하지 않는다 — 우회 코스는 요청 시점에 생성되는 값이라 나중에 같은 코스를
- * 다시 만들어 준다고 보장할 수 없다. 목적지를 저장해 두면 코스는 그때 다시 추천받는다.
+ * 코스는 저장하지 않는다 — 요청 시점 생성값이라 나중에 같은 코스를 보장할 수 없음.
+ * 목적지만 저장하고 코스는 그때 다시 추천.
  */
 export function BookmarksProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<BookmarksState>(EMPTY_STATE);
@@ -66,7 +66,7 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch(() => {
-        // 손상된 저장값은 빈 상태로 시작한다.
+        // 손상된 저장값은 빈 상태로 시작
       })
       .finally(() => setReady(true));
   }, []);

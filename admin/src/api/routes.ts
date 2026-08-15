@@ -25,7 +25,7 @@ export function fetchRoute(routeId: number): Promise<RouteDetail> {
 
 /**
  * POST /api/admin/routes — 코스 생성.
- * 서버가 TMAP으로 구간을 계산하므로 정류지 수 + 1(복귀)만큼 외부 호출이 발생한다.
+ * 서버가 TMAP으로 구간 계산 → 정류지 수 + 1(복귀)만큼 외부 호출 발생.
  */
 export function createRoute(input: CreateRouteInput): Promise<RouteDetail> {
   return apiRequest<RouteDetail>('/admin/routes', {
@@ -34,7 +34,7 @@ export function createRoute(input: CreateRouteInput): Promise<RouteDetail> {
   });
 }
 
-/** PATCH /api/admin/routes/:id — stops를 전달하면 전체 교체되고 경로가 재계산된다. */
+/** PATCH /api/admin/routes/:id — stops 전달 시 전체 교체 + 경로 재계산. */
 export function updateRoute(
   id: number,
   input: UpdateRouteInput,
@@ -45,7 +45,7 @@ export function updateRoute(
   });
 }
 
-/** DELETE /api/admin/routes/:id — 방문(Trip) 기록이 있으면 409(ROUTE_IN_USE). */
+/** DELETE /api/admin/routes/:id — 방문(Trip) 기록 있으면 409(ROUTE_IN_USE). */
 export function deleteRoute(id: number): Promise<{ deleted: boolean }> {
   return apiRequest<{ deleted: boolean }>(`/admin/routes/${id}`, {
     method: 'DELETE',

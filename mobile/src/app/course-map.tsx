@@ -35,7 +35,7 @@ export default function CourseMapScreen() {
   const returnTimeLabel = timeLabelAfter(course.totalMinutes);
   const courseName = course.stops.map((stop) => stop.name).join(' · ');
 
-  // 지도용 경로: 목적지 → 정류지들 → 목적지(복귀).
+  // 지도용 경로: 목적지 → 정류지들 → 목적지(복귀)
   const mapDetour = {
     id: 'generated',
     name: courseName,
@@ -54,7 +54,7 @@ export default function CourseMapScreen() {
     ],
   };
 
-  // 각 정류지 도착까지 걸리는 시간 = 앞선 정류지들의 (이동 + 체류) + 이번 구간 이동.
+  // 정류지 도착 시각 = 앞선 정류지들의 (이동+체류) + 이번 구간 이동
   const arrivalMinutes = course.stops.map(
     (stop, index) =>
       course.stops
@@ -85,7 +85,7 @@ export default function CourseMapScreen() {
     ...course.stops.map((stop, index) => ({
       key: `${stop.name}-${stop.latitude}`,
       dot: Teumta.greenDark,
-      // 지도 마커와 같은 번호를 달아 어느 지점인지 대조할 수 있게 한다.
+      // 지도 마커와 같은 번호 — 목록과 지도 대조용
       order: index + 1,
       title: stop.name,
       subtitle: `권장 체류 ${stop.stayMinutes}분${stop.address ? ` · ${stop.address}` : ''}`,

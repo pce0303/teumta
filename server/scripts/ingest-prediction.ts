@@ -1,15 +1,15 @@
 /**
  * KTO 집중률 예측(TatsCnctrRateService) 수동 적재 스크립트.
  *
- * 데이터 의미: 향후 30일의 날짜별 집중률 예측(일 1회 갱신). 실시간·시간대별 아님.
+ * 데이터 의미: 향후 30일 날짜별 집중률 예측, 일 1회 갱신. 실시간·시간대별 아님.
  *
  * 실행:
  *   npm run ingest:prediction -- --areaCd=11 --signguCd=11110 [--name=경복궁]
  *
- * 사전 조건: server/.env 에 DATABASE_URL, PREDICTION_API_KEY(Decoding 키),
- * PREDICTION_API_BASE_URL 설정 + DB 기동. 미설정 시 호출 없이 즉시 실패한다.
+ * 사전 조건: server/.env에 DATABASE_URL, PREDICTION_API_KEY(Decoding 키),
+ * PREDICTION_API_BASE_URL + DB 기동. 미설정 시 호출 없이 즉시 실패.
  *
- * 보안: API 키·완성된 요청 URL은 출력하지 않는다.
+ * 보안: API 키·완성된 요청 URL 출력 금지.
  */
 import { ingestConcentrationForecasts } from '../src/services/congestion-ingestion.service';
 import { prisma } from '../src/utils/prisma';
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
 
 main()
   .catch((error) => {
-    // 오류 message에는 URL/serviceKey가 포함되지 않는다(외부 오류 계층 설계 참조).
+    // 오류 message에 URL·serviceKey 미포함(외부 오류 계층 설계)
     console.error('적재 실패:', error instanceof Error ? error.message : error);
     process.exitCode = 1;
   })

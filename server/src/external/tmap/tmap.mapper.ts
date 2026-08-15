@@ -10,15 +10,15 @@ import type { TmapPoiDetailResponse, TmapPoiSearchResponse, TmapRouteResponse } 
 /**
  * TMAP 보행자 경로 원본 응답 → 틈타 내부 형태 변환.
  *
- * ⚠️ 공식 스펙 기반. 실제 응답 샘플로 요약 feature 필드를 한 번 더 검증할 것.
+ * ⚠️ 공식 스펙 기반 — 실제 응답 샘플로 요약 feature 필드 재검증 필요.
  */
 
 const SERVICE = 'tmap';
 
 /**
- * 응답의 LineString feature들을 이어붙여 보행 경로 도형으로 변환한다.
+ * LineString feature 연결 → 보행 경로 도형.
  * GeoJSON 좌표는 [경도, 위도] 순서라 {latitude, longitude}로 뒤집어 담는다.
- * 구간 경계에서 겹치는 좌표는 한 번만 남긴다.
+ * 구간 경계에서 겹치는 좌표는 한 번만.
  */
 export function extractRoutePath(response: TmapRouteResponse): Coordinate[] {
   const path: Coordinate[] = [];
@@ -40,7 +40,7 @@ export function extractRoutePath(response: TmapRouteResponse): Coordinate[] {
   return path;
 }
 
-/** 응답에서 요약 feature의 전체 거리(m)/시간(초)만 추출한다(분 변환은 호출부 정책에 따름). */
+/** 요약 feature의 전체 거리(m)·시간(초)만 추출. 분 변환은 호출부 정책. */
 export function extractRouteTotals(
   response: TmapRouteResponse,
 ): { distanceMeters: number; totalSeconds: number } {
@@ -60,7 +60,7 @@ export function extractRouteTotals(
   };
 }
 
-/** 응답에서 요약(totalDistance/totalTime)과 경로 도형을 찾아 한 구간의 이동 정보로 변환한다. */
+/** 요약(totalDistance/totalTime) + 경로 도형 → 한 구간 이동 정보. */
 export function extractRouteSummary(response: TmapRouteResponse): RouteSegmentData {
   const { distanceMeters, totalSeconds } = extractRouteTotals(response);
 
@@ -72,12 +72,12 @@ export function extractRouteSummary(response: TmapRouteResponse): RouteSegmentDa
 }
 
 /**
- * POI 검색 응답 → 목적지 검색 결과[](source=TMAP). 좌표 없는 항목은 제외.
+ * POI 검색 응답 → 목적지 검색 결과[](source=TMAP). 좌표 없는 항목 제외.
  *
- * **id 중복 제거:** TMAP은 같은 장소의 출입구·주차장을 별도 POI로 주면서 `id`는 공유하고
- * `pkey`로만 구분한다(예: "교보문고 강남점" / "교보문고 강남점 주차장" / "…정문" → id 736655).
- * 우리는 `id`를 목적지 식별자(`tmapPoiId`, 혼잡도 조회 키)로 쓰므로 중복을 그대로 내보내면
- * 목록에 같은 장소가 여러 번 뜨고 클라이언트가 항목을 구분할 수 없다. 첫 항목(대표)만 남긴다.
+ * **id 중복 제거:** TMAP은 같은 장소의 출입구·주차장을 별도 POI로 주면서 `id`는 공유,
+ * `pkey`로만 구분("교보문고 강남점" / "…주차장" / "…정문" → 모두 id 736655).
+ * `id`가 목적지 식별자(`tmapPoiId`, 혼잡도 조회 키)라 그대로 내보내면 같은 장소가 여러 번 뜨고
+ * 클라이언트가 구분 불가 → 첫 항목(대표)만 유지.
  */
 export function mapPoiSearchToDestinations(
   response: TmapPoiSearchResponse,
@@ -107,14 +107,14 @@ export function mapPoiSearchToDestinations(
       latitude,
       longitude,
       imageUrl: null,
-      // TMAP POI는 tourApiContentId가 없어 내부 Place와 이을 키가 없다.
+      // TMAP POI는 tourApiContentId 없음 → 내부 Place와 이을 키 없음
       placeId: null,
     });
   }
   return results;
 }
 
-/** POI 상세 응답 → 기준 좌표/이름. 좌표 없으면 null(호출부에서 NOT_FOUND 처리). */
+/** POI 상세 → 기준 좌표·이름. 좌표 없으면 null(호출부에서 NOT_FOUND). */
 export function extractPoiBase(
   response: TmapPoiDetailResponse,
 ): { latitude: number; longitude: number; name: string } | null {
@@ -151,7 +151,7 @@ function parseCoordinateOrNull(value: string | undefined): number | null {
   return Number.isFinite(parsed) && parsed !== 0 ? parsed : null;
 }
 
-/** 단일 출발→도착 응답을 RouteCalculationData(한 구간)로 변환한다. */
+/** 단일 출발→도착 응답 → RouteCalculationData(한 구간). */
 export function mapTmapRouteToRouteCalculation(response: TmapRouteResponse): RouteCalculationData {
   const segment = extractRouteSummary(response);
   return {

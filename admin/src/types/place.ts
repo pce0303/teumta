@@ -15,8 +15,7 @@ export interface Tag {
 
 /**
  * GET /api/places, GET /api/places/:id 응답 항목.
- * server/src/services/place.service.ts transformPlace 기준 —
- * tourApiContentId는 응답에서 제거되므로 여기에 없다.
+ * place.service.ts transformPlace 기준 — tourApiContentId는 응답에서 제외되므로 없음.
  */
 export interface Place {
   id: number;
@@ -31,9 +30,9 @@ export interface Place {
   openingTime: string | null;
   /** "HH:mm" */
   closingTime: string | null;
-  /** 추천 체류 시간(분). */
+  /** 추천 체류시간(분). */
   recommendedDuration: number | null;
-  /** 법정동 코드/분류체계(TourAPI 적재 데이터). 관리자에서는 조회만 한다. */
+  /** 법정동 코드·분류체계(TourAPI 적재분). 관리자에서는 조회 전용. */
   lDongRegnCd: string | null;
   lDongSignguCd: string | null;
   lclsSystm1: string | null;
@@ -46,8 +45,8 @@ export interface Place {
 
 /**
  * POST /api/admin/places 요청 본문.
- * 서버는 tourApiContentId도 받지만 응답으로 조회할 수 없어(관측 불가) UI에서 다루지 않는다.
- * tagIds는 전체 교체 방식 — 전달하면 해당 장소의 태그 연결이 이 목록으로 대체된다.
+ * 서버는 tourApiContentId도 받지만 응답으로 되돌아오지 않아(관측 불가) UI에서 미취급.
+ * tagIds는 전체 교체 — 전달하면 해당 장소의 태그 연결이 이 목록으로 대체.
  */
 export interface CreatePlaceInput {
   name: string;

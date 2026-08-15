@@ -262,9 +262,9 @@ export async function updatePlace(
 export type DeletePlaceResult = 'DELETED' | 'NOT_FOUND' | 'IN_USE';
 
 /**
- * 장소 삭제. PlaceTag/Congestion/ForecastPlaceAlias는 cascade로 함께 정리된다.
- * Route(mainPlace)/RouteStop이 참조 중이면 DB 제약(RESTRICT)에 걸려 IN_USE를 반환한다 —
- * 코스 데이터를 보호하기 위한 의도된 동작이다(코스에서 먼저 제거해야 삭제 가능).
+ * 장소 삭제. PlaceTag·Congestion·ForecastPlaceAlias는 cascade로 함께 정리.
+ * Route(mainPlace)·RouteStop이 참조 중이면 DB 제약(RESTRICT)에 걸려 IN_USE —
+ * 코스 데이터 보호를 위한 의도된 동작(코스에서 먼저 제거해야 삭제 가능).
  */
 export async function deletePlace(id: number): Promise<DeletePlaceResult> {
   try {
@@ -279,7 +279,7 @@ export async function deletePlace(id: number): Promise<DeletePlaceResult> {
       if (error.code === 'P2025') {
         return 'NOT_FOUND';
       }
-      // P2003: FK 제약 위반(Route/RouteStop 등에서 사용 중).
+      // P2003: FK 제약 위반 — Route·RouteStop 등에서 사용 중
       if (error.code === 'P2003') {
         return 'IN_USE';
       }
@@ -288,7 +288,7 @@ export async function deletePlace(id: number): Promise<DeletePlaceResult> {
   }
 }
 
-/** @deprecated getNearbyLocalPlacesRealtime(실시간 TourAPI+TMAP)으로 대체됨. 신규 사용 금지. */
+/** @deprecated getNearbyLocalPlacesRealtime(실시간 TourAPI+TMAP)으로 대체. 신규 사용 금지. */
 export async function getNearbyLocalPlaces(
   touristSpotId: number,
   radiusMeters = 2000,

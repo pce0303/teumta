@@ -1,12 +1,12 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
- * 최소 관리자 인증용 무상태 토큰(HMAC-SHA256).
+ * 관리자 인증용 무상태 토큰(HMAC-SHA256).
  *
- * - 세션 저장소/DB 없이 서명으로 검증한다.
- * - 서명 키는 ADMIN_PASSWORD에서 유도한다 → 비밀번호를 바꾸면 기존 토큰이 전부 무효화된다.
- * - 토큰 형식: "<만료시각 epoch ms>.<base64url HMAC>"
- * - 클라이언트 번들에는 어떤 secret도 넣지 않는다(비밀번호는 서버 env에만 존재).
+ * - 세션 저장소·DB 없이 서명으로 검증
+ * - 서명 키는 ADMIN_PASSWORD에서 유도 → 비밀번호 변경 시 기존 토큰 전부 무효
+ * - 형식: "<만료시각 epoch ms>.<base64url HMAC>"
+ * - 클라이언트 번들에 secret 미포함(비밀번호는 서버 env에만)
  */
 
 const KEY_CONTEXT = 'teumta-admin-token';
@@ -25,7 +25,7 @@ function signPayload(payload: string, adminPassword: string): Buffer {
     .digest();
 }
 
-/** 비밀번호 비교(타이밍 안전). 길이 노출을 막기 위해 해시 후 비교한다. */
+/** 비밀번호 비교(타이밍 안전). 길이 노출 방지를 위해 해시 후 비교. */
 export function verifyAdminPassword(
   input: string,
   configuredPassword: string,

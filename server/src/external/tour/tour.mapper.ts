@@ -12,16 +12,16 @@ import type {
 /**
  * TourAPI 원본 → 틈타 내부 PlaceData 변환.
  *
- * 미매핑(향후 detailCommon2 / detailIntro2 추가 호출 필요):
- *  - description: detailCommon2 의 overview
- *  - openingTime / closingTime: detailIntro2 의 운영시간(contentTypeId별 필드 상이, 자유텍스트 파싱 필요)
- *  - recommendedDuration: TourAPI 미제공(내부 규칙으로 산정 예정)
+ * 미매핑(detailCommon2 / detailIntro2 추가 호출 필요):
+ *  - description → detailCommon2의 overview
+ *  - openingTime·closingTime → detailIntro2 운영시간(contentTypeId별 필드 상이, 자유텍스트 파싱)
+ *  - recommendedDuration → TourAPI 미제공, 내부 규칙으로 산정
  */
 
 /**
- * LOCAL_PLACE(로컬 장소)로 볼 contentTypeId 집합.
- * 39=음식점, 38=쇼핑. 그 외(12 관광지, 14 문화시설, 15 축제, 25 여행코스, 28 레포츠, 32 숙박)는 TOURIST_SPOT.
- * 정책 변경 시 테스트(tour.mapper.test.ts)로 의도를 고정한다.
+ * LOCAL_PLACE로 볼 contentTypeId. 39=음식점, 38=쇼핑.
+ * 그 외(12 관광지, 14 문화시설, 15 축제, 25 여행코스, 28 레포츠, 32 숙박)는 TOURIST_SPOT.
+ * 정책 변경 시 tour.mapper.test.ts로 의도 고정.
  */
 const LOCAL_PLACE_CONTENT_TYPE_IDS = new Set(['38', '39']);
 
@@ -31,15 +31,15 @@ export function mapContentTypeIdToPlaceType(contentTypeId: string): PlaceType {
     : PlaceType.TOURIST_SPOT;
 }
 
-/** 목록 변환 결과. 좌표 불량 등 유효하지 않은 항목은 전체를 실패시키지 않고 skip 집계한다. */
+/** 목록 변환 결과. 좌표 불량 등은 전체 실패 대신 skip 집계. */
 export interface TourPlaceListMapResult {
   places: PlaceData[];
   skipped: { contentId: string; reason: string }[];
 }
 
 /**
- * 목록 응답 전체 → PlaceData[] + skip 집계.
- * 좌표가 없는 항목 하나 때문에 전체 페이지 적재가 실패하지 않도록, 항목 단위로 오류를 격리한다.
+ * 목록 응답 → PlaceData[] + skip 집계.
+ * 좌표 없는 항목 하나로 페이지 전체가 실패하지 않도록 항목 단위 오류 격리.
  */
 export function mapTourPlaceListDetailed(response: TourApiListResponse): TourPlaceListMapResult {
   const places: PlaceData[] = [];
@@ -58,14 +58,14 @@ export function mapTourPlaceListDetailed(response: TourApiListResponse): TourPla
   return { places, skipped };
 }
 
-/** 목록 응답 전체 → PlaceData[]. 유효하지 않은 항목은 조용히 제외된다(집계가 필요하면 Detailed 사용). */
+/** 목록 응답 → PlaceData[]. 불량 항목은 조용히 제외(집계가 필요하면 Detailed). */
 export function mapTourPlaceList(response: TourApiListResponse): PlaceData[] {
   return mapTourPlaceListDetailed(response).places;
 }
 
-/** 응답에서 항목 배열을 안전하게 추출한다(items="" 또는 단일 객체 케이스 방어). */
+/** 항목 배열 안전 추출 — items="" 또는 단일 객체 케이스 방어. */
 export function extractItems(response: TourApiListResponse): TourApiPlaceItem[] {
-  // items 는 결과가 없으면 빈 문자열("")로 오므로 falsy 체크로 함께 걸러진다.
+  // items는 결과 없으면 빈 문자열("") → falsy 체크로 함께 처리
   const items = response.response?.body?.items;
   if (!items) {
     return [];
@@ -133,7 +133,7 @@ export function mapNearbyCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCand
   };
 }
 
-/** searchKeyword2 목록 → 검색 결과[]. 좌표 없는 항목도 목록에는 포함(null 좌표). */
+/** searchKeyword2 목록 → 검색 결과[]. 좌표 없는 항목도 포함(좌표 null). */
 export function mapSearchResultList(response: TourApiListResponse): DestinationSearchResult[] {
   return extractItems(response).map((item) => ({
     source: 'TOUR' as const,
@@ -145,12 +145,12 @@ export function mapSearchResultList(response: TourApiListResponse): DestinationS
     latitude: safeCoordinate(item.mapy),
     longitude: safeCoordinate(item.mapx),
     imageUrl: item.firstimage || item.firstimage2 || null,
-    // 매퍼는 DB를 모른다. 내부 Place 매칭은 place-search.service에서 붙인다.
+    // 매퍼는 DB를 모름 — 내부 Place 매칭은 place-search.service 담당
     placeId: null,
   }));
 }
 
-/** detailCommon2 응답의 상세 항목 추출(items="" / 단일 객체 방어). */
+/** detailCommon2 상세 항목 추출(items="" · 단일 객체 방어). */
 export function extractDetailItem(response: TourApiDetailResponse): TourApiDetailItem | null {
   const items = response.response?.body?.items;
   if (!items) {
@@ -179,7 +179,7 @@ export function extractDetailCoordinate(
   return { latitude, longitude };
 }
 
-/** 좌표 문자열 → number | null. 빈 값/0/NaN은 null(throw 없음). */
+/** 좌표 문자열 → number | null. 빈 값·0·NaN은 null, throw 없음. */
 function safeCoordinate(value: string | undefined): number | null {
   if (value === undefined || String(value).trim() === '') {
     return null;
@@ -199,7 +199,7 @@ function buildAddress(addr1?: string, addr2?: string): string | null {
   return full.length > 0 ? full : null;
 }
 
-/** 좌표 문자열 → number. TourAPI는 빈 값을 ""로 주므로 0/NaN을 유효하지 않은 좌표로 간주한다. */
+/** 좌표 문자열 → number. TourAPI가 빈 값을 ""로 주므로 0·NaN은 무효 좌표. */
 function parseCoordinate(value: string | undefined, field: string, contentId: string): number {
   if (value === undefined || String(value).trim() === '') {
     throw new ExternalApiResponseError('tour', `Missing ${field} for content ${contentId}`);

@@ -2,16 +2,16 @@
  * TMAP 보행자 경로안내 API 원본 응답 타입.
  *
  * 출처: SK Open API "보행자 경로안내"(POST /tmap/routes/pedestrian?version=1) 공식 스펙.
- * 응답은 GeoJSON FeatureCollection 이며, 요약(totalDistance/totalTime)은 첫 요약 feature의
- * properties에 담긴다(pointType "SP", 나머지 구간 feature에는 distance/time).
+ * 응답은 GeoJSON FeatureCollection. 요약(totalDistance/totalTime)은 첫 요약 feature의
+ * properties(pointType "SP"), 나머지 구간 feature에는 distance/time.
  *
- * ⚠️ 공식 스펙 기반. 실제 응답 샘플로 요약 feature 위치/필드명을 한 번 더 검증할 것.
+ * ⚠️ 공식 스펙 기반 — 실제 응답 샘플로 요약 feature 위치·필드명 재검증 필요.
  */
 
 export interface TmapRouteFeatureProperties {
-  /** 요약 feature에만 존재. 전체 이동거리(m). */
+  /** 요약 feature 전용. 전체 이동거리(m). */
   totalDistance?: number;
-  /** 요약 feature에만 존재. 전체 소요시간(초). */
+  /** 요약 feature 전용. 전체 소요시간(초). */
   totalTime?: number;
   /** 구간(LineString) feature의 구간 거리(m). */
   distance?: number;
@@ -39,7 +39,7 @@ export interface TmapRouteResponse {
   features: TmapRouteFeature[];
 }
 
-/** 장소 통합 검색(GET /tmap/pois) 응답 항목. 실응답 기준(2026-08 검증). */
+/** 장소 통합 검색(GET /tmap/pois) 응답 항목. 실응답 기준, 2026-08 검증. */
 export interface TmapPoiSearchItem {
   id: string;
   name: string;

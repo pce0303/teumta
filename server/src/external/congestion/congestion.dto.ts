@@ -5,7 +5,7 @@
  */
 
 export interface SkPuzzleStatus {
-  /** '00' 이면 정상. */
+  /** '00'이 정상. */
   code: string;
   message: string;
   totalCount?: number;
@@ -30,8 +30,8 @@ export interface SkCongestionContents {
 }
 
 /**
- * 오류 응답 봉투. 정상 응답과 달리 status가 없고 error만 온다.
- * 커버리지 밖 POI: HTTP 400 + `{"error":{"code":"404","message":"NOT_FOUND_POI"}}` (실응답 확인, 2026-08-14).
+ * 오류 응답 봉투. 정상 응답과 달리 status 없이 error만.
+ * 커버리지 밖 POI: HTTP 400 + `{"error":{"code":"404","message":"NOT_FOUND_POI"}}`(실응답 확인, 2026-08-14).
  */
 export interface SkPuzzleError {
   code?: string;

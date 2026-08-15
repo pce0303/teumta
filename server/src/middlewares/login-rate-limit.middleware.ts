@@ -1,12 +1,12 @@
 import type { Request, RequestHandler } from 'express';
 
 /**
- * 로그인 무차별 대입 방지(최소 구현, 외부 의존성 없음).
+ * 로그인 무차별 대입 방지. 최소 구현, 외부 의존성 없음.
  *
- * - IP별 실패 횟수를 in-memory로 집계: 15분 창에서 실패 10회 초과 시 429.
- * - 로그인 성공 시 해당 IP 기록을 즉시 초기화한다.
- * - 프로세스 재시작 시 초기화됨(단일 인스턴스 전제 — 현재 배포 구조와 일치).
- * - req.ip가 프록시 뒤에서 실제 클라이언트를 가리키도록 app.ts에서 trust proxy 설정.
+ * - IP별 실패 횟수 in-memory 집계 — 15분 창에서 10회 초과 시 429
+ * - 로그인 성공 시 해당 IP 기록 즉시 초기화
+ * - 프로세스 재시작 시 초기화(단일 인스턴스 전제 — 현재 배포 구조와 일치)
+ * - req.ip가 프록시 뒤 실제 클라이언트를 가리키도록 app.ts에서 trust proxy 설정
  */
 
 export const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
@@ -64,7 +64,7 @@ export const loginRateLimitMiddleware: RequestHandler = (req, res, next) => {
   next();
 };
 
-/** 로그인 실패 시 컨트롤러가 호출한다. */
+/** 로그인 실패 시 컨트롤러가 호출. */
 export function recordLoginFailure(req: Request, now: number = Date.now()) {
   if (failureEntries.size >= SWEEP_THRESHOLD) {
     sweepExpired(now);

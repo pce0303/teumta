@@ -1,7 +1,4 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+/** 라이트·다크 모드 색상. Expo 템플릿 기본값 — 틈타 화면은 아래 `Teumta` 토큰을 쓴다. */
 
 import '@/global.css';
 
@@ -27,8 +24,8 @@ export const Colors = {
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 /**
- * 틈타 디자인 토큰 (Figma "틈타 사용자 앱" 파일 기준).
- * congestion.medium은 디자인에 정의가 없어 혼잡/여유 톤에 맞춰 보간한 값.
+ * 틈타 디자인 토큰(Figma "틈타 사용자 앱" 기준).
+ * congestion.medium은 디자인 미정의 → 혼잡·여유 톤 사이 보간값.
  */
 export const Teumta = {
   background: '#FAFAF7',

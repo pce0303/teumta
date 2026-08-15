@@ -6,8 +6,8 @@
  *  - TMAP:    "전주한옥마을"
  *  - KTO:     "해운대 해수욕장"
  *
- * 공백과 대괄호 부가설명을 걷어내고 비교해야 같은 곳으로 인식된다.
- * 이 키로 "포함 관계"까지 보면 지역 접두사가 붙은 이름도 이어진다.
+ * 공백·대괄호 부가설명을 걷어내야 같은 곳으로 인식됨.
+ * 이 키로 포함 관계까지 보면 지역 접두사가 붙은 이름도 연결.
  */
 export function toPlaceMatchKey(name: string): string {
   return name
@@ -17,7 +17,7 @@ export function toPlaceMatchKey(name: string): string {
     .trim();
 }
 
-/** 이름 유사도 등급. 0=정확히 같음, 1=한쪽이 다른 쪽을 포함, 2=그 외. 낮을수록 좋다. */
+/** 이름 유사도 등급. 0=완전 일치, 1=포함 관계, 2=그 외. 낮을수록 좋음. */
 export function placeNameRank(candidateName: string, targetName: string): number {
   const candidate = toPlaceMatchKey(candidateName);
   const target = toPlaceMatchKey(targetName);

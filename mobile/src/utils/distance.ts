@@ -7,10 +7,9 @@ function toRadians(degrees: number): number {
 }
 
 /**
- * 두 좌표 사이의 거리(Haversine, 미터).
+ * 두 좌표 사이 거리(Haversine, m).
  *
- * 개인정보 최소화: 이 계산은 전적으로 단말 내부에서 수행된다.
- * 사용자 현재 위치와 Place 좌표의 거리 계산에 쓰이며, 어떤 좌표도 서버로 전송하지 않는다.
+ * 개인정보 최소화: 계산은 전부 단말 내부. 사용자 위치와 Place 좌표 모두 서버 미전송.
  */
 export function distanceInMeters(from: Coordinate, to: Coordinate): number {
   const dLat = toRadians(to.latitude - from.latitude);

@@ -1,6 +1,7 @@
 /**
- * 집중률 예측 항목 ↔ Place 매칭(순수 함수). contentid가 없어 지역(법정동) + 정규화된 이름
- * 정확 일치만 허용 — 단어 제거·유사도 자동 연결 금지(오매칭 방지).
+ * 집중률 예측 항목 ↔ Place 매칭(순수 함수).
+ * contentid가 없어 지역(법정동) + 정규화 이름 정확 일치만 허용
+ * — 단어 제거·유사도 자동 연결 금지(오매칭 방지).
  */
 
 export interface ForecastPlaceCandidate {
@@ -23,10 +24,10 @@ export type ForecastMatchResult =
 
 /**
  * 관광지명 정규화. 허용 범위:
- *  - 유니코드 정규화(NFC)
- *  - 앞뒤 공백 제거, 연속 공백 하나로 축소
- *  - 여는/닫는 괄호 앞뒤 공백 정리
- * 단어 제거 등 공격적 변형은 하지 않는다.
+ *  - 유니코드 NFC
+ *  - 앞뒤 공백 제거, 연속 공백 축소
+ *  - 괄호 앞뒤 공백 정리
+ * 단어 제거 같은 공격적 변형 금지.
  */
 export function normalizePlaceName(name: string): string {
   return name
@@ -53,7 +54,7 @@ export function isSameRegion(
   return signgu === signguCd || `${regn}${signgu}` === signguCd;
 }
 
-/** 하나의 예측 키(지역+관광지명)를 후보 장소 목록과 매칭한다. */
+/** 예측 키(지역+관광지명) 하나를 후보 장소 목록과 매칭. */
 export function matchForecastToPlace(
   forecast: ForecastMatchKey,
   candidates: ForecastPlaceCandidate[],
