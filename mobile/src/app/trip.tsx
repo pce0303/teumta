@@ -233,7 +233,11 @@ export default function TripScreen() {
           <Pressable
             style={[styles.directionsButton, !nextStop && styles.directionsButtonDisabled]}
             disabled={!nextStop}
-            onPress={() => nextStop && openDirections(nextStop)}>
+            onPress={() => {
+              if (nextStop) {
+                void openDirections(nextStop);
+              }
+            }}>
             <Text style={styles.directionsButtonLabel}>길찾기 열기</Text>
           </Pressable>
         </View>

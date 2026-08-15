@@ -116,13 +116,13 @@ export default function LocalPlaceDetailScreen() {
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
         <Pressable
           style={styles.ctaButton}
-          onPress={() =>
-            openDirections({
+          onPress={() => {
+            void openDirections({
               name: params.name as string,
               latitude,
               longitude,
-            })
-          }>
+            });
+          }}>
           <Text style={styles.ctaLabel}>길찾기 열기</Text>
         </Pressable>
       </View>
