@@ -65,7 +65,14 @@ export default function CourseMapScreen() {
         ) + stop.travelMinutesFromPrevious,
   );
 
-  const timeline = [
+  const timeline: {
+    key: string;
+    dot: string;
+    order?: number;
+    title: string;
+    subtitle: string;
+    time: string;
+  }[] = [
     {
       key: 'start',
       dot: DOT_START,
@@ -77,14 +84,16 @@ export default function CourseMapScreen() {
     },
     ...course.stops.map((stop, index) => ({
       key: `${stop.name}-${stop.latitude}`,
-      dot: Teumta.green,
+      dot: Teumta.greenDark,
+      // 지도 마커와 같은 번호를 달아 어느 지점인지 대조할 수 있게 한다.
+      order: index + 1,
       title: stop.name,
       subtitle: `권장 체류 ${stop.stayMinutes}분${stop.address ? ` · ${stop.address}` : ''}`,
       time: timeLabelAfter(arrivalMinutes[index]),
     })),
     {
       key: 'return',
-      dot: Teumta.greenDark,
+      dot: DOT_START,
       title: `${withRoJosa(destination.name)} 복귀`,
       subtitle: `도보 ${course.returnTravelMinutes}분 · 복귀 전 최신 혼잡도 확인`,
       time: returnTimeLabel,
@@ -133,7 +142,11 @@ export default function CourseMapScreen() {
         <View style={styles.timeline}>
           {timeline.map((entry) => (
             <View key={entry.key} style={styles.timelineRow}>
-              <View style={[styles.timelineDot, { backgroundColor: entry.dot }]} />
+              <View style={[styles.timelineDot, { backgroundColor: entry.dot }]}>
+                {entry.order !== undefined && (
+                  <Text style={styles.timelineDotLabel}>{entry.order}</Text>
+                )}
+              </View>
               <View style={styles.timelineTexts}>
                 <Text style={styles.timelineTitle}>{entry.title}</Text>
                 <Text style={styles.timelineSubtitle} numberOfLines={1}>
@@ -298,9 +311,17 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   timelineDot: {
-    borderRadius: 7,
-    height: 14,
-    width: 14,
+    alignItems: 'center',
+    borderRadius: 10,
+    height: 20,
+    justifyContent: 'center',
+    width: 20,
+  },
+  timelineDotLabel: {
+    color: Teumta.surface,
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 13,
   },
   timelineTexts: {
     flex: 1,

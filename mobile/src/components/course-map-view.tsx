@@ -1,8 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
 import { Teumta } from '@/constants/theme';
-import type { DetourCourse } from '@/types/place';
+import type { Coordinate, DetourCourse } from '@/types/place';
 
 type CourseMapViewProps = {
   detour?: DetourCourse;
@@ -11,12 +11,10 @@ type CourseMapViewProps = {
 };
 
 const MARKER_ANCHOR = { x: 0.5, y: 0.5 };
+const DESTINATION_COLOR = '#FF9175';
 
-function markerColor(index: number, lastIndex: number) {
-  if (index === 0) {
-    return '#FF9175';
-  }
-  return index === lastIndex ? Teumta.greenDark : Teumta.green;
+function sameCoordinate(first: Coordinate, second: Coordinate): boolean {
+  return first.latitude === second.latitude && first.longitude === second.longitude;
 }
 
 export function CourseMapView({ detour, showsUserLocation }: CourseMapViewProps) {
@@ -33,26 +31,44 @@ export function CourseMapView({ detour, showsUserLocation }: CourseMapViewProps)
         }
       : { latitude: 37.5796, longitude: 126.977, latitudeDelta: 0.01, longitudeDelta: 0.01 };
 
+  // 경로는 목적지 → 정류지들 → 목적지(복귀)라 첫·마지막 좌표가 같다.
+  // 선은 그대로 그리되 마커는 한 번만 찍는다(같은 자리에 두 개가 겹치면 구분이 안 된다).
+  const returnsToStart =
+    coordinates.length > 1 && sameCoordinate(coordinates[0], coordinates[coordinates.length - 1]);
+  const markerCoordinates = returnsToStart ? coordinates.slice(0, -1) : coordinates;
+
   return (
     <View style={styles.container}>
       <MapView style={styles.map} initialRegion={region} showsUserLocation={showsUserLocation}>
-        {coordinates.map((coordinate, index) => (
-          <Marker
-            key={`${coordinate.latitude}-${coordinate.longitude}`}
-            coordinate={coordinate}
-            anchor={MARKER_ANCHOR}
-            title={
-              detour?.stops?.[index] ??
-              (index === 0 ? '출발' : index === coordinates.length - 1 ? '도착' : '경유')
-            }>
-            <View
-              style={[
-                styles.markerDot,
-                { backgroundColor: markerColor(index, coordinates.length - 1) },
-              ]}
-            />
-          </Marker>
-        ))}
+        {markerCoordinates.map((coordinate, index) => {
+          const isDestination = index === 0;
+          const title = detour?.stops?.[index];
+          return (
+            <Marker
+              key={`${index}-${coordinate.latitude}-${coordinate.longitude}`}
+              coordinate={coordinate}
+              anchor={MARKER_ANCHOR}
+              title={
+                title ?? (isDestination ? '목적지' : `${index}번째 들르는 곳`)
+              }
+              description={
+                isDestination
+                  ? returnsToStart
+                    ? '출발하고 돌아오는 곳'
+                    : '출발하는 곳'
+                  : undefined
+              }>
+              <View
+                style={[
+                  styles.marker,
+                  isDestination ? styles.markerDestination : styles.markerStop,
+                ]}>
+                {/* 정류지는 방문 순서를 숫자로 표시한다 — 색만으로는 구분이 안 된다. */}
+                {!isDestination && <Text style={styles.markerLabel}>{index}</Text>}
+              </View>
+            </Marker>
+          );
+        })}
         <Polyline
           coordinates={coordinates}
           strokeColor={Teumta.green}
@@ -76,11 +92,25 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  markerDot: {
+  marker: {
+    alignItems: 'center',
     borderColor: Teumta.surface,
-    borderRadius: 8,
+    borderRadius: 13,
     borderWidth: 3,
-    height: 16,
-    width: 16,
+    height: 26,
+    justifyContent: 'center',
+    width: 26,
+  },
+  markerDestination: {
+    backgroundColor: DESTINATION_COLOR,
+  },
+  markerStop: {
+    backgroundColor: Teumta.greenDark,
+  },
+  markerLabel: {
+    color: Teumta.surface,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 15,
   },
 });
