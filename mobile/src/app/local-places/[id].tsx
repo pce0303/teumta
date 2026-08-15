@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
-import { openDirections } from '@/utils/directions';
+import { openDirections, openNaverMapPlace } from '@/utils/directions';
 
 const STATUS_BAR_TINT = '#CCE8DB';
 const HERO_BAND = '#1C4738';
@@ -25,6 +25,8 @@ type LocalPlaceParams = {
   distanceMeters?: string;
   travelTimeMinutes?: string;
   imageUrl?: string;
+  /** 분류 라벨(문화시설/쇼핑/음식점). */
+  category?: string;
   /** 어느 목적지 주변에서 찾은 장소인지(표시용). */
   destinationName?: string;
 };
@@ -76,6 +78,7 @@ export default function LocalPlaceDetailScreen() {
           <View style={styles.heroImage} />
         )}
         <View style={styles.heroTitleBand}>
+          {params.category ? <Text style={styles.heroCategory}>{params.category}</Text> : null}
           <Text style={styles.heroTitle}>{params.name}</Text>
           {params.destinationName && Number.isFinite(travelMinutes) && (
             <Text style={styles.heroSubtitle}>
@@ -108,6 +111,15 @@ export default function LocalPlaceDetailScreen() {
               걷는 거리와 시간은 실제 보행 경로로 계산한 값이에요.
             </Text>
           </View>
+
+          {/* 사진·리뷰·영업시간까지는 우리가 제공하지 않는다. 판단은 여기서, 심화 정보는 지도 앱에서. */}
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => {
+              void openNaverMapPlace({ name: params.name as string, address: params.address });
+            }}>
+            <Text style={styles.secondaryButtonLabel}>네이버지도에서 사진·리뷰 보기</Text>
+          </Pressable>
 
           <TourApiAttribution style={styles.attribution} />
         </View>
@@ -193,6 +205,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
+  heroCategory: {
+    color: Teumta.greenLight,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
   heroTitle: {
     color: Teumta.surface,
     fontSize: 23,
@@ -259,6 +277,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 15,
     textAlign: 'center',
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    borderColor: Teumta.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 12,
+    paddingVertical: 13,
+  },
+  secondaryButtonLabel: {
+    color: Teumta.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   courseList: {
     gap: 8,

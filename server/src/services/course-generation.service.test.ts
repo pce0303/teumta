@@ -52,6 +52,7 @@ function measured(
     candidate: {
       tourApiContentId: name,
       contentTypeId,
+      categoryCode: null,
       name,
       address: null,
       latitude: 37.58 + offset * 0.001,

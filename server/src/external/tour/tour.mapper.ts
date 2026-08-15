@@ -123,6 +123,7 @@ export function mapNearbyCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCand
   return {
     tourApiContentId: String(item.contentid),
     contentTypeId: item.contenttypeid === undefined ? null : String(item.contenttypeid),
+    categoryCode: item.cat3 ? String(item.cat3) : null,
     name: item.title,
     address: buildAddress(item.addr1, item.addr2),
     latitude,

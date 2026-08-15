@@ -62,6 +62,8 @@ export type NearbyLocalPlaceResult = {
   latitude: number;
   longitude: number;
   imageUrl: string | null;
+  /** 분류 라벨(문화시설/쇼핑/음식점). 알 수 없으면 null. */
+  category: string | null;
   /** TMAP 실제 보행거리(m). 직선거리 아님. */
   distanceMeters: number;
   travelTimeMinutes: number;

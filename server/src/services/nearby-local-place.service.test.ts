@@ -226,12 +226,49 @@ describe('getNearbyLocalPlacesRealtime — 후보 정제', () => {
         latitude: 37.58,
         longitude: 126.97,
         imageUrl: 'a.jpg',
+        category: '음식점', // contenttypeid 39
         distanceMeters: 850,
         travelTimeMinutes: 13, // Math.ceil(780/60)
       });
       // 내부 식별자/DB id를 노출하지 않는다.
       expect(result.places[0]).not.toHaveProperty('id');
       expect(result.places[0]).not.toHaveProperty('tourApiContentId');
+    }
+  });
+
+  it('cat3로 세부 분류 라벨을 만든다(A05020900 → 카페·찻집)', async () => {
+    fetchTourPlacesByLocationMock.mockResolvedValue(
+      listResponse([listItem({ contenttypeid: '39', cat3: 'A05020900' })]),
+    );
+    fetchPedestrianRouteMock.mockResolvedValue(tmapResponse(850, 780));
+
+    const result = await getNearbyLocalPlacesRealtime(1);
+    if (result.status === 'SUCCESS') {
+      expect(result.places[0].category).toBe('카페·찻집');
+    }
+  });
+
+  it('표에 없는 cat3는 대분류로 떨어뜨린다', async () => {
+    fetchTourPlacesByLocationMock.mockResolvedValue(
+      listResponse([listItem({ contenttypeid: '38', cat3: 'A04019999' })]),
+    );
+    fetchPedestrianRouteMock.mockResolvedValue(tmapResponse(850, 780));
+
+    const result = await getNearbyLocalPlacesRealtime(1);
+    if (result.status === 'SUCCESS') {
+      expect(result.places[0].category).toBe('쇼핑');
+    }
+  });
+
+  it('분류를 전혀 모르면 임의 라벨을 만들지 않고 null', async () => {
+    fetchTourPlacesByLocationMock.mockResolvedValue(
+      listResponse([listItem({ contenttypeid: '25', cat3: undefined })]),
+    );
+    fetchPedestrianRouteMock.mockResolvedValue(tmapResponse(850, 780));
+
+    const result = await getNearbyLocalPlacesRealtime(1);
+    if (result.status === 'SUCCESS') {
+      expect(result.places[0].category).toBeNull();
     }
   });
 
@@ -441,6 +478,7 @@ describe('selectClosestCandidates', () => {
   const candidate = (id: string, dist: number | null, latitude = 37.58) => ({
     tourApiContentId: id,
     contentTypeId: '39',
+    categoryCode: null,
     name: id,
     address: null,
     latitude,

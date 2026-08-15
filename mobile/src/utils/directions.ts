@@ -124,10 +124,36 @@ async function canOpen(url: string): Promise<boolean> {
 }
 
 /** 열지 못하면 조용히 끝내지 않고 알린다 — 버튼이 죽은 것처럼 보이는 상황을 막는다. */
-async function openOrWarn(url: string): Promise<void> {
+async function openOrWarn(url: string, title = '길찾기를 열 수 없어요'): Promise<void> {
   try {
     await Linking.openURL(url);
   } catch {
-    Alert.alert('길찾기를 열 수 없어요', '지도 앱을 열지 못했어요. 잠시 후 다시 시도해 주세요.');
+    Alert.alert(title, '지도 앱을 열지 못했어요. 잠시 후 다시 시도해 주세요.');
   }
+}
+
+/**
+ * 네이버지도에서 장소 정보(사진·리뷰·영업시간)를 연다.
+ *
+ * 로컬 장소는 TourAPI가 주는 정보가 이름·주소·대표사진 정도라 "가볼지" 판단에 부족할 때가 있다.
+ * 사진 여러 장과 리뷰는 기존 지도 서비스가 압도적으로 낫고, 우리가 따라 만들 영역이 아니다.
+ * 판단은 앱 안에서 끝내고 심화 정보만 넘긴다(주 CTA는 계속 우리 길찾기).
+ *
+ * 좌표 핀이 아니라 검색으로 여는 이유: 핀은 마커만 찍고 장소 페이지로 들어가지 않는다.
+ * 동명 상호를 피하려고 이름과 주소를 함께 넘긴다.
+ *
+ * 개인정보: 목적지 이름·주소만 전달한다. 사용자 위치는 쓰지 않는다.
+ */
+export async function openNaverMapPlace(place: {
+  name: string;
+  address?: string | null;
+}): Promise<void> {
+  const query = encodeURIComponent([place.name, place.address].filter(Boolean).join(' '));
+  const title = '네이버지도를 열 수 없어요';
+
+  if (await canOpen('nmap://')) {
+    await openOrWarn(`nmap://search?query=${query}&appname=${APP_NAME}`, title);
+    return;
+  }
+  await openOrWarn(`https://map.naver.com/p/search/${query}`, title);
 }
