@@ -4,15 +4,27 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { getNearbyLocalPlaces, getRealtimeCongestion } from '@/api/places';
+import {
+  getConcentrationForecast,
+  getNearbyLocalPlaces,
+  getRealtimeCongestion,
+} from '@/api/places';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import type {
   CongestionLevel,
+  ConcentrationForecast,
   NearbyLocalPlaceResult,
   RealtimeCongestion,
 } from '@/types/place';
+import {
+  chartRatio,
+  forecastDayLabel,
+  formatForecastDate,
+  summarizeForecast,
+  type ForecastTone,
+} from '@/utils/forecast';
 
 const STATUS_BAR_TINT = '#CCE8DB';
 const HERO_BAND = '#1C4738';
@@ -52,6 +64,25 @@ const REALTIME_LEVEL_LABEL: Record<RealtimeCongestion['level'], string> = {
   VERY_CROWDED: '매우 혼잡',
 };
 
+/** 중앙값 대비 오늘이 어느 쪽인지. KTO는 등급을 주지 않으므로 상대 표현만 쓴다. */
+const FORECAST_TONE_TITLE: Record<ForecastTone, string> = {
+  busy: '오늘은 평소보다 붐비는 날이에요',
+  usual: '오늘은 평소와 비슷해요',
+  quiet: '오늘은 평소보다 한산한 날이에요',
+};
+
+/** 측정 시각을 "15:40" 형태로. 값이 이상하면 표시하지 않는다. */
+function measuredAtLabel(measuredAt: string | null): string | null {
+  if (!measuredAt) {
+    return null;
+  }
+  const at = new Date(measuredAt);
+  if (Number.isNaN(at.getTime())) {
+    return null;
+  }
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+}
+
 const LEGEND_STEPS = [
   { key: 'low', label: '여유' },
   { key: 'medium', label: '보통' },
@@ -83,6 +114,8 @@ export default function PlaceDetailScreen() {
   const [nearby, setNearby] = useState<NearbyLocalPlaceResult[]>([]);
   const [nearbyStatus, setNearbyStatus] = useState<Status>('loading');
 
+  const [forecast, setForecast] = useState<ConcentrationForecast | null>(null);
+
 
   useEffect(() => {
     if (!id || !source) return;
@@ -91,6 +124,7 @@ export default function PlaceDetailScreen() {
 
     setCongestion(null);
     setNearby([]);
+    setForecast(null);
 
     // TOUR 목적지도 서버가 TMAP POI로 매칭해 조회해 준다(api-spec 3.4a).
     setCongestionStatus('loading');
@@ -106,6 +140,19 @@ export default function PlaceDetailScreen() {
         const status = (error as { response?: { status?: number } }).response?.status;
         setCongestionStatus(status === 404 ? 'unavailable' : 'error');
       });
+
+    // 집중률 예측은 TourAPI 목적지에만 있다(관광지 단위 데이터).
+    if (source === 'TOUR') {
+      getConcentrationForecast(id)
+        .then((data) => {
+          if (!ignored) {
+            setForecast(data);
+          }
+        })
+        .catch(() => {
+          // 예측이 없는 장소도 많다. 실패하면 해당 섹션만 숨긴다.
+        });
+    }
 
     setNearbyStatus('loading');
     const identifier = source === 'TOUR' ? { contentId: id } : { poiId: id };
@@ -134,6 +181,7 @@ export default function PlaceDetailScreen() {
   }
 
   const congestionLevel = congestion ? REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level] : null;
+  const forecastSummary = forecast ? summarizeForecast(forecast.forecasts) : null;
   const palette = congestionLevel ? Teumta.congestion[congestionLevel] : null;
   const headline = congestionLevel ? CONGESTION_HEADLINE[congestionLevel] : null;
 
@@ -193,9 +241,16 @@ export default function PlaceDetailScreen() {
                     <Text style={styles.congestionTitle}>{headline.title}</Text>
                     <Text style={styles.congestionSubtitle}>{headline.subtitle}</Text>
                   </View>
-                  <Text style={[styles.congestionLevel, { color: palette.text }]}>
-                    {REALTIME_LEVEL_LABEL[congestion.level]}
-                  </Text>
+                  <View style={styles.congestionLevelBox}>
+                    <Text style={[styles.congestionLevel, { color: palette.text }]}>
+                      {REALTIME_LEVEL_LABEL[congestion.level]}
+                    </Text>
+                    {measuredAtLabel(congestion.measuredAt) && (
+                      <Text style={styles.measuredAt}>
+                        {measuredAtLabel(congestion.measuredAt)} 기준
+                      </Text>
+                    )}
+                  </View>
                 </View>
                 <View style={styles.congestionTrack}>
                   <View
@@ -248,6 +303,76 @@ export default function PlaceDetailScreen() {
                     </View>
                   );
                 })}
+              </View>
+            </>
+          )}
+
+          {forecastSummary && (
+            <>
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionTitle}>언제 가면 덜 붐빌까</Text>
+                <Text style={styles.sectionAction}>앞으로 2주</Text>
+              </View>
+
+              <View style={styles.forecastCard}>
+                <Text style={styles.forecastTitle}>
+                  {FORECAST_TONE_TITLE[forecastSummary.tone]}
+                </Text>
+                <Text style={styles.forecastSubtitle}>
+                  앞으로 30일 평균과 견주면{' '}
+                  {forecastSummary.differenceFromMedian === 0
+                    ? '비슷한 수준이에요'
+                    : `${Math.abs(forecastSummary.differenceFromMedian)}% ${
+                        forecastSummary.differenceFromMedian > 0 ? '높아요' : '낮아요'
+                      }`}
+                  .
+                </Text>
+
+                <View style={styles.forecastChart}>
+                  {forecastSummary.upcoming.map((entry, index) => {
+                    const isToday = index === 0;
+                    const isQuietest =
+                      forecastSummary.quietest?.forecastDate === entry.forecastDate;
+                    return (
+                      <View key={entry.forecastDate} style={styles.forecastBarColumn}>
+                        <View style={styles.forecastBarTrack}>
+                          <View
+                            style={[
+                              styles.forecastBar,
+                              {
+                                height: `${Math.round(
+                                  chartRatio(entry.concentrationRate, forecastSummary.upcoming) * 100,
+                                )}%`,
+                              },
+                              isToday && styles.forecastBarToday,
+                              isQuietest && styles.forecastBarQuietest,
+                            ]}
+                          />
+                        </View>
+                        <Text
+                          style={[
+                            styles.forecastDayLabel,
+                            (isToday || isQuietest) && styles.forecastDayLabelStrong,
+                          ]}>
+                          {forecastDayLabel(entry.forecastDate)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {forecastSummary.quietest && (
+                  <View style={styles.forecastHint}>
+                    <Text style={styles.forecastHintText}>
+                      {formatForecastDate(forecastSummary.quietest.forecastDate)}에 가면 오늘보다{' '}
+                      {forecastSummary.quietestDropPercent}% 한산할 것으로 예상돼요.
+                    </Text>
+                  </View>
+                )}
+
+                <Text style={styles.forecastNote}>
+                  한국관광공사 관광지 집중률 예측 기준. 실시간 혼잡도가 아니라 날짜별 예상치예요.
+                </Text>
               </View>
             </>
           )}
@@ -508,6 +633,88 @@ const styles = StyleSheet.create({
   stateText: {
     color: Teumta.textSecondary,
     fontSize: 12,
+  },
+  congestionLevelBox: {
+    alignItems: 'flex-end',
+    gap: 1,
+  },
+  measuredAt: {
+    color: Teumta.textTertiary,
+    fontSize: 9,
+    lineHeight: 12,
+  },
+  forecastCard: {
+    backgroundColor: Teumta.surface,
+    borderColor: Teumta.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+  },
+  forecastTitle: {
+    color: Teumta.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  forecastSubtitle: {
+    color: Teumta.textSecondary,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: -6,
+  },
+  forecastChart: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 4,
+    height: 84,
+  },
+  forecastBarColumn: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 4,
+  },
+  forecastBarTrack: {
+    height: 64,
+    justifyContent: 'flex-end',
+    width: '100%',
+  },
+  forecastBar: {
+    backgroundColor: '#D6E9DF',
+    borderRadius: 4,
+    width: '100%',
+  },
+  forecastBarToday: {
+    backgroundColor: Teumta.textTertiary,
+  },
+  forecastBarQuietest: {
+    backgroundColor: Teumta.green,
+  },
+  forecastDayLabel: {
+    color: Teumta.textTertiary,
+    fontSize: 8,
+    lineHeight: 11,
+  },
+  forecastDayLabelStrong: {
+    color: Teumta.textPrimary,
+    fontWeight: '700',
+  },
+  forecastHint: {
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  forecastHintText: {
+    color: Teumta.greenDark,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
+  },
+  forecastNote: {
+    color: Teumta.textTertiary,
+    fontSize: 9,
+    lineHeight: 13,
   },
   nearbyList: {
     gap: 8,
