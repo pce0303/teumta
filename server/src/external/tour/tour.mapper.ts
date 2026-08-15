@@ -1,6 +1,11 @@
 import { PlaceType } from '@prisma/client';
 
-import type { DestinationSearchResult, NearbyLocalPlaceCandidate, PlaceData } from '../../dtos';
+import type {
+  DestinationSearchResult,
+  LocalPlaceDetailData,
+  NearbyLocalPlaceCandidate,
+  PlaceData,
+} from '../../dtos';
 import { ExternalApiResponseError } from '../common';
 import type {
   TourApiDetailItem,
@@ -177,6 +182,60 @@ export function extractDetailCoordinate(
     return null;
   }
   return { latitude, longitude };
+}
+
+/**
+ * detailCommon2 → 로컬 장소 소개 정보.
+ *
+ * 목록(locationBasedList2)에는 소개문이 없어 "뭐 하는 곳인지"를 알 수 없다.
+ * 상세를 한 번 더 부르는 비용을 감수할 값어치가 있는 필드만 뽑는다.
+ * 좌표·이미지는 목록에서 이미 받았으므로 여기서 다시 내리지 않는다.
+ */
+export function mapLocalPlaceDetail(response: TourApiDetailResponse): LocalPlaceDetailData | null {
+  const item = extractDetailItem(response);
+  if (!item) {
+    return null;
+  }
+  return {
+    tourApiContentId: String(item.contentid),
+    name: item.title ?? null,
+    overview: cleanRichText(item.overview),
+    tel: cleanRichText(item.tel),
+    homepage: extractFirstUrl(item.homepage),
+  };
+}
+
+/** HTML 태그·엔티티 제거. 소개문에 `<br>`, `&amp;` 등이 섞여 온다. */
+function cleanRichText(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const text = value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return text.length > 0 ? text : null;
+}
+
+/** homepage는 `<a href="...">...</a>` 형태로 오는 경우가 많아 URL만 꺼낸다. */
+function extractFirstUrl(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const href = /href=["']([^"']+)["']/i.exec(value);
+  if (href) {
+    return href[1];
+  }
+  const bare = /https?:\/\/[^\s"'<>]+/i.exec(value);
+  return bare ? bare[0] : null;
 }
 
 /** 좌표 문자열 → number | null. 빈 값·0·NaN은 null, throw 없음. */

@@ -57,6 +57,8 @@ export type RealtimeCongestion = {
 
 /** GET /api/local-places 응답 항목. DB 미저장 — 내부 id 없이 name+좌표로 구분. */
 export type NearbyLocalPlaceResult = {
+  /** TourAPI 콘텐츠 식별자. 상세 소개 조회 키. */
+  tourApiContentId: string;
   name: string;
   address: string | null;
   latitude: number;
@@ -86,4 +88,17 @@ export type ConcentrationForecast = {
   signguCd: string;
   isRealtime: false;
   forecasts: ConcentrationForecastEntry[];
+};
+
+/**
+ * GET /api/local-places/detail 응답. 상세 화면 진입 시 1회만 조회한다.
+ * 목록에는 소개문이 없어 이름·거리만으로 판단해야 한다.
+ */
+export type LocalPlaceDetail = {
+  tourApiContentId: string;
+  name: string | null;
+  /** 소개문. HTML 정리 후 평문. */
+  overview: string | null;
+  tel: string | null;
+  homepage: string | null;
 };

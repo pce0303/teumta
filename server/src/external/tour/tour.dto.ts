@@ -81,7 +81,11 @@ export interface TourApiDetailItem {
   addr2?: string;
   firstimage?: string;
   firstimage2?: string;
+  /** 소개문. HTML 태그·엔티티가 섞여 온다(매퍼에서 정리). */
   overview?: string;
+  tel?: string;
+  /** 앵커 태그로 감싸져 오는 경우가 있다. */
+  homepage?: string;
   [key: string]: unknown;
 }
 

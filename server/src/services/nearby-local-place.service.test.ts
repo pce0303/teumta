@@ -221,6 +221,7 @@ describe('getNearbyLocalPlacesRealtime — 후보 정제', () => {
     expect(result.status).toBe('SUCCESS');
     if (result.status === 'SUCCESS') {
       expect(result.places[0]).toEqual({
+        tourApiContentId: '100',
         name: '통인시장',
         address: '서울 종로구',
         latitude: 37.58,
@@ -230,9 +231,8 @@ describe('getNearbyLocalPlacesRealtime — 후보 정제', () => {
         distanceMeters: 850,
         travelTimeMinutes: 13, // Math.ceil(780/60)
       });
-      // 내부 식별자/DB id를 노출하지 않는다.
+      // 내부 DB id는 노출하지 않는다(tourApiContentId는 공공데이터 식별자라 3.3c 조회용으로 노출).
       expect(result.places[0]).not.toHaveProperty('id');
-      expect(result.places[0]).not.toHaveProperty('tourApiContentId');
     }
   });
 
