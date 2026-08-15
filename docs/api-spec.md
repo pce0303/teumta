@@ -32,7 +32,21 @@
 }
 ```
 
-> `error.code`는 클라이언트 분기용 문자열 코드(신규 제안). 최소 요구는 `message`.
+> `error.code`는 클라이언트 분기용 문자열 코드다. **제안이 아니라 채택된 규약**이며(#58),
+> 실패 응답은 `code`와 `message`를 함께 내려준다.
+
+현재 사용 중인 코드:
+
+| 코드 | 상황 |
+|---|---|
+| `INVALID_TYPE` / `INVALID_TAG` | 장소 목록 쿼리 검증 실패 |
+| `INVALID_CONTENT_ID` | 소개문 조회(3.3c) `contentId` 누락·형식 오류 |
+| `INVALID_IDENTIFIER` | `contentId`/`poiId` 중 하나만 규칙 위반 |
+| `PLACE_NOT_FOUND` / `LOCAL_PLACE_NOT_FOUND` / `ROUTE_NOT_FOUND` / `TRIP_NOT_FOUND` | 대상 없음 |
+| `PLACE_IN_USE` / `ROUTE_IN_USE` | 참조 중이라 삭제 불가 |
+| `ROUTE_TRIP_IN_PROGRESS` | 진행 중 방문이 있어 코스 구성 변경 불가 |
+| `CONGESTION_DATA_NOT_FOUND` | 외부 API가 다루지 않는 장소(장애 아님) |
+| `EXTERNAL_API_UNAVAILABLE` / `AUTH_FAILED` / `RATE_LIMITED` / `TIMEOUT` | 외부 API 실패(§4) |
 
 ### 1.3 필드/직렬화 규약
 - JSON 필드명은 **camelCase** (Prisma 모델과 동일)
@@ -260,24 +274,40 @@ DB는 기준 관광지 1건 읽기(findUnique)에만 사용한다.
 **radius:** 양의 정수, 기본 2000, 최대 20000(초과 시 400). TourAPI 후보 검색 반경이자
 최종 TMAP 보행거리 필터 기준.
 
-**응답:** 항목은 DB Place 엔티티가 아니므로 내부 `id`가 없다(`tourApiContentId`도 기존 정책대로 미노출).
+**응답:** 항목은 DB Place 엔티티가 아니므로 내부 `id`가 없다.
+`tourApiContentId`는 **공공데이터 식별자**라 노출한다 — 소개문 조회(3.3c) 키이며,
+목적지 검색(3.3a)도 같은 값을 이미 내려준다. 내부 DB id는 계속 노출하지 않는다.
 ```jsonc
 {
   "success": true,
   "data": [
     {
+      "tourApiContentId": "2748115", // 3.3c 소개문 조회 키
       "name": "통인시장",
       "address": "서울 종로구 ...",
       "latitude": 37.58,
       "longitude": 126.97,
-      "imageUrl": "https://...",
-      "distanceMeters": 850,        // ⚠️ 직선거리가 아니라 TMAP 실제 보행거리(totalDistance)
-      "travelTimeMinutes": 13       // TMAP totalTime 기반 Math.ceil(초/60)
+      "imageUrl": "https://...",     // 없는 장소가 있다(앱은 분류 색으로 대체 표시)
+      "category": "전통시장",         // 표시용 분류 라벨. 알 수 없으면 null
+      "distanceMeters": 850,         // ⚠️ 직선거리가 아니라 TMAP 실제 보행거리(totalDistance)
+      "travelTimeMinutes": 13        // TMAP totalTime 기반 Math.ceil(초/60)
     }
   ],
   "error": null
 }
 ```
+
+**`category` 산정:** 목록 응답에 함께 오는 `cat3`(구 분류코드)를 라벨로 바꾼 값이라
+**추가 외부 호출이 없다.** 이름과 거리만으로는 "가볼지"가 판단되지 않아 넣었다.
+
+| 대분류(contentTypeId) | 세부 라벨 |
+|---|---|
+| 39 음식점 | 한식 · 양식 · 일식 · 중식 · 이색음식 · 카페·찻집 |
+| 38 쇼핑 | 5일장 · 전통시장 · 백화점 · 전문매장·상가 · 공예·공방 · 특산물 · 거리·상권 |
+| 14 문화시설 | 박물관 · 기념관 · 전시관 · 컨벤션 · 미술관·갤러리 · 공연장 · 문화원 · 도서관 · 서점 |
+
+매핑표는 서울 종로·부산 해운대·전주 한옥마을·제주 성산의 실제 응답으로 확인한 코드만 담는다.
+**표에 없는 `cat3`는 임의 라벨을 만들지 않고** 대분류로 떨어뜨리며, 대분류도 모르면 `null`이다.
 
 **외부 API 실패 정책:**
 - TourAPI 목록 호출 전부 실패 → 502/503/504 (`error.code`: AUTH_FAILED/RATE_LIMITED/TIMEOUT 등)
@@ -296,6 +326,44 @@ DB는 기준 관광지 1건 읽기(findUnique)에만 사용한다.
 > `place.service.ts`의 구 `getNearbyLocalPlaces`(DB 전체 조회 + 하버사인)는 deprecated.
 
 ---
+
+### 3.3c 로컬 장소 소개 조회 — [B] (구현됨, 2026-08-15)
+
+```
+GET /api/local-places/detail?contentId=2748115
+```
+
+목록(3.3b)에는 소개문이 없어 이름·분류·거리만으로 방문 여부를 판단해야 한다.
+TourAPI `detailCommon2`의 소개문을 **상세 화면에서만** 조회한다.
+
+**호출량이 설계의 핵심:** 목록에 붙이면 주변 장소 10곳마다 상세를 불러 조회 1회당 외부 호출이
+10건 늘고 TourAPI 일 1,000 한도를 그대로 태운다. **사용자가 실제로 연 1곳만 호출한다.**
+
+- `contentId` 필수(빈 문자열 → `400 INVALID_CONTENT_ID`)
+- 해당 콘텐츠가 없으면 `404 LOCAL_PLACE_NOT_FOUND`
+- 외부 API 오류는 공통 정책(502/503/504)
+
+**응답:**
+```jsonc
+{
+  "success": true,
+  "data": {
+    "tourApiContentId": "2748115",
+    "name": "아키비스트 서촌",
+    "overview": "아키비스트 서촌은 ... 시그니처 아인슈페너로 유명한 카페다.",
+    "tel": "02-000-0000",
+    "homepage": "https://example.com"
+  },
+  "error": null
+}
+```
+
+- `overview`/`tel`/`homepage`는 값이 없으면 `null`. 빈 문자열을 그대로 내리지 않는다
+  (클라이언트가 빈 섹션을 그리지 않게)
+- 원본에 `<br>`·`&amp;` 같은 태그·엔티티가 섞여 오므로 **평문으로 정리해서 내려준다.**
+  `homepage`는 앵커 태그에서 URL만 추출
+- **이미지는 내려주지 않는다.** 목록에 `firstimage`가 없는 장소는 상세에도 없고
+  `detailImage2`도 0장이라(종로 표본 6곳 전수 확인) 가져올 것이 없다
 
 ### 3.4 장소 혼잡도 — [B]
 ```
@@ -552,7 +620,7 @@ GET /api/trips/:tripId
 3. **`tags` 응답 평탄화** — `placeTags[].tag` 중첩 대신 `tags: [{id, name}]`.
 4. **좌표 number 변환** — `Decimal` → `Number` 직렬화.
 5. **신규 엔드포인트 구현** — 코스(3.5/3.6), 방문(3.7~3.9).
-6. **`error.code` 도입**(선택) — 클라이언트 분기용 코드 문자열.
+6. ~~**`error.code` 도입**(선택)~~ — #58에서 채택 완료. §1.2에 코드 목록 유지.
 
 > B는 3.4(혼잡도)와 3.2/3.5의 데이터 적재·가공(TourAPI/SK/TMAP)을 담당한다.
 
