@@ -10,7 +10,10 @@
     "ios": {
       "bundleIdentifier": "com.teumta.teumta",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": [
+          "tmap"
+        ]
       }
     },
     "android": {
