@@ -370,9 +370,6 @@ export default function PlaceDetailScreen() {
                   </View>
                 )}
 
-                <Text style={styles.forecastNote}>
-                  한국관광공사 관광지 집중률 예측 기준. 실시간 혼잡도가 아니라 날짜별 예상치예요.
-                </Text>
               </View>
             </>
           )}
@@ -710,11 +707,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
-  },
-  forecastNote: {
-    color: Teumta.textTertiary,
-    fontSize: 9,
-    lineHeight: 13,
   },
   nearbyList: {
     gap: 8,
