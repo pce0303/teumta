@@ -2,9 +2,9 @@ import { KTO_CONCENTRATION_FORECAST_SOURCE, type ConcentrationForecastData } fro
 import {
   fetchConcentrationForecast,
   mapConcentrationForecast,
-  normalizePlaceName,
 } from '../external/prediction';
 import { extractDetailItem, fetchTourPlaceDetail } from '../external/tour';
+import { toPlaceMatchKey } from '../utils/place-name';
 
 /**
  * 집중률 예측 실시간 조회(DB 미사용, 전국).
@@ -105,19 +105,19 @@ export function selectForecastsByName(
   forecasts: ConcentrationForecastData[],
   destinationName: string,
 ): ConcentrationForecastData[] {
-  const target = matchKey(destinationName);
+  const target = toPlaceMatchKey(destinationName);
   if (target.length === 0) {
     return [];
   }
 
-  const exact = forecasts.filter((forecast) => matchKey(forecast.tAtsNm) === target);
+  const exact = forecasts.filter((forecast) => toPlaceMatchKey(forecast.tAtsNm) === target);
   if (exact.length > 0) {
     return exact;
   }
 
   // 부분 일치는 후보가 여럿일 수 있어 가장 짧은 이름(부속 시설이 아닌 본 시설)으로 좁힌다.
   const partial = forecasts.filter((forecast) => {
-    const name = matchKey(forecast.tAtsNm);
+    const name = toPlaceMatchKey(forecast.tAtsNm);
     return name.includes(target) || target.includes(name);
   });
   if (partial.length === 0) {
@@ -125,19 +125,13 @@ export function selectForecastsByName(
   }
 
   const bestName = partial
-    .map((forecast) => matchKey(forecast.tAtsNm))
+    .map((forecast) => toPlaceMatchKey(forecast.tAtsNm))
     .sort((first, second) => first.length - second.length)[0];
 
-  return partial.filter((forecast) => matchKey(forecast.tAtsNm) === bestName);
+  return partial.filter((forecast) => toPlaceMatchKey(forecast.tAtsNm) === bestName);
 }
 
-/**
- * 이름 비교용 키. KTO와 TourAPI가 같은 장소를 다르게 띄어써서("해운대 해수욕장" vs "해운대해수욕장")
- * 공백을 모두 지우고 비교한다. 적재 매칭용 normalizePlaceName은 계약이 걸려 있어 건드리지 않는다.
- */
-function matchKey(name: string): string {
-  return normalizePlaceName(name).replace(/\s+/g, '');
-}
+
 
 export type ConcentrationForecastLookupResult =
   | { status: 'SUCCESS'; data: ConcentrationForecastByContentIdResult }

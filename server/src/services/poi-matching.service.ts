@@ -1,7 +1,7 @@
-import { normalizePlaceName } from '../external/prediction';
 import { fetchPoiSearch, mapPoiSearchToDestinations } from '../external/tmap';
 import { extractDetailCoordinate, extractDetailItem, fetchTourPlaceDetail } from '../external/tour';
 import { distanceMeters, type GeoPoint } from '../utils/geo';
+import { placeNameRank } from '../utils/place-name';
 
 /**
  * TourAPI 관광지(contentId) → TMAP POI(poiId) 매칭.
@@ -82,27 +82,16 @@ export interface PoiCandidate {
   longitude: number | null;
 }
 
-/** 이름 유사도 등급. 낮을수록 좋다. */
-function nameRank(candidateName: string, targetName: string): number {
-  const candidate = normalizePlaceName(candidateName);
-  const target = normalizePlaceName(targetName);
-
-  if (candidate === target) {
-    return 0;
-  }
-  if (candidate.startsWith(target) || target.startsWith(candidate)) {
-    return 1;
-  }
-  return 2;
-}
-
 /**
  * 반경 안에서 가장 잘 맞는 후보의 poiId. 반경 밖만 있으면 null(억지 매칭 금지).
  *
  * **거리만으로 고르면 안 된다.** TMAP은 본 시설과 부속 시설을 각각 POI로 주는데
- * (예: "경복궁" / "경복궁 주차장" — id가 다르다) 부속 시설이 몇 m 더 가까운 경우가 실제로 있고,
- * SK 혼잡도는 본 시설 POI만 커버해서 엉뚱한 id를 고르면 "데이터 없음"이 된다.
+ * (예: "전주한옥마을" / "전주한옥마을 관광안내소" — id가 다르다) 부속 시설이 몇 m 더 가까운 경우가
+ * 실제로 있고, SK 혼잡도는 본 시설 POI만 커버해서 엉뚱한 id를 고르면 "데이터 없음"이 된다.
  * 그래서 이름 일치도를 먼저 보고 거리로 동점을 가린다.
+ *
+ * 이름 비교는 공백·대괄호 표기를 걷어낸 뒤 포함 관계까지 본다 — TourAPI는
+ * "전북 전주 한옥마을 [슬로시티]"처럼 지역 접두사와 부가 표기를 붙여 주기 때문이다.
  */
 export function pickBestPoiMatch(
   candidates: PoiCandidate[],
@@ -123,7 +112,7 @@ export function pickBestPoiMatch(
       continue;
     }
 
-    const rank = nameRank(candidate.name, target.name);
+    const rank = placeNameRank(candidate.name, target.name);
     const better =
       best === null || rank < best.rank || (rank === best.rank && distance < best.distance);
 

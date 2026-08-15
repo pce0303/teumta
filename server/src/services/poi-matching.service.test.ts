@@ -75,7 +75,21 @@ describe('pickBestPoiMatch', () => {
     expect(picked).toBe('362105');
   });
 
-  it('정확히 맞는 이름이 없으면 접두 일치를 우선한다', () => {
+  it('TourAPI가 지역 접두사·대괄호 표기를 붙여도 본 시설을 고른다', () => {
+    // 실제 사례: TourAPI "전북 전주 한옥마을 [슬로시티]" ↔ TMAP "전주한옥마을"(130m).
+    // 관광안내소가 7m로 훨씬 가깝지만 SK 혼잡도는 본 시설만 커버한다.
+    const picked = pickBestPoiMatch(
+      [
+        { tmapPoiId: '1555653', name: '전주한옥마을 관광안내소', latitude: 35.81821389, longitude: 127.15363618 },
+        { tmapPoiId: '8846569', name: '전주한옥마을 1공영주차장', latitude: 35.81860274, longitude: 127.1539417 },
+        { tmapPoiId: '737851', name: '전주한옥마을', latitude: 35.81724177, longitude: 127.15294182 },
+      ],
+      { name: '전북 전주 한옥마을 [슬로시티]', coordinate: { latitude: 35.8182727649, longitude: 127.1536126138 } },
+    );
+    expect(picked).toBe('737851');
+  });
+
+  it('정확히 맞는 이름이 없으면 포함 관계를 우선한다', () => {
     const picked = pickBestPoiMatch(
       [
         { tmapPoiId: 'parking', name: '경복궁 주차장', latitude: 37.5761, longitude: 126.9767 },
