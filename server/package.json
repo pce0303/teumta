@@ -10,7 +10,7 @@
     "dev": "tsx watch src/server.ts",
     "ingest:prediction": "tsx scripts/ingest-prediction.ts",
     "ingest:tour": "tsx scripts/ingest-tour.ts",
-    "postinstall": "prisma generate",
+    "postinstall": "if [ -f prisma/schema.prisma ]; then prisma generate; fi",
     "start": "node dist/server.js",
     "start:deploy": "prisma migrate deploy && node dist/server.js",
     "test": "vitest",
