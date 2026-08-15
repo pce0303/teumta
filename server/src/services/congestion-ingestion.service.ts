@@ -19,26 +19,26 @@ import {
 } from './concentration-matching.service';
 
 /**
- * 예측 혼잡도(집중률 예측) 데이터를 내부 Congestion 테이블에 적재하는 서비스.
+ * 집중률 예측 → Congestion 테이블 적재.
  *
  * 설계 근거(협업 규칙 §4 데이터 인계):
- *  - 예측(PREDICTED) 데이터는 시계열로 축적/조회하므로 DB에 저장한다.
- *  - 실시간(REALTIME) 데이터는 저장하지 않고 서비스 함수로 pass-through 하므로 여기서 다루지 않는다.
+ *  - PREDICTED: 시계열 축적·조회 대상 → DB 저장
+ *  - REALTIME: 저장 없이 서비스 함수로 pass-through → 여기서 다루지 않음
  *
- * 이 서비스는 외부 API 스펙과 무관하다(내부 CongestionData + Prisma 스키마에만 의존).
- * 예측 API 연동이 완료되면 prediction.mapper 가 CongestionData[]를 만들어 이 서비스에 넘긴다.
+ * 외부 API 스펙과 무관 — 내부 CongestionData + Prisma 스키마에만 의존.
+ * 변환은 prediction.mapper 담당.
  */
 
 export interface CongestionSaveResult {
-  /** 기존 예측 로우 삭제 수(재적재 시 교체). */
+  /** 재적재 시 교체로 삭제된 기존 예측 로우 수. */
   replaced: number;
   inserted: number;
 }
 
 /**
- * 특정 장소의 예측 혼잡도를 저장한다.
- * 재적재 시 중복을 막기 위해 해당 장소의 기존 PREDICTED 로우를 지우고 새로 넣는다(replace 전략).
- * Congestion에는 (placeId, predictedFor) 유니크 제약이 없어 upsert 대신 교체 방식을 쓴다.
+ * 특정 장소의 예측 혼잡도 저장.
+ * 중복 방지를 위해 기존 PREDICTED 로우 삭제 후 삽입(replace 전략).
+ * (placeId, predictedFor) 유니크 제약이 없어 upsert 대신 교체.
  */
 export async function savePredictedCongestion(
   placeId: number,
@@ -61,8 +61,8 @@ export async function savePredictedCongestion(
 }
 
 /**
- * CongestionData[] → Congestion 삽입 로우[] (순수 변환, 오프라인 검증용).
- * PREDICTED 타입만 대상으로 한다(실시간이 섞여 들어와도 걸러낸다).
+ * CongestionData[] → 삽입 로우[]. 순수 변환.
+ * PREDICTED만 통과 — 실시간이 섞여도 필터링.
  */
 export function toPredictedCongestionRows(
   placeId: number,
@@ -81,10 +81,10 @@ export function toPredictedCongestionRows(
     }));
 }
 
-// KTO 집중률 예측 적재 — 향후 30일 날짜별(실시간·시간대별 아님), 공식 등급 기준 없어 level 미저장.
+// KTO 집중률 예측 적재 — 향후 30일 날짜별(시간대별 아님). 공식 등급 기준 없어 level 미저장
 
 export interface ConcentrationForecastSaveResult {
-  /** 같은 source의 반환 날짜 범위 내 기존 로우 삭제 수. */
+  /** 같은 source·반환 날짜 범위에서 삭제된 기존 로우 수. */
   deleted: number;
   inserted: number;
 }
@@ -135,28 +135,28 @@ export async function saveConcentrationForecasts(
 }
 
 export interface ConcentrationForecastIngestResult {
-  /** 안전하게 매칭되어 저장된 관광지 수(alias 매칭 포함). */
+  /** 매칭 성공해 저장된 관광지 수(alias 포함). */
   matchedPlaces: number;
-  /** matchedPlaces 중 관리자 alias(ForecastPlaceAlias)로 연결된 수. */
+  /** 그중 관리자 alias(ForecastPlaceAlias)로 연결된 수. */
   aliasMatchedPlaces: number;
   inserted: number;
   deleted: number;
-  /** 후보 없음 — 자동 저장하지 않고 집계만 반환. */
+  /** 후보 없음 — 자동 저장 없이 집계만. */
   unmatched: { tAtsNm: string }[];
-  /** 후보 둘 이상 — 자동 저장하지 않고 집계만 반환. */
+  /** 후보 2건 이상 — 자동 저장 없이 집계만. */
   ambiguous: { tAtsNm: string; candidatePlaceIds: number[] }[];
-  /** 형식 불량으로 매핑 단계에서 건너뛴 항목. */
+  /** 형식 불량으로 매핑에서 제외된 항목. */
   skipped: { tAtsNm: string; baseYmd: string; reason: string }[];
 }
 
 /**
- * fetch → map → 매칭 → 저장. MATCHED만 저장, UNMATCHED/AMBIGUOUS는 집계만.
- * 관리자 alias(ForecastPlaceAlias)가 있으면 자동 이름 매칭보다 우선 적용한다.
+ * fetch → map → 매칭 → 저장. MATCHED만 저장, UNMATCHED·AMBIGUOUS는 집계만.
+ * 관리자 alias(ForecastPlaceAlias)가 자동 이름 매칭보다 우선.
  */
 export async function ingestConcentrationForecasts(
   params: ConcentrationForecastParams,
 ): Promise<ConcentrationForecastIngestResult> {
-  // 행 수 = 관광지 수 × 30일. 클라이언트 기본값(100)은 지역당 3곳 수준이라 전 지역이 담기도록 키운다.
+  // 행 수 = 관광지 수 × 30일. 기본값(100)은 지역당 3곳 수준이라 전 지역이 담기게 확대
   const response = await fetchConcentrationForecast({
     numOfRows: FORECAST_FETCH_NUM_OF_ROWS,
     ...params,
@@ -177,7 +177,7 @@ export async function ingestConcentrationForecasts(
     return result;
   }
 
-  // 지역(법정동 시도) 후보만 로드한다. 시군구 판정은 matcher가 담당한다.
+  // 시도 단위 후보만 로드 — 시군구 판정은 matcher 담당
   const [candidateRows, aliasMap] = await Promise.all([
     prisma.place.findMany({
       where: { lDongRegnCd: String(params.areaCd).trim() },
@@ -192,7 +192,7 @@ export async function ingestConcentrationForecasts(
     lDongSignguCd: row.lDongSignguCd,
   }));
 
-  // 같은 관광지명(tAtsNm) 묶음 단위로 매칭 후 저장한다.
+  // 같은 관광지명(tAtsNm) 묶음 단위로 매칭 후 저장
   for (const group of groupForecastsByKey(forecasts).values()) {
     const { areaCd, signguCd, tAtsNm } = group[0];
 

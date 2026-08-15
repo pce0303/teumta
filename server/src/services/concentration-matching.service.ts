@@ -9,22 +9,21 @@ import {
 import { prisma } from '../utils/prisma';
 
 /**
- * KTO 집중률 예측 ↔ Place 매칭 운영 도구(관리자 웹용).
+ * KTO 집중률 ↔ Place 매칭 운영 도구(관리자 웹).
  *
- * - preview: 외부 API를 1회 호출해 현재 매칭 상태(MATCHED/ALIAS_MATCHED/UNMATCHED/AMBIGUOUS)를
- *   집계만 하고 저장하지 않는다.
- * - alias: 자동 매칭이 못 잇는 항목을 관리자가 Place에 수동 연결한다.
- *   적재(congestion-ingestion)는 이 alias를 자동 매칭보다 우선 적용한다.
+ * - preview: 외부 API 1회 호출로 매칭 상태(MATCHED/ALIAS_MATCHED/UNMATCHED/AMBIGUOUS) 집계만, 저장 없음
+ * - alias: 자동 매칭이 못 잇는 항목을 관리자가 Place에 수동 연결.
+ *   적재(congestion-ingestion)에서 자동 매칭보다 우선 적용
  */
 
 /**
- * 집중률 예측 조회 시 요청할 최대 행 수(preview/적재 공용).
- * 행 수 = 관광지 수 × 예측일 수(30일)라 기존 클라이언트 기본값(100)은 지역당 3곳 수준만 담긴다
- * (서울 종로구 실측: 67곳+ × 30일 > 2,000행). 행 수를 키워도 외부 API 호출은 1회로 동일하다.
+ * 집중률 조회 요청 최대 행 수(preview·적재 공용).
+ * 행 수 = 관광지 수 × 30일이라 기본값(100)은 지역당 3곳 수준
+ * (종로구 실측 67곳+ × 30일 > 2,000행). 행 수를 키워도 외부 호출은 1회로 동일.
  */
 export const FORECAST_FETCH_NUM_OF_ROWS = 5000;
 
-/** alias 조회 키. 이름은 자동 매칭과 같은 규칙으로 정규화한다. */
+/** alias 조회 키. 이름 정규화 규칙은 자동 매칭과 동일. */
 export function buildForecastAliasKey(
   areaCd: string,
   signguCd: string,
@@ -33,7 +32,7 @@ export function buildForecastAliasKey(
   return `${areaCd.trim()}|${signguCd.trim()}|${normalizePlaceName(tAtsNm)}`;
 }
 
-/** 지역(시도)의 alias 전체를 키 → placeId 맵으로 로드한다(적재/preview 공용). */
+/** 시도 단위 alias 전체 → 키 → placeId 맵(적재·preview 공용). */
 export async function loadForecastAliasMap(
   areaCd: string | number,
 ): Promise<Map<string, number>> {
@@ -86,12 +85,12 @@ export interface MatchingPreviewItem {
   areaCd: string;
   signguCd: string;
   status: MatchingPreviewStatus;
-  /** 예측 날짜 행 수(보통 향후 30일). */
+  /** 예측 날짜 행 수(보통 30일). */
   forecastCount: number;
   /** 집중률 평균(참고용). */
   averageRate: number | null;
   matchedPlace: { id: number; name: string } | null;
-  /** AMBIGUOUS일 때 자동 매칭 후보. */
+  /** AMBIGUOUS일 때의 자동 매칭 후보. */
   candidates: { id: number; name: string }[];
 }
 
@@ -106,9 +105,9 @@ export interface MatchingPreviewResult {
     ambiguous: number;
   };
   items: MatchingPreviewItem[];
-  /** 형식 불량으로 매핑 단계에서 제외된 항목. */
+  /** 형식 불량으로 매핑에서 제외된 항목. */
   skipped: { tAtsNm: string; baseYmd: string; reason: string }[];
-  /** 외부 API totalCount가 요청 행 수를 넘어 일부만 조회된 경우 true. */
+  /** totalCount가 요청 행 수를 넘어 일부만 조회됐으면 true. */
   truncated: boolean;
 }
 
@@ -130,7 +129,7 @@ function averageRate(group: ConcentrationForecastData[]): number | null {
   return Math.round((sum / rates.length) * 100) / 100;
 }
 
-/** 외부 API 1회 호출로 지역의 매칭 상태를 집계한다(DB 저장 없음). */
+/** 외부 API 1회 호출로 지역 매칭 상태 집계. DB 저장 없음. */
 export async function previewConcentrationMatching(
   areaCd: string,
   signguCd: string,
@@ -315,7 +314,7 @@ export type UpsertForecastAliasResult =
   | { status: 'SAVED'; alias: ForecastAliasDto }
   | { status: 'PLACE_NOT_FOUND' };
 
-/** alias 저장(같은 키가 있으면 대상 장소만 교체). 이름은 정규화 후 저장한다. */
+/** alias 저장 — 같은 키면 대상 장소만 교체. 이름은 정규화 후 저장. */
 export async function upsertForecastAlias(input: {
   areaCd: string;
   signguCd: string;

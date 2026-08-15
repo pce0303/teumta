@@ -1,8 +1,8 @@
 /**
  * 관리자 토큰 저장소(localStorage).
  *
- * 토큰은 서버(POST /api/admin/login)가 발급한 만료 있는 HMAC 토큰이다.
- * 비밀번호/secret은 어떤 형태로도 프론트 코드·번들에 두지 않는다.
+ * 토큰은 서버(POST /api/admin/login)가 발급한 만료 있는 HMAC 토큰.
+ * 비밀번호·secret은 어떤 형태로도 프론트 코드·번들에 두지 않는다.
  */
 
 const TOKEN_KEY = 'teumta-admin-token';
@@ -44,7 +44,7 @@ export function clearToken() {
   notifyAuthChanged();
 }
 
-/** RequireAuth 등에서 useSyncExternalStore로 구독한다. */
+/** RequireAuth 등에서 useSyncExternalStore로 구독. */
 export function subscribeAuth(callback: () => void): () => void {
   window.addEventListener(AUTH_EVENT, callback);
   window.addEventListener('storage', callback);

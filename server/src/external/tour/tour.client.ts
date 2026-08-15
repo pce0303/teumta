@@ -10,14 +10,14 @@ import {
 import type { TourApiDetailResponse, TourApiListResponse } from './tour.dto';
 
 /**
- * 한국관광공사 TourAPI (KorService2) 클라이언트.
- * 통신(URL/인증/timeout)과 TourAPI 자체 오류코드 처리까지만 담당한다. 변환은 tour.mapper.ts.
+ * 한국관광공사 TourAPI(KorService2) 클라이언트.
+ * 통신(URL·인증·timeout) + TourAPI 오류코드 처리까지. 변환은 tour.mapper.ts.
  *
- * 매뉴얼 v4.4 기준: 요청 파라미터는 법정동 코드(lDongRegnCd/lDongSignguCd)와
- * 분류체계(lclsSystm1~3)를 사용한다(구 areaCode/sigunguCode/cat1~3 미사용).
+ * v4.4 기준 파라미터: 법정동 코드(lDongRegnCd/lDongSignguCd) + 분류체계(lclsSystm1~3).
+ * 구 areaCode/sigunguCode/cat1~3 미사용.
  *
- * TOUR_API_KEY 는 Encoding/Decoding 키 모두 허용(normalizeServiceKey가 이중 인코딩 방지).
- * 인증키 오류 등 XML 오류 봉투는 공통 http-client가 오류 계층으로 변환한다.
+ * TOUR_API_KEY는 Encoding/Decoding 키 모두 허용(normalizeServiceKey가 이중 인코딩 방지).
+ * XML 오류 봉투 변환은 공통 http-client 담당.
  */
 
 const SERVICE = 'tour';
@@ -64,7 +64,7 @@ export interface TourLocationListParams {
   arrange?: string;
 }
 
-/** areaBasedList2 요청 쿼리(공통 파라미터 제외)를 만든다. 순수 함수(테스트 용이). */
+/** areaBasedList2 요청 쿼리(공통 파라미터 제외). 순수 함수. */
 export function buildAreaListQuery(params: TourAreaListParams = {}): Record<string, string> {
   return {
     ...optionalParam('lDongRegnCd', params.lDongRegnCd),
@@ -81,8 +81,8 @@ export function buildAreaListQuery(params: TourAreaListParams = {}): Record<stri
 }
 
 /**
- * locationBasedList2 요청 쿼리(공통 파라미터 제외)를 만든다. 순수 함수(테스트 용이).
- * radius가 1~20000(m) 범위를 벗어나면 외부 호출 없이 즉시 입력 오류를 던진다.
+ * locationBasedList2 요청 쿼리(공통 파라미터 제외). 순수 함수.
+ * radius 1~20000(m) 벗어나면 외부 호출 없이 즉시 입력 오류.
  */
 export function buildLocationListQuery(params: TourLocationListParams): Record<string, string> {
   assertValidRadius(params.radius);
@@ -98,7 +98,7 @@ export function buildLocationListQuery(params: TourLocationListParams): Record<s
     ...optionalParam('lclsSystm3', params.lclsSystm3),
     numOfRows: String(params.numOfRows ?? 20),
     pageNo: String(params.pageNo ?? 1),
-    // 위치기반 조회 기본 정렬은 거리순(E)을 유지한다.
+    // 위치기반 기본 정렬: 거리순(E)
     arrange: params.arrange ?? 'E',
   };
 }
@@ -110,7 +110,7 @@ export async function fetchTourPlacesByArea(
   return requestTourList(buildTourUrl('areaBasedList2', buildAreaListQuery(params)));
 }
 
-/** 위치기반 관광정보 조회(locationBasedList2). "빈 시간 근처 관광지" 시나리오의 주 진입점. */
+/** 위치기반 관광정보 조회(locationBasedList2). 주변 로컬 장소 흐름의 주 진입점. */
 export async function fetchTourPlacesByLocation(
   params: TourLocationListParams,
 ): Promise<TourApiListResponse> {
@@ -159,14 +159,14 @@ export function buildKeywordSearchQuery(params: TourKeywordSearchParams): Record
   };
 }
 
-/** 키워드 검색(searchKeyword2). 사용자가 목적지를 직접 검색하는 흐름의 진입점. */
+/** 키워드 검색(searchKeyword2). 목적지 검색 흐름의 진입점. */
 export async function fetchTourPlacesByKeyword(
   params: TourKeywordSearchParams,
 ): Promise<TourApiListResponse> {
   return requestTourList(buildTourUrl('searchKeyword2', buildKeywordSearchQuery(params)));
 }
 
-/** 공통정보 조회(detailCommon2). 기준 관광지의 현재 좌표를 실시간으로 얻는다. */
+/** 공통정보 조회(detailCommon2). 기준 관광지 좌표 실시간 확보용. */
 export async function fetchTourPlaceDetail(
   contentId: string | number,
 ): Promise<TourApiDetailResponse> {
@@ -203,7 +203,7 @@ function buildTourUrl(operation: string, params: Record<string, string>): string
   }
 
   const url = new URL(`${baseUrl.replace(/\/+$/, '')}/${operation}`);
-  // Encoding/Decoding 키 모두 허용 — 정규화 후 URLSearchParams가 정확히 한 번만 인코딩한다.
+  // Encoding/Decoding 키 모두 허용 — 정규화 후 URLSearchParams가 정확히 한 번만 인코딩
   url.searchParams.set('serviceKey', normalizeServiceKey(apiKey));
   url.searchParams.set('MobileOS', 'ETC');
   url.searchParams.set('MobileApp', MOBILE_APP);
@@ -215,13 +215,12 @@ function buildTourUrl(operation: string, params: Record<string, string>): string
 }
 
 /**
- * 결과 없음(0003 NODATA_ERROR). 오류가 아니라 "조회 결과 0건"이다.
- * 검색어에 해당하는 관광지가 없을 때 오므로, 이걸 오류로 던지면 TMAP 폴백이 실행되지 않고
- * 검색 자체가 502로 죽는다(실제로 일반 상점 키워드에서 발생).
+ * 결과 없음(0003 NODATA_ERROR) — 오류가 아니라 "조회 결과 0건".
+ * 오류로 던지면 TMAP 폴백을 못 타고 검색 전체가 502(일반 상점 키워드에서 실제 발생).
  */
 const NODATA_RESULT_CODE = '03';
 
-/** TourAPI는 HTTP 200이어도 resultCode로 논리 오류를 알린다(중첩/flat 봉투 모두). 정상은 '0000'. */
+/** HTTP 200이어도 resultCode로 논리 오류 통지(중첩·flat 봉투 모두). 정상은 '0000'. */
 function assertTourApiOk(response: TourApiListResponse | TourApiDetailResponse): void {
   const header = extractPublicDataHeader(response);
   if (header?.resultCode === '0000') {

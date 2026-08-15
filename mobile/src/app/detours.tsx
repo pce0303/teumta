@@ -18,14 +18,14 @@ import {
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
 
-/** 서버가 지원하는 가용 시간 선택지(api-spec 3.10). */
+/** 서버 지원 가용 시간 선택지(api-spec 3.10). */
 const DURATION_OPTIONS = [30, 60, 90] as const;
 const HEADER_TINTS = ['#A8D6C2', '#D6C7AB'];
 
 type Status = 'loading' | 'idle' | 'error';
 
 type DetoursParams = {
-  /** 목적지 식별자 — 검색 결과의 tourApiContentId 또는 tmapPoiId 중 하나. */
+  /** 목적지 식별자 — tourApiContentId 또는 tmapPoiId 중 하나. */
   contentId?: string;
   poiId?: string;
   name?: string;
@@ -35,7 +35,7 @@ function formatKilometers(meters: number) {
   return `${(meters / 1000).toFixed(1)}km`;
 }
 
-/** 코스 이름은 서버가 주지 않으므로 정류지 이름을 이어 붙여 만든다. */
+/** 코스 이름은 서버 미제공 → 정류지 이름을 이어 붙여 생성. */
 function courseTitle(course: GeneratedCourse) {
   return course.stops.map((stop) => stop.name).join(' · ');
 }
@@ -169,14 +169,14 @@ export default function DetoursScreen() {
       setCourses([]);
       setStatus('error');
     }
-    // identifier는 매 렌더 새 객체라 의존성에 넣지 않고 원본 파라미터를 본다.
+    // identifier는 매 렌더 새 객체 → 의존성 대신 원본 파라미터 참조
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentId, poiId, availableMinutes]);
 
   useEffect(() => {
     let ignored = false;
 
-    // 코스 생성은 외부 API를 여러 번 호출한다. 화면 전환 중 응답이 늦게 와도 상태를 덮어쓰지 않는다.
+    // 코스 생성은 외부 API 다중 호출 → 화면 전환 뒤 늦게 온 응답이 상태를 덮어쓰지 않게
     void (async () => {
       if (ignored) {
         return;

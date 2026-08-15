@@ -9,7 +9,7 @@ import type { CreateRouteInput } from '../types/route';
 import { usePlaces } from '../utils/usePlaces';
 
 interface StopRow {
-  /** 순서를 바꿔도 입력 상태가 섞이지 않도록 행마다 고정 키를 둔다. */
+  /** 순서 변경 시 입력 상태가 섞이지 않도록 행마다 고정 키. */
   key: number;
   placeId: string;
   stayMinutes: string;
@@ -103,7 +103,7 @@ export function RouteFormPage({ mode }: RouteFormPageProps) {
     );
   };
 
-  /** 장소를 고르면 비어 있는 체류시간만 그 장소의 추천 체류시간으로 채운다(입력값은 보존). */
+  /** 장소 선택 시 비어 있는 체류시간만 추천값으로 채움(입력값 보존). */
   const handleStopPlaceChange = (row: StopRow, value: string) => {
     const place: Place | undefined = placeById.get(Number(value));
     const shouldPrefill =

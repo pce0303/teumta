@@ -36,8 +36,8 @@ export function RouteDetailPage() {
       const loaded = await fetchRoute(routeId);
       setRoute(loaded);
 
-      // 코스 상세 응답에는 mainPlace 정보가 없어 별도 조회한다.
-      // 실패해도 코스 자체는 보여준다(ID만 표시).
+      // 코스 상세 응답에 mainPlace 정보가 없어 별도 조회
+      // 실패해도 코스 자체는 표시(ID만 노출)
       try {
         setMainPlace(await fetchPlace(loaded.mainPlaceId));
       } catch {

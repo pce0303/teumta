@@ -8,14 +8,14 @@ import {
 import type { SkCongestionResponse } from './congestion.dto';
 
 /**
- * SK 지오비전 퍼즐 "실시간 장소 혼잡도" 클라이언트. 통신 책임만, 변환은 congestion.mapper.ts.
+ * SK 지오비전 퍼즐 "실시간 장소 혼잡도" 클라이언트. 통신 책임만 — 변환은 congestion.mapper.ts.
  * 인증은 TMAP과 같은 SK Open API appKey 헤더(CONGESTION_API_KEY).
  */
 
 const SERVICE = 'congestion';
 const RLTM_PATH = '/place/congestion/rltm/pois';
 
-/** 특정 장소(POI)의 실시간 혼잡도 조회. poiId는 TMAP 장소 통합 검색의 id. */
+/** POI 실시간 혼잡도 조회. poiId는 TMAP 장소 통합 검색의 id. */
 export async function fetchRealtimeCongestion(
   poiId: string | number,
 ): Promise<SkCongestionResponse> {
@@ -42,20 +42,20 @@ export async function fetchRealtimeCongestion(
     service: SERVICE,
     url,
     headers: { appKey: apiKey },
-    // 커버리지 밖 POI를 400으로 알려주므로 본문을 읽어 "없음"과 실제 장애를 구분한다.
+    // 커버리지 밖 POI를 400으로 통지 → 본문을 읽어 "없음"과 실제 장애 구분
     acceptStatuses: [400, 404],
   });
   assertPuzzleOk(response);
   return response;
 }
 
-/** SK가 "이 POI는 다루지 않는다"고 알릴 때 쓰는 오류 메시지. */
+/** SK가 "이 POI 미지원"을 알릴 때의 오류 메시지. */
 const NOT_FOUND_POI_MESSAGE = 'NOT_FOUND_POI';
 
 /**
- * 퍼즐 API는 HTTP 200이어도 status.code로 논리 오류를 알리고(정상 '00'),
- * 커버리지 밖 POI는 400 + error 봉투로 알린다.
- * 후자는 연동 장애가 아니라 "데이터 없음"이므로 404로 내려야 한다(502 아님).
+ * 퍼즐 API는 HTTP 200이어도 status.code로 논리 오류 통지(정상 '00'),
+ * 커버리지 밖 POI는 400 + error 봉투.
+ * 후자는 연동 장애가 아닌 "데이터 없음" → 502가 아니라 404.
  */
 function assertPuzzleOk(response: SkCongestionResponse): void {
   const error = response.error;

@@ -20,7 +20,7 @@ import {
 import type { TagWithUsage } from '../types/tag';
 import { formatDateTime } from '../utils/format';
 
-/** 서버 place.controller.ts의 TIME_PATTERN과 동일하게 유지한다. */
+/** 서버 place.controller.ts의 TIME_PATTERN과 동일 유지. */
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 interface FormValues {
@@ -74,7 +74,7 @@ function emptyToNull(value: string): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
-/** 서버 validation(place.controller.ts)과 같은 규칙으로 검사하고 올바른 타입의 payload를 만든다. */
+/** 서버 validation(place.controller.ts)과 동일 규칙 검사 + payload 생성. */
 function validate(values: FormValues): {
   errors: FieldErrors;
   payload: CreatePlaceInput | null;
@@ -258,7 +258,7 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
   };
 
-  /** 태그 전체 삭제(모든 장소에서 제거). 관리 모드에서만 노출된다. */
+  /** 태그 전체 삭제(모든 장소에서 제거). 관리 모드에서만 노출. */
   const handleDeleteTag = async (tagId: number, tagName: string) => {
     const usage = allTags?.find((tag) => tag.id === tagId)?.placeCount;
     const usageText =
@@ -282,7 +282,7 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
   };
 
-  /** 장소 삭제. 코스에서 사용 중이면 서버가 409로 막는다. */
+  /** 장소 삭제. 코스에서 사용 중이면 서버가 409로 차단. */
   const handleDeletePlace = async () => {
     if (placeId === null || !place) {
       return;
@@ -320,7 +320,7 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
       return;
     }
 
-    // 태그는 전체 교체 방식(tagIds) — 현재 선택 상태를 함께 저장한다.
+    // 태그는 전체 교체(tagIds) — 현재 선택 상태를 함께 저장
     const fullPayload: CreatePlaceInput = {
       ...payload,
       tagIds: selectedTagIds,
@@ -348,7 +348,7 @@ export function PlaceFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
   };
 
-  // 태그 선택지: 전체 태그 + (목록 API 실패/누락 대비) 현재 장소에 이미 붙은 태그.
+  // 태그 선택지: 전체 태그 + 현재 장소에 붙은 태그(목록 API 실패·누락 대비)
   const knownTags = new Map<
     number,
     { name: string; placeCount: number | null }

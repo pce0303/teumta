@@ -38,7 +38,7 @@ export default function TripScreen() {
   const course = selected?.course;
   const destination = selected?.destination;
 
-  // 도착 판정 목적지 목록: 정류지들 + 마지막에 목적지(복귀).
+  // 도착 판정 대상: 정류지들 + 마지막 목적지(복귀)
   const courseStops: CourseStop[] =
     course && destination
       ? [
@@ -81,7 +81,7 @@ export default function TripScreen() {
     }
     let ignored = false;
 
-    // 복귀 판단에 쓰는 목적지 혼잡도. 진입 시 1회만 본다(서버 5분 캐시).
+    // 복귀 판단용 목적지 혼잡도. 진입 시 1회만(서버 5분 캐시)
     getRealtimeCongestion(destinationParams)
       .then((data) => {
         if (!ignored) {
@@ -89,7 +89,7 @@ export default function TripScreen() {
         }
       })
       .catch(() => {
-        // 혼잡도를 못 가져와도 코스 진행 자체는 계속된다.
+        // 혼잡도 조회 실패해도 코스 진행은 계속
       });
 
     return () => {
@@ -114,7 +114,7 @@ export default function TripScreen() {
   const walkMinutes =
     distanceToNext !== null ? Math.max(1, Math.round(distanceToNext / WALK_METERS_PER_MINUTE)) : null;
 
-  // 남은 시간 = 아직 안 들른 정류지의 이동+체류 + 복귀 이동.
+  // 남은 시간 = 미방문 정류지의 이동+체류 + 복귀 이동
   const remainingMinutes = completed
     ? 0
     : course.stops

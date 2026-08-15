@@ -12,9 +12,9 @@ export type DetourCourse = {
   distanceKm: number;
   description: string;
   coordinates: Coordinate[];
-  /** 코스 경유지 이름 (표시용, 마지막은 복귀 지점) */
+  /** 코스 경유지 이름(표시용, 마지막은 복귀 지점). */
   stops?: string[];
-  /** 코스 내 추천 체류 시간(분) */
+  /** 코스 내 추천 체류시간(분). */
   stayMinutes?: number;
 };
 
@@ -31,7 +31,7 @@ export type Place = {
   detours: DetourCourse[];
 };
 
-/** GET /api/search/places 응답 항목. DB 미저장 — source에 따라 식별자가 다름. */
+/** GET /api/search/places 응답 항목. DB 미저장 — source에 따라 식별자 상이. */
 export type SearchPlaceResult = {
   source: 'TOUR' | 'TMAP';
   tourApiContentId: string | null;
@@ -44,7 +44,7 @@ export type SearchPlaceResult = {
   imageUrl: string | null;
 };
 
-/** GET /api/congestion?poiId= 응답. tmapPoiId가 있는(TMAP) 장소만 조회 가능. */
+/** GET /api/congestion 응답. TMAP POI로 매칭되는 장소만 조회 가능. */
 export type RealtimeCongestion = {
   poiId: string;
   poiName: string | null;
@@ -55,7 +55,7 @@ export type RealtimeCongestion = {
   isRealtime: boolean;
 };
 
-/** GET /api/local-places 응답 항목. DB 미저장 — 내부 id 없음, name+좌표로 구분. */
+/** GET /api/local-places 응답 항목. DB 미저장 — 내부 id 없이 name+좌표로 구분. */
 export type NearbyLocalPlaceResult = {
   name: string;
   address: string | null;
@@ -64,12 +64,12 @@ export type NearbyLocalPlaceResult = {
   imageUrl: string | null;
   /** 분류 라벨(문화시설/쇼핑/음식점). 알 수 없으면 null. */
   category: string | null;
-  /** TMAP 실제 보행거리(m). 직선거리 아님. */
+  /** TMAP 실측 보행거리(m). 직선거리 아님. */
   distanceMeters: number;
   travelTimeMinutes: number;
 };
 
-/** GET /api/concentration-forecast 응답. 날짜별 예측이며 실시간 혼잡도가 아니다. */
+/** GET /api/concentration-forecast 응답. 날짜별 예측 — 실시간 혼잡도 아님. */
 export type ConcentrationForecastEntry = {
   /** "YYYY-MM-DD" (KST). */
   forecastDate: string;
@@ -80,7 +80,7 @@ export type ConcentrationForecastEntry = {
 
 export type ConcentrationForecast = {
   destinationName: string;
-  /** 실제로 매칭된 KTO 관광지명(표기가 다를 수 있음). */
+  /** 실제 매칭된 KTO 관광지명(표기 상이 가능). */
   matchedName: string;
   areaCd: string;
   signguCd: string;

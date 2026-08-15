@@ -13,35 +13,32 @@ import {
 } from './public-data';
 
 /**
- * 모든 외부 API 클라이언트가 공유하는 fetch 래퍼.
+ * 외부 API 클라이언트 공용 fetch 래퍼.
  *
- * 책임:
- * - timeout(AbortController) 적용
- * - HTTP 상태 코드를 ExternalApiError 계층으로 분류
- * - JSON 파싱 실패 처리
+ * 책임: timeout(AbortController) · HTTP 상태 → ExternalApiError 분류 · JSON 파싱 실패 처리
  *
  * 주의:
- * - 에러 message에 URL/헤더/응답 본문을 넣지 않는다(API key 등 민감정보 유출 방지).
- * - Node 22의 global fetch를 사용한다(별도 HTTP 라이브러리 추가 없음).
+ * - 에러 message에 URL·헤더·응답 본문 포함 금지(API key 등 민감정보 유출 방지)
+ * - Node 22 global fetch 사용, 별도 HTTP 라이브러리 없음
  */
 
 export interface RequestJsonOptions {
-  /** 로깅/에러 분류용 서비스 식별자. */
+  /** 로깅·에러 분류용 서비스 식별자. */
   service: string;
-  /** 완성된 요청 URL(쿼리 포함). key가 쿼리에 포함될 수 있으므로 에러 message에는 넣지 않는다. */
+  /** 완성된 요청 URL(쿼리 포함). key가 섞여 있어 에러 message에 넣지 않는다. */
   url: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
-  /** 있으면 JSON 직렬화하여 전송한다. */
+  /** 있으면 JSON 직렬화 후 전송. */
   body?: unknown;
-  /** 미지정 시 externalConfig.timeoutMs 사용. */
+  /** 미지정 시 externalConfig.timeoutMs. */
   timeoutMs?: number;
   /**
-   * 2xx가 아니어도 본문을 파싱해 그대로 반환할 상태 코드 목록.
+   * 2xx가 아니어도 본문을 파싱해 반환할 상태 코드.
    *
-   * 외부 API가 "해당 리소스 없음" 같은 정상적인 결과를 4xx로 표현할 때만 쓴다
-   * (예: SK 퍼즐은 커버리지 밖 POI에 400 + `{"error":{"message":"NOT_FOUND_POI"}}`를 준다).
-   * 판단은 호출부(클라이언트)가 하고, 본문을 오류 계층으로 바꾸는 책임도 호출부에 있다.
+   * 외부 API가 "리소스 없음" 같은 정상 결과를 4xx로 표현할 때만 사용
+   * (SK 퍼즐은 커버리지 밖 POI에 400 + `{"error":{"message":"NOT_FOUND_POI"}}`).
+   * 판단과 오류 계층 변환은 호출부 책임.
    */
   acceptStatuses?: number[];
 }
@@ -69,7 +66,7 @@ export async function requestJson<T = unknown>(options: RequestJsonOptions): Pro
     if (error instanceof Error && error.name === 'AbortError') {
       throw new ExternalApiTimeoutError(service, { cause: error });
     }
-    // 네트워크 오류 등. 원본 메시지에 민감정보가 있을 수 있어 그대로 노출하지 않는다.
+    // 네트워크 오류 등 — 원본 메시지에 민감정보 가능성, 그대로 노출 금지
     throw new ExternalApiError(service, `Request to "${service}" failed`, {
       code: 'NETWORK_ERROR',
       cause: error,
@@ -82,8 +79,8 @@ export async function requestJson<T = unknown>(options: RequestJsonOptions): Pro
     throw classifyHttpError(service, response.status);
   }
 
-  // 본문은 정확히 한 번만 읽는다. 공공데이터포털은 _type=json 요청이어도
-  // 인증키 오류 등의 경우 HTTP 200 + XML 오류 봉투를 반환할 수 있다.
+  // 본문은 정확히 한 번만 읽기 — 공공데이터포털은 _type=json 요청에도
+  // 인증키 오류 시 HTTP 200 + XML 오류 봉투 반환 가능
   let bodyText: string;
   try {
     bodyText = await response.text();
@@ -99,7 +96,7 @@ export async function requestJson<T = unknown>(options: RequestJsonOptions): Pro
     if (envelope) {
       throw classifyPublicDataResultCode(service, envelope.resultCode, envelope.resultMsg);
     }
-    // 오류 봉투 형태도 아닌 XML. 원문은 message에 넣지 않는다(민감정보 방지).
+    // 오류 봉투도 아닌 XML — 원문은 message에 넣지 않음(민감정보 방지)
     throw new ExternalApiResponseError(service, 'Received unexpected XML response', {
       status: response.status,
     });
@@ -115,7 +112,7 @@ export async function requestJson<T = unknown>(options: RequestJsonOptions): Pro
   }
 }
 
-/** HTTP 상태 코드를 상황별 ExternalApiError로 분류한다. */
+/** HTTP 상태 코드 → 상황별 ExternalApiError. */
 function classifyHttpError(service: string, status: number): ExternalApiError {
   if (status === 401 || status === 403) {
     return new ExternalApiAuthError(service, { status });

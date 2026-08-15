@@ -17,7 +17,7 @@ export function fetchPlace(id: number): Promise<Place> {
   return apiRequest<Place>(`/places/${id}`);
 }
 
-/** POST /api/admin/places — 주의: 현재 서버에 관리자 인증 없음(팀 TODO). */
+/** POST /api/admin/places — 관리자 토큰 필요(admin-auth.middleware). */
 export function createPlace(input: CreatePlaceInput): Promise<Place> {
   return apiRequest<Place>('/admin/places', {
     method: 'POST',
@@ -25,7 +25,7 @@ export function createPlace(input: CreatePlaceInput): Promise<Place> {
   });
 }
 
-/** PATCH /api/admin/places/:id — 전달한 필드만 수정된다. */
+/** PATCH /api/admin/places/:id — 전달한 필드만 수정. */
 export function updatePlace(
   id: number,
   input: UpdatePlaceInput,

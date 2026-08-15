@@ -6,18 +6,18 @@ import type { Coordinate } from '@/types/place';
 export type DirectionsDestination = Coordinate & { name: string };
 
 /**
- * 외부 지도 앱으로 목적지 길찾기를 연다.
+ * 외부 지도 앱으로 목적지 길찾기 열기.
  *
  * 개인정보 최소화 원칙:
- *  - 틈타 서버로 사용자 현재 GPS를 보내지 않는다.
- *  - **출발지를 넘기지 않는다.** 목적지만 전달하고 지도 앱이 자체 위치로 길을 찾는다.
- *    (네이버지도는 출발지 생략 시 현 위치를 기본값으로 쓴다. 카카오맵 길찾기는 출발지가
- *     필수라서, 대신 좌표를 지도에 표시하는 스킴으로 연다 — 원칙을 지키기 위한 선택이다.)
+ *  - 틈타 서버로 사용자 GPS 전송 없음
+ *  - **출발지 미전달** — 목적지만 넘기고 지도 앱이 자체 위치로 경로 탐색
+ *    (네이버지도는 출발지 생략 시 현 위치 기본값. 카카오맵 길찾기는 출발지 필수라
+ *     좌표 표시 스킴으로 대체 — 원칙을 지키기 위한 선택)
  *
- * iOS는 `LSApplicationQueriesSchemes`에 선언된 스킴만 조회할 수 있다(app.json 참조).
+ * iOS는 `LSApplicationQueriesSchemes`에 선언된 스킴만 조회 가능(app.json).
  */
 
-/** 네이버지도는 모든 URL에 호출 앱 식별자를 요구한다(iOS는 번들 ID). */
+/** 네이버지도는 모든 URL에 호출 앱 식별자 요구(iOS는 번들 ID). */
 const APP_NAME =
   Constants.expoConfig?.ios?.bundleIdentifier ?? 'com.teumta.teumta';
 
@@ -28,7 +28,7 @@ interface MapApp {
   buildUrl: (destination: DirectionsDestination) => string;
 }
 
-/** 한국에서 도보 길찾기에 실제로 많이 쓰는 순서대로. */
+/** 국내 도보 길찾기 사용 빈도 순. */
 const MAP_APPS: MapApp[] = [
   {
     probe: 'nmap://',
@@ -38,7 +38,7 @@ const MAP_APPS: MapApp[] = [
   },
   {
     probe: 'kakaomap://',
-    // 카카오맵 길찾기(route)는 출발지가 필수라 목적지 표시로 연다.
+    // 카카오맵 길찾기(route)는 출발지 필수 → 목적지 표시로 대체
     label: '카카오맵에서 위치 보기',
     buildUrl: ({ latitude, longitude }) => `kakaomap://look?p=${latitude},${longitude}`,
   },
@@ -50,7 +50,7 @@ const MAP_APPS: MapApp[] = [
   },
 ];
 
-/** 설치된 앱이 없을 때. 애플 지도는 목적지만으로 도보 경로가 열린다. */
+/** 설치된 앱 없을 때. 애플 지도는 목적지만으로 도보 경로 가능. */
 function webFallbackUrl({ latitude, longitude }: DirectionsDestination): string {
   return Platform.select({
     ios: `https://maps.apple.com/?daddr=${latitude},${longitude}&dirflg=w`,
@@ -79,7 +79,7 @@ export async function openDirections(destination: DirectionsDestination): Promis
   chooseApp(installed, destination);
 }
 
-/** 설치된 앱이 여럿이면 사용자가 고르게 한다. */
+/** 설치된 앱이 여럿이면 사용자 선택. */
 function chooseApp(apps: MapApp[], destination: DirectionsDestination): void {
   const labels = apps.map((app) => app.label);
 
@@ -114,7 +114,7 @@ function chooseApp(apps: MapApp[], destination: DirectionsDestination): void {
   );
 }
 
-/** 스킴 조회 실패는 "설치되지 않음"으로 본다(미선언 스킴에서 예외가 날 수 있다). */
+/** 스킴 조회 실패는 "미설치"로 간주 — 미선언 스킴에서 예외 가능. */
 async function canOpen(url: string): Promise<boolean> {
   try {
     return await Linking.canOpenURL(url);
@@ -123,7 +123,7 @@ async function canOpen(url: string): Promise<boolean> {
   }
 }
 
-/** 열지 못하면 조용히 끝내지 않고 알린다 — 버튼이 죽은 것처럼 보이는 상황을 막는다. */
+/** 실패 시 조용히 끝내지 않고 안내 — 버튼이 죽은 것처럼 보이는 상황 방지. */
 async function openOrWarn(url: string, title = '길찾기를 열 수 없어요'): Promise<void> {
   try {
     await Linking.openURL(url);
@@ -133,16 +133,16 @@ async function openOrWarn(url: string, title = '길찾기를 열 수 없어요')
 }
 
 /**
- * 네이버지도에서 장소 정보(사진·리뷰·영업시간)를 연다.
+ * 네이버지도에서 장소 정보(사진·리뷰·영업시간) 열기.
  *
- * 로컬 장소는 TourAPI가 주는 정보가 이름·주소·대표사진 정도라 "가볼지" 판단에 부족할 때가 있다.
- * 사진 여러 장과 리뷰는 기존 지도 서비스가 압도적으로 낫고, 우리가 따라 만들 영역이 아니다.
+ * TourAPI가 로컬 장소에 주는 건 이름·주소·대표사진 정도라 "가볼지" 판단에 부족할 때가 있음.
+ * 사진 여러 장과 리뷰는 기존 지도 서비스가 압도적 — 따라 만들 영역이 아님.
  * 판단은 앱 안에서 끝내고 심화 정보만 넘긴다(주 CTA는 계속 우리 길찾기).
  *
- * 좌표 핀이 아니라 검색으로 여는 이유: 핀은 마커만 찍고 장소 페이지로 들어가지 않는다.
- * 동명 상호를 피하려고 이름과 주소를 함께 넘긴다.
+ * 좌표 핀이 아니라 검색으로 여는 이유: 핀은 마커만 찍고 장소 페이지로 안 들어감.
+ * 동명 상호 회피를 위해 이름 + 주소 동시 전달.
  *
- * 개인정보: 목적지 이름·주소만 전달한다. 사용자 위치는 쓰지 않는다.
+ * 개인정보: 목적지 이름·주소만 전달, 사용자 위치 미사용.
  */
 export async function openNaverMapPlace(place: {
   name: string;

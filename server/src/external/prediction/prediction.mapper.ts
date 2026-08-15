@@ -9,13 +9,14 @@ import type {
 } from './prediction.dto';
 
 /**
- * 집중률 예측 원본 → ConcentrationForecastData. 날짜별 예측이므로 level/score 변환 없음
- * (공식 등급 임계값 부재). baseYmd(KST)는 +09:00 자정으로 변환해 하루 밀림을 막는다.
+ * 집중률 예측 원본 → ConcentrationForecastData.
+ * 날짜별 예측이라 level·score 변환 없음(공식 등급 임계값 부재).
+ * baseYmd(KST)는 +09:00 자정으로 변환해 하루 밀림 방지.
  */
 
 const SERVICE = 'prediction';
 
-/** 목록 변환 결과. 형식 불량 항목은 전체를 실패시키지 않고 skip 집계한다. */
+/** 목록 변환 결과. 형식 불량 항목은 전체 실패 대신 skip 집계. */
 export interface ConcentrationForecastMapResult {
   forecasts: ConcentrationForecastData[];
   skipped: { tAtsNm: string; baseYmd: string; reason: string }[];
@@ -42,7 +43,7 @@ export function mapConcentrationForecast(
   return { forecasts, skipped };
 }
 
-/** 응답에서 항목 배열을 안전하게 추출한다(items="" 또는 단일 객체 케이스 방어). */
+/** 항목 배열 안전 추출 — items="" 또는 단일 객체 케이스 방어. */
 export function extractForecastItems(
   response: ConcentrationForecastListResponse,
 ): KtoConcentrationForecastItem[] {
@@ -83,12 +84,12 @@ function parseBaseYmd(baseYmd: unknown): { forecastDate: string; predictedFor: D
   const day = raw.slice(6, 8);
   const forecastDate = `${year}-${month}-${day}`;
 
-  // KST 자정으로 고정해 UTC 변환 시 예측일이 하루 밀리지 않게 한다.
+  // KST 자정 고정 — UTC 변환 시 예측일이 하루 밀리지 않게
   const predictedFor = new Date(`${forecastDate}T00:00:00+09:00`);
   if (Number.isNaN(predictedFor.getTime())) {
     throw new ExternalApiResponseError(SERVICE, `Invalid baseYmd "${raw}"`);
   }
-  // new Date는 '20260231' 같은 날짜를 3월로 넘겨 해석하므로 달력 날짜와 재대조한다.
+  // new Date는 '20260231'을 3월로 넘겨 해석 → 달력 날짜와 재대조 필요
   const kstCheck = new Date(predictedFor.getTime() + 9 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
@@ -99,8 +100,8 @@ function parseBaseYmd(baseYmd: unknown): { forecastDate: string; predictedFor: D
 }
 
 /**
- * cnctrRate → 소수 문자열. Number로 유효성만 검증하고, 원본 정밀도를 잃지 않도록
- * 문자열 그대로 유지한다(Prisma Decimal에 문자열 전달).
+ * cnctrRate → 소수 문자열. Number로 유효성만 검증하고 원본 정밀도 보존을 위해
+ * 문자열 그대로 유지(Prisma Decimal에 문자열 전달).
  */
 function parseConcentrationRate(value: string | number | undefined): string {
   const raw = typeof value === 'number' ? String(value) : String(value ?? '').trim();

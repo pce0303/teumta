@@ -39,8 +39,8 @@ function resolveBaseUrl(): string {
 }
 
 /**
- * 서버 공통 envelope({ success, data, error })를 해석해 data만 반환한다.
- * 실패 시 서버 error.message를 담은 ApiError를 던진다. mock fallback은 없다.
+ * 서버 공통 envelope({ success, data, error }) 해석 후 data만 반환.
+ * 실패 시 서버 error.message를 담은 ApiError throw. mock fallback 없음.
  */
 export async function apiRequest<T>(
   path: string,
@@ -80,8 +80,8 @@ export async function apiRequest<T>(
   if (!response.ok || !body.success) {
     const errorBody = body.success ? null : body.error;
 
-    // 토큰 만료/무효 → 저장된 토큰 정리(RequireAuth가 로그인 화면으로 보낸다).
-    // 로그인 실패(INVALID_CREDENTIALS)는 화면에서 그대로 보여줘야 하므로 제외.
+    // 토큰 만료·무효 → 저장 토큰 정리(RequireAuth가 로그인 화면으로 이동)
+    // 로그인 실패(INVALID_CREDENTIALS)는 화면에 그대로 보여야 하므로 제외
     if (response.status === 401 && path !== '/admin/login') {
       clearToken();
     }
@@ -95,7 +95,7 @@ export async function apiRequest<T>(
   return body.data;
 }
 
-/** 화면 표시에 사용할 API 대상 호스트(설정 안내용). */
+/** 화면에 표시할 API 대상 호스트(설정 안내용). */
 export function getApiTargetLabel(): string {
   try {
     return new URL(resolveBaseUrl()).host;

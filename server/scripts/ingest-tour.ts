@@ -5,10 +5,10 @@
  *   npm run ingest:tour -- <mapX(경도)> <mapY(위도)> [radius(m, 기본 2000)] [--rows=20]
  *   예: npm run ingest:tour -- 126.977 37.5788 2000 --rows=100
  *
- * 지역기반(법정동, 집중률 예측 매칭용 관광지 확보에 사용):
+ * 지역기반(법정동 — 집중률 매칭용 관광지 확보):
  *   npm run ingest:tour -- --area --lDongRegnCd=11 --lDongSignguCd=110 [--contentTypeId=12] [--rows=100]
  *
- * 사전 조건: server/.env 에 DATABASE_URL, TOUR_API_KEY(및 TOUR_API_BASE_URL) 설정 + DB 기동.
+ * 사전 조건: server/.env에 DATABASE_URL, TOUR_API_KEY(및 TOUR_API_BASE_URL) + DB 기동.
  */
 import {
   ingestTourPlacesByArea,

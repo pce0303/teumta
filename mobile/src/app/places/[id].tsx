@@ -64,14 +64,14 @@ const REALTIME_LEVEL_LABEL: Record<RealtimeCongestion['level'], string> = {
   VERY_CROWDED: '매우 혼잡',
 };
 
-/** 중앙값 대비 오늘이 어느 쪽인지. KTO는 등급을 주지 않으므로 상대 표현만 쓴다. */
+/** 중앙값 대비 오늘의 위치. KTO는 등급 미제공이라 상대 표현만. */
 const FORECAST_TONE_TITLE: Record<ForecastTone, string> = {
   busy: '오늘은 평소보다 붐비는 날이에요',
   usual: '오늘은 평소와 비슷해요',
   quiet: '오늘은 평소보다 한산한 날이에요',
 };
 
-/** 측정 시각을 "15:40" 형태로. 값이 이상하면 표시하지 않는다. */
+/** 측정 시각 → "15:40". 값이 이상하면 미표시. */
 function measuredAtLabel(measuredAt: string | null): string | null {
   if (!measuredAt) {
     return null;
@@ -126,7 +126,7 @@ export default function PlaceDetailScreen() {
     setNearby([]);
     setForecast(null);
 
-    // TOUR 목적지도 서버가 TMAP POI로 매칭해 조회해 준다(api-spec 3.4a).
+    // TOUR 목적지도 서버가 TMAP POI로 매칭해 조회(api-spec 3.4a)
     setCongestionStatus('loading');
     getRealtimeCongestion(source === 'TOUR' ? { contentId: id } : { poiId: id })
       .then((data) => {
@@ -136,12 +136,12 @@ export default function PlaceDetailScreen() {
       })
       .catch((error: unknown) => {
         if (ignored) return;
-        // 404는 SK가 다루지 않는 장소 — 장애가 아니라 원래 제공되지 않는 데이터다.
+        // 404는 SK 미커버 장소 — 장애가 아니라 원래 없는 데이터
         const status = (error as { response?: { status?: number } }).response?.status;
         setCongestionStatus(status === 404 ? 'unavailable' : 'error');
       });
 
-    // 집중률 예측은 TourAPI 목적지에만 있다(관광지 단위 데이터).
+    // 집중률 예측은 TourAPI 목적지 전용(관광지 단위 데이터)
     if (source === 'TOUR') {
       getConcentrationForecast(id)
         .then((data) => {
@@ -150,7 +150,7 @@ export default function PlaceDetailScreen() {
           }
         })
         .catch(() => {
-          // 예측이 없는 장소도 많다. 실패하면 해당 섹션만 숨긴다.
+          // 예측 없는 장소도 많음 → 실패 시 해당 섹션만 숨김
         });
     }
 

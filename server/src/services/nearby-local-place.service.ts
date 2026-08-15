@@ -18,13 +18,14 @@ import {
 import { prisma } from '../utils/prisma';
 
 /**
- * 주변 로컬 장소 실시간 조회(TourAPI + TMAP). 공모전 기준상 관광정보는 DB에 저장하지 않으며,
- * prisma는 기준 관광지 읽기(findUnique)에만 사용한다. 실패 정책은 docs/api-spec.md §3.3b 참조.
+ * 주변 로컬 장소 실시간 조회(TourAPI + TMAP).
+ * 공모전 기준상 관광정보 DB 저장 없음 — prisma는 기준 관광지 읽기(findUnique)에만 사용.
+ * 실패 정책은 docs/api-spec.md §3.3b.
  */
 
 export const DEFAULT_RADIUS_METERS = 2000;
 export const MAX_RADIUS_METERS = 20_000;
-/** TMAP 호출량 제한: TourAPI 후보 중 가까운 순 최대 이 개수만 TMAP을 호출한다. */
+/** TMAP 호출량 제한 — 후보 중 가까운 순 최대 이 개수만 호출. */
 export const MAX_TOUR_CANDIDATES = 10;
 /** TMAP 동시 호출 제한. */
 export const TMAP_CONCURRENCY = 3;
@@ -96,8 +97,8 @@ export type NearbyLocalPlacesResult =
   | { status: 'SUCCESS'; places: NearbyLocalPlaceDto[] };
 
 /**
- * 사용자가 검색으로 결정한 목적지(TourAPI contentId) 기준 주변 로컬 장소 조회.
- * DB를 전혀 사용하지 않는다. contentId 상세 조회가 실패하거나 좌표가 없으면 NOT_FOUND.
+ * 목적지(TourAPI contentId) 기준 주변 로컬 장소 조회. DB 미사용.
+ * 상세 조회 실패·좌표 없음 → NOT_FOUND.
  */
 export async function getNearbyLocalPlacesByContentId(
   contentId: string,
@@ -113,14 +114,14 @@ export async function getNearbyLocalPlacesByContentId(
 }
 
 /**
- * TMAP POI 목적지(poiId) 기준 주변 로컬 장소 조회. 좌표는 서버가 POI 상세로 해석한다
- * (privacy: 좌표를 API 입력으로 받지 않는다 — docs/location-privacy.md).
+ * TMAP POI 목적지(poiId) 기준 주변 로컬 장소 조회.
+ * 좌표는 서버가 POI 상세로 해석 — API 입력으로 좌표를 받지 않기 위함(docs/location-privacy.md).
  */
 export async function getNearbyLocalPlacesByPoiId(
   poiId: string,
   radiusMeters: number = DEFAULT_RADIUS_METERS,
 ): Promise<NearbyLocalPlacesResult> {
-  // TMAP POI 목적지는 TourAPI contentId가 없어 자기 자신 제외 키가 없다('' = 제외 없음).
+  // TMAP POI 목적지는 contentId 없음 → 자기 자신 제외 키 없음('')
   const base = await resolveDestinationByPoiId(poiId);
   if (!base) {
     return { status: 'NOT_FOUND' };
@@ -130,7 +131,7 @@ export async function getNearbyLocalPlacesByPoiId(
   return { status: 'SUCCESS', places };
 }
 
-/** 내부 DB 관광지(Place id) 기준 주변 로컬 장소 조회. 기준 확인에만 DB를 읽는다. */
+/** 내부 DB 관광지(Place id) 기준 주변 로컬 장소 조회. 기준 확인에만 DB 읽기. */
 export async function getNearbyLocalPlacesRealtime(
   touristSpotId: number,
   radiusMeters: number = DEFAULT_RADIUS_METERS,
@@ -169,7 +170,7 @@ export async function getNearbyLocalPlacesRealtime(
   return { status: 'SUCCESS', places };
 }
 
-/** 목적지 기준점. 좌표는 서버가 식별자로 해석한 값이다(사용자 GPS 아님). */
+/** 목적지 기준점. 좌표는 서버가 식별자로 해석한 값(사용자 GPS 아님). */
 export interface DestinationBase {
   latitude: number;
   longitude: number;
@@ -178,7 +179,7 @@ export interface DestinationBase {
   contentId: string;
 }
 
-/** 후보 + 목적지로부터의 TMAP 실측 보행 거리·시간. 코스 조합에 쓰려고 원본 후보를 함께 남긴다. */
+/** 후보 + 목적지로부터의 TMAP 실측 거리·시간. 코스 조합용으로 원본 후보 유지. */
 export interface MeasuredNearbyPlace {
   candidate: NearbyLocalPlaceCandidate;
   /** TMAP 보행거리(m). 직선거리 아님. */
@@ -187,7 +188,7 @@ export interface MeasuredNearbyPlace {
   travelMinutes: number;
 }
 
-/** 목적지 상세를 해석해 기준점을 만든다. 좌표가 없으면 null. */
+/** 목적지 상세 → 기준점. 좌표 없으면 null. */
 export async function resolveDestinationByContentId(
   contentId: string,
 ): Promise<DestinationBase | null> {
@@ -203,7 +204,7 @@ export async function resolveDestinationByContentId(
   };
 }
 
-/** TMAP POI 목적지 해석. 좌표를 API 입력으로 받지 않기 위한 서버측 해석이다. */
+/** TMAP POI 목적지 해석 — 좌표를 API 입력으로 받지 않기 위한 서버측 처리. */
 export async function resolveDestinationByPoiId(poiId: string): Promise<DestinationBase | null> {
   const base = extractPoiBase(await fetchPoiDetail(poiId));
   if (!base) {
@@ -214,7 +215,7 @@ export async function resolveDestinationByPoiId(poiId: string): Promise<Destinat
 
 /**
  * 공용 코어: 후보 수집 → 선별 → TMAP 보행거리 측정.
- * 주변 장소 응답(3.3b)과 코스 생성이 같은 후보 집합을 공유한다.
+ * 3.3b 응답과 코스 생성이 후보 집합 공유.
  */
 export async function measureNearbyLocalPlaces(
   base: DestinationBase,
@@ -254,7 +255,7 @@ async function resolveBaseCoordinate(
 
 /**
  * contentTypeId별 locationBasedList2 결과 병합(중복·자기 자신 제외).
- * 일부 타입만 실패하면 성공분으로 진행, 전부 실패하면 첫 오류를 던진다.
+ * 일부 실패 → 성공분으로 진행, 전부 실패 → 첫 오류 전파.
  */
 async function fetchNearbyCandidates(
   base: { latitude: number; longitude: number },
@@ -302,7 +303,7 @@ async function fetchNearbyCandidates(
   return candidates;
 }
 
-/** TMAP 호출량 제한용 선별. dist(없으면 하버사인)는 선별에만 쓰고 응답에 노출하지 않는다. */
+/** TMAP 호출량 제한용 선별. dist(없으면 하버사인)는 선별 전용, 응답 미노출. */
 export function selectClosestCandidates(
   candidates: NearbyLocalPlaceCandidate[],
   base: { latitude: number; longitude: number },
@@ -399,7 +400,7 @@ export async function mapWithConcurrency<T, R>(
 
 const EARTH_RADIUS_METERS = 6_371_000;
 
-/** 하버사인 직선거리(m). 선별용 전용 — distanceMeters로 노출 금지. */
+/** 하버사인 직선거리(m). 선별 전용 — distanceMeters로 노출 금지. */
 function haversineMeters(
   latitude1: number,
   longitude1: number,

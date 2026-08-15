@@ -2,8 +2,8 @@ import { env } from '../config/env';
 import { ingestConcentrationForecasts } from './congestion-ingestion.service';
 
 /**
- * 집중률 예측 일일 자동 적재 스케줄러(외부 의존성 없음, setTimeout 체인).
- * KTO 집중률 API가 일 1회 갱신이므로 하루 한 번(KST 지정 시각) + 서버 기동 직후 1회 실행한다.
+ * 집중률 예측 일일 자동 적재 스케줄러. 외부 의존성 없이 setTimeout 체인.
+ * KTO가 일 1회 갱신이라 하루 한 번(KST 지정 시각) + 서버 기동 직후 1회.
  * 대상은 PREDICTION_INGEST_TARGETS("areaCd:signguCd,...")로 지정, 비우면 비활성.
  */
 
@@ -12,7 +12,7 @@ export interface IngestTarget {
   signguCd: string;
 }
 
-/** "11:11110,26:26350" → 대상 목록. 형식이 어긋난 항목은 무시한다. */
+/** "11:11110,26:26350" → 대상 목록. 형식 불량 항목은 무시. */
 export function parseIngestTargets(raw: string): IngestTarget[] {
   return raw
     .split(',')
@@ -39,7 +39,7 @@ export function msUntilNextKstHour(hourKst: number, now: Date = new Date()): num
   return next.getTime() - kstNow.getTime();
 }
 
-/** 대상 전체를 순차 적재한다. 개별 실패는 다음 대상으로 넘어간다(스케줄 중단 없음). */
+/** 대상 전체 순차 적재. 개별 실패는 다음 대상으로 — 스케줄 중단 없음. */
 export async function runPredictionIngest(targets: IngestTarget[]): Promise<void> {
   for (const target of targets) {
     try {
@@ -50,7 +50,7 @@ export async function runPredictionIngest(targets: IngestTarget[]): Promise<void
           `unmatched ${result.unmatched.length}, ambiguous ${result.ambiguous.length}`,
       );
     } catch (error) {
-      // 오류 message에는 키/URL이 포함되지 않는다(외부 오류 계층 설계).
+      // 오류 message에 키·URL 미포함(외부 오류 계층 설계)
       console.error(
         `[prediction-scheduler] areaCd=${target.areaCd} signguCd=${target.signguCd} 실패:`,
         error instanceof Error ? error.message : error,
@@ -59,7 +59,7 @@ export async function runPredictionIngest(targets: IngestTarget[]): Promise<void
   }
 }
 
-/** 서버 기동 시 호출. 대상이 없으면 아무것도 하지 않는다. */
+/** 서버 기동 시 호출. 대상 없으면 no-op. */
 export function startPredictionIngestScheduler(): void {
   const targets = parseIngestTargets(env.PREDICTION_INGEST_TARGETS);
   if (targets.length === 0) {
@@ -70,7 +70,7 @@ export function startPredictionIngestScheduler(): void {
     `[prediction-scheduler] 활성화: ${targets.length}개 지역, 매일 ${env.PREDICTION_INGEST_HOUR_KST}시(KST)`,
   );
 
-  // 기동 직후 1회(비차단) — 시연/재기동 시 최신 데이터 확보.
+  // 기동 직후 1회, 비차단 — 시연·재기동 시 최신 데이터 확보
   void runPredictionIngest(targets);
 
   const scheduleNext = () => {

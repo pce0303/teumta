@@ -1,27 +1,27 @@
 /**
- * 한국관광공사 TourAPI (KorService2) 원본 응답 타입.
+ * 한국관광공사 TourAPI(KorService2) 원본 응답 타입.
  *
  * 출처: 공공데이터포털 "한국관광공사_국문 관광정보 서비스" 공식 매뉴얼 v4.4 기준.
  *
  * 응답 공통 구조:
  *   { response: { header: {...}, body: { items: {...} | "", numOfRows, pageNo, totalCount } } }
- * - totalCount 가 0이면 items 가 빈 문자열("")로 오는 알려진 케이스가 있다.
- * - 결과가 1건이면 item 이 배열이 아닌 단일 객체로 올 수 있어 방어가 필요하다(mapper에서 처리).
- * - 숫자 필드(numOfRows/totalCount 등)가 문자열로 오는 경우가 있어 number | string 으로 둔다.
+ * - totalCount 0 → items가 빈 문자열("")로 오는 케이스 있음
+ * - 결과 1건 → item이 배열 아닌 단일 객체 가능(mapper에서 방어)
+ * - 숫자 필드(numOfRows/totalCount 등)가 문자열로 오는 경우 있어 number | string
  *
- * v4.4 주의: 기존 areacode/sigungucode/cat1~cat3 대신 법정동 코드(lDongRegnCd/lDongSignguCd)와
- * 분류체계(lclsSystm1~3)가 최신 필드다. 내부 로직은 최신 필드에만 의존한다.
+ * v4.4 주의: 구 areacode/sigungucode/cat1~cat3 대신 법정동 코드(lDongRegnCd/lDongSignguCd) +
+ * 분류체계(lclsSystm1~3)가 최신 필드. 내부 로직은 최신 필드에만 의존.
  */
 
 export interface TourApiHeader {
-  /** '0000' 이면 정상. 그 외는 오류 코드(예: '30' 미등록 키, '22' 요청제한 초과). */
+  /** '0000'이 정상. 그 외 오류 코드(예: '30' 미등록 키, '22' 요청제한 초과). */
   resultCode: string;
   resultMsg: string;
 }
 
 /**
  * areaBasedList2 / locationBasedList2 등의 개별 장소 항목.
- * 알려진 필드만 명시하고, 나머지는 확장 허용한다.
+ * 알려진 필드만 명시, 나머지는 확장 허용.
  */
 export interface TourApiPlaceItem {
   /** 콘텐츠 ID. 내부 Place.tourApiContentId(unique)와 매칭. */
@@ -32,9 +32,9 @@ export interface TourApiPlaceItem {
   addr1?: string;
   addr2?: string;
   zipcode?: string;
-  /** 경도(longitude). 문자열로 온다. 빈 문자열("")로 오는 경우가 있다. */
+  /** 경도. 문자열로 옴, 빈 문자열("") 가능. */
   mapx?: string;
-  /** 위도(latitude). 문자열로 온다. 빈 문자열("")로 오는 경우가 있다. */
+  /** 위도. 문자열로 옴, 빈 문자열("") 가능. */
   mapy?: string;
   firstimage?: string;
   firstimage2?: string;
@@ -43,7 +43,7 @@ export interface TourApiPlaceItem {
   /** 지도 레벨. */
   mlevel?: string;
   tel?: string;
-  /** locationBasedList2 응답에만 존재(중심점으로부터 거리, m). */
+  /** locationBasedList2 응답 전용(중심점으로부터 거리, m). */
   dist?: string;
   createdtime?: string;
   modifiedtime?: string;
@@ -67,15 +67,15 @@ export interface TourApiPlaceItem {
 
 /**
  * detailCommon2 응답의 상세 항목.
- * 기준 관광지의 "현재 좌표"를 실시간으로 얻는 용도로 사용한다(mapinfoYN=Y).
+ * 기준 관광지의 현재 좌표를 실시간으로 얻는 용도(mapinfoYN=Y).
  */
 export interface TourApiDetailItem {
   contentid: string;
   contenttypeid?: string;
   title?: string;
-  /** 경도(longitude). 문자열로 온다. */
+  /** 경도. 문자열로 옴. */
   mapx?: string;
-  /** 위도(latitude). 문자열로 온다. */
+  /** 위도. 문자열로 옴. */
   mapy?: string;
   addr1?: string;
   addr2?: string;
@@ -100,7 +100,7 @@ export interface TourApiDetailResponse {
 }
 
 export interface TourApiListBody {
-  /** 결과가 없으면 빈 문자열("")로 오는 케이스가 있다. */
+  /** 결과 없으면 빈 문자열("") 가능. */
   items: { item: TourApiPlaceItem | TourApiPlaceItem[] } | '';
   numOfRows: number | string;
   pageNo: number | string;
