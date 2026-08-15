@@ -9,6 +9,7 @@ import {
   getNearbyLocalPlaces,
   getRealtimeCongestion,
 } from '@/api/places';
+import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
@@ -409,11 +410,12 @@ export default function PlaceDetailScreen() {
                     },
                   })
                 }>
-                {place.imageUrl ? (
-                  <Image source={{ uri: place.imageUrl }} style={styles.nearbyThumb} />
-                ) : (
-                  <View style={styles.nearbyThumb} />
-                )}
+                <PlaceThumbnail
+                  imageUrl={place.imageUrl}
+                  category={place.category}
+                  variant="card"
+                  style={styles.nearbyThumb}
+                />
                 <View style={styles.nearbyTexts}>
                   <Text style={styles.nearbyName}>{place.name}</Text>
                   <Text style={styles.nearbyMeta}>
