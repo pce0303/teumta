@@ -1,10 +1,13 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { getLocalPlaceDetail } from '@/api/places';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
+import type { LocalPlaceDetail } from '@/types/place';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
 
 const STATUS_BAR_TINT = '#CCE8DB';
@@ -17,6 +20,8 @@ const HERO_BAND = '#1C4738';
  * 목록 화면에서 표시용 값을 그대로 넘겨받아 렌더링.
  */
 type LocalPlaceParams = {
+  /** TourAPI 콘텐츠 식별자. 소개문 조회 키 — 없으면 소개 섹션을 띄우지 않는다. */
+  contentId?: string;
   name?: string;
   address?: string;
   latitude?: string;
@@ -43,6 +48,31 @@ export default function LocalPlaceDetailScreen() {
   const latitude = Number(params.latitude);
   const longitude = Number(params.longitude);
   const hasCoordinate = Number.isFinite(latitude) && Number.isFinite(longitude);
+
+  const [detail, setDetail] = useState<LocalPlaceDetail | null>(null);
+
+  // 소개문은 목록에 없다. 화면에 실제로 들어온 1곳만 상세로 조회한다(외부 API 쿼터).
+  const contentId = params.contentId;
+  useEffect(() => {
+    if (!contentId) {
+      return;
+    }
+    let ignored = false;
+
+    getLocalPlaceDetail(contentId)
+      .then((data) => {
+        if (!ignored) {
+          setDetail(data);
+        }
+      })
+      .catch(() => {
+        // 소개가 없는 장소도 있다. 실패하면 해당 섹션만 숨긴다.
+      });
+
+    return () => {
+      ignored = true;
+    };
+  }, [contentId]);
 
   if (!params.name || !hasCoordinate) {
     return (
@@ -103,8 +133,22 @@ export default function LocalPlaceDetailScreen() {
             </View>
           </View>
 
+          {detail?.overview ? (
+            <>
+              <Text style={styles.sectionTitle}>어떤 곳인가요</Text>
+              <Text style={styles.overview}>{detail.overview}</Text>
+            </>
+          ) : null}
+
           <Text style={styles.sectionTitle}>주소</Text>
           <Text style={styles.description}>{params.address ?? '주소 정보가 없어요.'}</Text>
+
+          {detail?.tel ? (
+            <>
+              <Text style={styles.sectionTitle}>연락처</Text>
+              <Text style={styles.description}>{detail.tel}</Text>
+            </>
+          ) : null}
 
           <View style={styles.emptyBox}>
             <Text style={styles.emptyBoxText}>
@@ -265,6 +309,11 @@ const styles = StyleSheet.create({
     color: Teumta.textSecondary,
     fontSize: 12,
     lineHeight: 19,
+  },
+  overview: {
+    color: Teumta.textPrimary,
+    fontSize: 13,
+    lineHeight: 21,
   },
   emptyBox: {
     backgroundColor: '#F7F9F8',

@@ -4,6 +4,7 @@ import { PlaceType } from '@prisma/client';
 import {
   DEFAULT_RADIUS_METERS,
   MAX_RADIUS_METERS,
+  getLocalPlaceDetail,
   getNearbyLocalPlacesByContentId,
   getNearbyLocalPlacesByPoiId,
   getNearbyLocalPlacesRealtime,
@@ -192,6 +193,48 @@ export const getNearbyLocalPlacesByContentIdController: RequestHandler = async (
       data: result.places,
       error: null,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 로컬 장소 소개 조회(3.3c). 상세 화면 진입 시 1회.
+ *
+ * 목록(3.3b)에는 소개문이 없어 이름·거리만으로 판단해야 했다. 목록에 붙이면
+ * 항목 수만큼 외부 호출이 늘어 쿼터가 감당되지 않으므로 여기서만 부른다.
+ */
+export const getLocalPlaceDetailController: RequestHandler = async (req, res, next) => {
+  try {
+    const contentId = req.query.contentId;
+
+    if (typeof contentId !== 'string' || contentId.trim().length === 0) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'INVALID_CONTENT_ID',
+          message: 'contentId는 비어 있지 않은 문자열이어야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const detail = await getLocalPlaceDetail(contentId.trim());
+
+    if (!detail) {
+      res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'LOCAL_PLACE_NOT_FOUND',
+          message: '장소 정보를 찾을 수 없습니다.',
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({ success: true, data: detail, error: null });
   } catch (error) {
     next(error);
   }

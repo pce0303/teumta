@@ -72,8 +72,28 @@ export interface DestinationSearchResult {
   placeId: number | null;
 }
 
+/**
+ * 로컬 장소 소개 정보(detailCommon2). 상세 화면 진입 시 1회만 조회한다.
+ *
+ * 목록에 붙이면 항목 수만큼 외부 호출이 늘어 쿼터가 감당되지 않는다
+ * (주변 장소 10곳 × 조회 수). 사용자가 실제로 연 1곳만 부른다.
+ */
+export interface LocalPlaceDetailData {
+  tourApiContentId: string;
+  name: string | null;
+  /** 소개문. HTML 정리 후 평문. */
+  overview: string | null;
+  tel: string | null;
+  homepage: string | null;
+}
+
 /** 주변 로컬 장소 응답 항목. distanceMeters는 직선거리 아닌 TMAP 실측 보행거리. */
 export interface NearbyLocalPlaceDto {
+  /**
+   * TourAPI 콘텐츠 식별자. 상세 소개 조회(3.3c) 키.
+   * 공공데이터 식별자이며 내부 id가 아니다 — 검색 응답(3.2)도 같은 값을 노출한다.
+   */
+  tourApiContentId: string;
   name: string;
   address: string | null;
   latitude: number;

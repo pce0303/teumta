@@ -396,6 +396,7 @@ export default function PlaceDetailScreen() {
                     pathname: '/local-places/[id]',
                     params: {
                       id: place.name,
+                      contentId: place.tourApiContentId,
                       name: place.name,
                       latitude: String(place.latitude),
                       longitude: String(place.longitude),

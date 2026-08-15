@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 import type {
   ConcentrationForecast,
+  LocalPlaceDetail,
   NearbyLocalPlaceResult,
   Place,
   RealtimeCongestion,
@@ -44,6 +45,18 @@ export async function getConcentrationForecast(
     '/concentration-forecast',
     { params: { contentId } },
   );
+  return response.data.data;
+}
+
+/**
+ * GET /api/local-places/detail — 로컬 장소 소개(TourAPI detailCommon2).
+ *
+ * 상세 화면 진입 시 1회만 부른다. 목록 화면에서 항목마다 부르면 외부 API 쿼터가 감당되지 않는다.
+ */
+export async function getLocalPlaceDetail(contentId: string): Promise<LocalPlaceDetail> {
+  const response = await apiClient.get<{ data: LocalPlaceDetail }>('/local-places/detail', {
+    params: { contentId },
+  });
   return response.data.data;
 }
 

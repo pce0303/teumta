@@ -1,6 +1,10 @@
 import { PlaceType } from '@prisma/client';
 
-import type { NearbyLocalPlaceCandidate, NearbyLocalPlaceDto } from '../dtos';
+import type {
+  LocalPlaceDetailData,
+  NearbyLocalPlaceCandidate,
+  NearbyLocalPlaceDto,
+} from '../dtos';
 import { ExternalApiError } from '../external/common';
 import {
   extractPoiBase,
@@ -13,6 +17,7 @@ import {
   extractDetailItem,
   fetchTourPlaceDetail,
   fetchTourPlacesByLocation,
+  mapLocalPlaceDetail,
   mapNearbyCandidateList,
 } from '../external/tour';
 import { prisma } from '../utils/prisma';
@@ -168,6 +173,18 @@ export async function getNearbyLocalPlacesRealtime(
     radiusMeters,
   );
   return { status: 'SUCCESS', places };
+}
+
+/**
+ * 로컬 장소 소개 조회(3.3c). 상세 화면에서 1회만 부른다.
+ *
+ * 목록(3.3b)에는 소개문이 없어 이름·거리만으로 "가볼지"를 판단해야 했다.
+ * 목록에 붙이면 항목 수만큼 호출이 늘어 쿼터가 감당되지 않으므로 상세 진입 시에만 조회한다.
+ */
+export async function getLocalPlaceDetail(
+  contentId: string,
+): Promise<LocalPlaceDetailData | null> {
+  return mapLocalPlaceDetail(await fetchTourPlaceDetail(contentId));
 }
 
 /** 목적지 기준점. 좌표는 서버가 식별자로 해석한 값(사용자 GPS 아님). */
@@ -354,13 +371,19 @@ async function resolveWalkingDistances(
     .sort((a, b) => a.distanceMeters - b.distanceMeters);
 }
 
-/** 응답 DTO 변환. tourApiContentId는 정책상 미노출. */
+/**
+ * 응답 DTO 변환.
+ *
+ * `tourApiContentId`는 상세 소개 조회(3.3c) 키라 노출한다. 공공데이터 식별자이며
+ * 검색 응답(3.2)도 같은 값을 이미 내려주고 있다 — 내부 DB id는 여전히 노출하지 않는다.
+ */
 export function toNearbyLocalPlaceDto(
   candidate: NearbyLocalPlaceCandidate,
   distanceMeters: number,
   travelTimeMinutes: number,
 ): NearbyLocalPlaceDto {
   return {
+    tourApiContentId: candidate.tourApiContentId,
     name: candidate.name,
     address: candidate.address,
     latitude: candidate.latitude,

@@ -6,6 +6,7 @@ import type { TourApiListResponse, TourApiPlaceItem } from './tour.dto';
 import {
   extractItems,
   mapContentTypeIdToPlaceType,
+  mapLocalPlaceDetail,
   mapTourPlaceList,
   mapTourPlaceListDetailed,
   mapTourPlaceToPlaceData,
@@ -173,5 +174,51 @@ describe('mapTourPlaceList', () => {
     const result = mapTourPlaceList(res);
     expect(result.map((p) => p.tourApiContentId)).toEqual(['1', '2']);
     expect(result[1].type).toBe(PlaceType.LOCAL_PLACE);
+  });
+});
+
+describe('mapLocalPlaceDetail', () => {
+  const detail = (item: Record<string, unknown> | null) =>
+    ({
+      response: {
+        header: { resultCode: '0000', resultMsg: 'OK' },
+        body: {
+          items: item === null ? '' : { item },
+          numOfRows: 1,
+          pageNo: 1,
+          totalCount: item === null ? 0 : 1,
+        },
+      },
+    }) as unknown as Parameters<typeof mapLocalPlaceDetail>[0];
+
+  it('소개문의 HTML 태그와 엔티티를 걷어낸다', () => {
+    const result = mapLocalPlaceDetail(
+      detail({
+        contentid: '100',
+        title: '아키비스트 서촌',
+        overview: '<p>고소한 커피와<br>시그니처 아인슈페너</p>&nbsp;&amp; 디저트',
+      }),
+    );
+    expect(result?.overview).toBe('고소한 커피와\n시그니처 아인슈페너 & 디저트');
+    expect(result?.name).toBe('아키비스트 서촌');
+  });
+
+  it('homepage는 앵커 태그에서 URL만 꺼낸다', () => {
+    const result = mapLocalPlaceDetail(
+      detail({
+        contentid: '100',
+        homepage: '<a href="https://example.com" target="_blank">공식 홈페이지</a>',
+      }),
+    );
+    expect(result?.homepage).toBe('https://example.com');
+  });
+
+  it('빈 소개문은 null (빈 문자열을 그대로 내리지 않는다)', () => {
+    const result = mapLocalPlaceDetail(detail({ contentid: '100', overview: '<br> ' }));
+    expect(result?.overview).toBeNull();
+  });
+
+  it('항목이 없으면 null', () => {
+    expect(mapLocalPlaceDetail(detail(null))).toBeNull();
   });
 });
