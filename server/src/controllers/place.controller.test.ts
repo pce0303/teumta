@@ -87,4 +87,25 @@ describe('getPlacesController', () => {
         expect(res.statusCode).toBe(400);
         expect(getPlacesMock).not.toHaveBeenCalled();
     });
+
+    it('tag가 배열이면 400을 반환한다', async () => {
+        const req = makeReq({
+            tag: ['카페', '맛집'],
+        });
+        const res = makeRes();
+        const next = vi.fn();
+
+        await getPlacesController(req, res, next);
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body).toEqual({
+            success: false,
+            data: null,
+            error: {
+                code: 'INVALID_TAG',
+                message: 'tag는 비어 있지 않은 문자열이어야 합니다.',
+            },
+        });
+        expect(getPlacesMock).not.toHaveBeenCalled();
+    });
 });

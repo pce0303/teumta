@@ -48,6 +48,7 @@ export const getPlacesController: RequestHandler = async (
         success: false,
         data: null,
         error: {
+          code: 'INVALID_TYPE',
           message:
             'type은 TOURIST_SPOT 또는 LOCAL_PLACE여야 합니다.',
         },
@@ -63,6 +64,7 @@ export const getPlacesController: RequestHandler = async (
         success: false,
         data: null,
         error: {
+          code: 'INVALID_TAG',
           message: 'tag는 비어 있지 않은 문자열이어야 합니다.',
         },
       });
