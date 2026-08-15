@@ -404,6 +404,7 @@ export default function PlaceDetailScreen() {
                       destinationName: name,
                       ...(place.address ? { address: place.address } : {}),
                       ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
+                      ...(place.category ? { category: place.category } : {}),
                     },
                   })
                 }>
@@ -415,7 +416,9 @@ export default function PlaceDetailScreen() {
                 <View style={styles.nearbyTexts}>
                   <Text style={styles.nearbyName}>{place.name}</Text>
                   <Text style={styles.nearbyMeta}>
-                    도보 {place.travelTimeMinutes}분 · {place.distanceMeters}m
+                    {/* 어떤 곳인지 먼저 보여야 갈지 말지 판단할 수 있다. */}
+                    {place.category ? `${place.category} · ` : ''}도보 {place.travelTimeMinutes}분 ·{' '}
+                    {place.distanceMeters}m
                   </Text>
                 </View>
               </Pressable>

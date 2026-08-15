@@ -57,6 +57,11 @@ export interface TourApiPlaceItem {
   lclsSystm2?: string;
   /** 분류체계 3Depth. */
   lclsSystm3?: string;
+  /**
+   * 구 분류코드 3Depth(예: A05020900 카페·찻집). v4.4 요청 파라미터에서는 빠졌지만
+   * 응답에는 계속 들어온다. 세부 분류 라벨은 공식 코드표가 있는 이 값을 쓴다.
+   */
+  cat3?: string;
   [key: string]: unknown;
 }
 

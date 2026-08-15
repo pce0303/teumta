@@ -41,6 +41,8 @@ export interface NearbyLocalPlaceCandidate {
   tourApiContentId: string;
   /** TourAPI 분류(14 문화시설 / 38 쇼핑 / 39 음식점). 코스 체류시간 기본값 산정에 쓴다. */
   contentTypeId: string | null;
+  /** 세부 분류코드(cat3, 예: A05020900 카페·찻집). 표시용 라벨 산정에 쓴다. */
+  categoryCode: string | null;
   name: string;
   address: string | null;
   latitude: number;
@@ -79,6 +81,8 @@ export interface NearbyLocalPlaceDto {
   latitude: number;
   longitude: number;
   imageUrl: string | null;
+  /** 분류 라벨(문화시설/쇼핑/음식점). 알 수 없으면 null. */
+  category: string | null;
   /** TMAP 보행거리(m). */
   distanceMeters: number;
   /** TMAP 보행시간(분, ceil). */

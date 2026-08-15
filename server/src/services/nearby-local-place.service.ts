@@ -32,6 +32,61 @@ export const TMAP_CONCURRENCY = 3;
 /** 로컬 장소 후보로 볼 TourAPI contentTypeId. 14=문화시설, 38=쇼핑, 39=음식점. */
 const LOCAL_CANDIDATE_CONTENT_TYPE_IDS = ['14', '38', '39'] as const;
 
+/**
+ * 세부 분류코드(cat3) → 화면 표시용 라벨.
+ *
+ * 이름과 거리만으로는 "가볼지" 판단이 안 된다. "음식점"보다 "카페", "쇼핑"보다 "공예·공방"이
+ * 훨씬 많은 것을 말해 준다. cat3는 목록 응답에 함께 오므로 추가 호출이 없다.
+ *
+ * 아래 매핑은 서울 종로·부산 해운대·전주 한옥마을·제주 성산에서 실제 응답을 뽑아 확인한 값이다.
+ * 표에 없는 코드는 임의로 라벨을 만들지 않고 대분류로 떨어뜨린다.
+ */
+const CATEGORY_BY_CAT3: Record<string, string> = {
+  // A05 음식
+  A05020100: '한식',
+  A05020200: '양식',
+  A05020300: '일식',
+  A05020400: '중식',
+  A05020700: '이색음식',
+  A05020900: '카페·찻집',
+  // A04 쇼핑
+  A04010100: '5일장',
+  A04010200: '전통시장',
+  A04010300: '백화점',
+  A04010600: '전문매장·상가',
+  A04010700: '공예·공방',
+  A04010900: '특산물',
+  A04011200: '거리·상권',
+  // A02 문화시설
+  A02060100: '박물관',
+  A02060200: '기념관',
+  A02060300: '전시관',
+  A02060400: '컨벤션',
+  A02060500: '미술관·갤러리',
+  A02060600: '공연장',
+  A02060700: '문화원',
+  A02060900: '도서관',
+  A02061000: '서점',
+};
+
+/** cat3가 없거나 표에 없을 때 쓰는 대분류. */
+const CATEGORY_BY_CONTENT_TYPE_ID: Record<string, string> = {
+  '14': '문화시설',
+  '38': '쇼핑',
+  '39': '음식점',
+};
+
+/** 세부 분류 우선, 없으면 대분류, 둘 다 모르면 null(임의 라벨 금지). */
+export function resolveCategoryLabel(
+  categoryCode: string | null,
+  contentTypeId: string | null,
+): string | null {
+  if (categoryCode && CATEGORY_BY_CAT3[categoryCode]) {
+    return CATEGORY_BY_CAT3[categoryCode];
+  }
+  return contentTypeId ? CATEGORY_BY_CONTENT_TYPE_ID[contentTypeId] ?? null : null;
+}
+
 const NUM_OF_ROWS_PER_TYPE = 20;
 
 export type NearbyLocalPlacesResult =
@@ -310,6 +365,7 @@ export function toNearbyLocalPlaceDto(
     latitude: candidate.latitude,
     longitude: candidate.longitude,
     imageUrl: candidate.imageUrl,
+    category: resolveCategoryLabel(candidate.categoryCode, candidate.contentTypeId),
     distanceMeters,
     travelTimeMinutes,
   };
