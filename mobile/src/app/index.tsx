@@ -7,10 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import {
+  AVAILABLE_REGIONS,
   destinationsInRegion,
-  HOME_REGIONS,
   type FeaturedDestination,
-  type HomeRegion,
+  type Region,
 } from '@/constants/destinations';
 import { Teumta } from '@/constants/theme';
 
@@ -22,12 +22,14 @@ function detailHref(destination: FeaturedDestination) {
       id: destination.tourApiContentId,
       source: 'TOUR',
       name: destination.name,
+      ...(destination.imageUrl ? { imageUrl: destination.imageUrl } : {}),
     },
   };
 }
 
 export default function HomeScreen() {
-  const [region, setRegion] = useState<HomeRegion>('전체');
+  // null = 전체
+  const [region, setRegion] = useState<Region | null>(null);
   const destinations = destinationsInRegion(region);
   const [featured, ...restDestinations] = destinations;
   const regionDestinations = restDestinations.slice(0, 2);
@@ -64,8 +66,18 @@ export default function HomeScreen() {
           </Pressable>
         </Link>
 
-        <View style={styles.chipRow}>
-          {HOME_REGIONS.map((item) => {
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}>
+          <Pressable
+            onPress={() => setRegion(null)}
+            style={[styles.chip, region === null && styles.chipSelected]}>
+            <Text style={[styles.chipLabel, region === null && styles.chipLabelSelected]}>
+              전체
+            </Text>
+          </Pressable>
+          {AVAILABLE_REGIONS.map((item) => {
             const selected = item === region;
             return (
               <Pressable
@@ -76,10 +88,10 @@ export default function HomeScreen() {
               </Pressable>
             );
           })}
-        </View>
+        </ScrollView>
 
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>지금 인기 있는 관광지</Text>
+          <Text style={styles.sectionTitle}>붐비기 쉬운 대표 관광지</Text>
           <Link href={'/search' as Href} asChild>
             <Pressable>
               <Text style={styles.sectionAction}>전체 보기</Text>
@@ -90,7 +102,15 @@ export default function HomeScreen() {
         {featured && (
           <Link href={detailHref(featured)} asChild>
             <Pressable style={styles.featuredCard}>
-              <View style={styles.featuredImage} />
+              {featured.imageUrl ? (
+                <Image
+                  source={{ uri: featured.imageUrl }}
+                  style={styles.featuredImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.featuredImage} />
+              )}
               <View style={styles.featuredBody}>
                 <View style={styles.featuredTexts}>
                   <Text style={styles.featuredName}>{featured.name}</Text>
@@ -104,14 +124,22 @@ export default function HomeScreen() {
         )}
 
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>다른 지역도 둘러보기</Text>
+          <Text style={styles.sectionTitle}>함께 둘러보기</Text>
         </View>
 
         <View style={styles.regionRow}>
           {regionDestinations.map((destination) => (
             <Link key={destination.tourApiContentId} href={detailHref(destination)} asChild>
               <Pressable style={styles.regionCard}>
-                <View style={styles.regionImage} />
+                {destination.imageUrl ? (
+                  <Image
+                    source={{ uri: destination.imageUrl }}
+                    style={styles.regionImage}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={styles.regionImage} />
+                )}
                 <View style={styles.regionBody}>
                   <Text style={styles.regionName}>{destination.name}</Text>
                   <Text style={styles.regionMeta}>{destination.areaLabel}</Text>
