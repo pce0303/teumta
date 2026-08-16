@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchCourses } from '@/api/courses';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
+import { useCourseLog } from '@/hooks/use-course-log';
 import { setSelectedCourse } from '@/stores/selected-course';
 import {
   courseDistanceMeters,
@@ -138,6 +139,7 @@ export default function DetoursScreen() {
   const { contentId, poiId, name } = useLocalSearchParams<DetoursParams>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { logViewedCourse } = useCourseLog();
 
   const [availableMinutes, setAvailableMinutes] =
     useState<(typeof DURATION_OPTIONS)[number]>(60);
@@ -195,12 +197,15 @@ export default function DetoursScreen() {
       return;
     }
 
-    setSelectedCourse({
+    const selected = {
       destination,
       course,
       availableMinutes,
       destinationParams: identifier,
-    });
+    };
+    setSelectedCourse(selected);
+    // 내 여행 탭 "최근 본 코스"에 기기 전용으로 남긴다 — 앱을 껐다 켜도 재진입 가능.
+    logViewedCourse(selected);
     router.push('/course-map');
   };
 
