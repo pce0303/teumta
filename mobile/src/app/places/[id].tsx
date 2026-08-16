@@ -641,8 +641,8 @@ const styles = StyleSheet.create({
   },
   measuredAt: {
     color: Teumta.textTertiary,
-    fontSize: 9,
-    lineHeight: 12,
+    fontSize: 10,
+    lineHeight: 13,
   },
   forecastCard: {
     backgroundColor: Teumta.surface,
@@ -693,8 +693,8 @@ const styles = StyleSheet.create({
   },
   forecastDayLabel: {
     color: Teumta.textTertiary,
-    fontSize: 8,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 13,
   },
   forecastDayLabelStrong: {
     color: Teumta.textPrimary,
@@ -745,8 +745,8 @@ const styles = StyleSheet.create({
   },
   nearbyMeta: {
     color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
   },
   attribution: {
     marginTop: 4,

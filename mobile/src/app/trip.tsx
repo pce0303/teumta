@@ -610,8 +610,8 @@ const styles = StyleSheet.create({
   },
   statusSubtitle: {
     color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
   },
   easedBanner: {
     alignItems: 'center',
@@ -661,9 +661,9 @@ const styles = StyleSheet.create({
   },
   progressChipLabel: {
     color: Teumta.textTertiary,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 14,
   },
   progressChipLabelActive: {
     color: Teumta.greenDark,
@@ -703,8 +703,8 @@ const styles = StyleSheet.create({
   },
   noticeBody: {
     color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
   },
   statsRow: {
     flexDirection: 'row',
@@ -723,8 +723,8 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     color: Teumta.textTertiary,
-    fontSize: 8,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 13,
   },
   statValue: {
     color: Teumta.textPrimary,

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Onboarding } from '@/components/onboarding';
 import { QuietNow } from '@/components/quiet-now';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
@@ -39,6 +40,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
+      <Onboarding />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -353,7 +355,7 @@ const styles = StyleSheet.create({
   },
   regionMeta: {
     color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
   },
 });

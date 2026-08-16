@@ -12,6 +12,7 @@ import {
 
 import { searchPlaces } from '@/api/places';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
+import { Teumta } from '@/constants/theme';
 import type { SearchPlaceResult } from '@/types/place';
 import {
   MAX_RECENT_SEARCHES,
@@ -95,7 +96,7 @@ export default function SearchScreen() {
           onSubmitEditing={() => void runSearch(keyword)}
           returnKeyType="search"
           placeholder="관광지, 지역, 테마 검색"
-          placeholderTextColor="#7b8490"
+          placeholderTextColor={Teumta.textTertiary}
           style={styles.searchInput}
         />
         <Pressable style={styles.searchButton} onPress={() => void runSearch(keyword)}>
@@ -193,9 +194,10 @@ export default function SearchScreen() {
   );
 }
 
+// 다른 화면과 같은 Teumta 토큰만 쓴다 — 이 화면만 초기 프로토타입 색이 남아 이질적이었다.
 const styles = StyleSheet.create({
   container: {
-    gap: 18,
+    gap: 16,
     padding: 20,
   },
   searchRow: {
@@ -203,30 +205,30 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchInput: {
-    backgroundColor: '#ffffff',
-    borderColor: '#d4d9df',
-    borderRadius: 8,
+    backgroundColor: Teumta.surface,
+    borderColor: Teumta.border,
+    borderRadius: 14,
     borderWidth: 1,
-    color: '#111827',
+    color: Teumta.textPrimary,
     flex: 1,
-    fontSize: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    fontSize: 14,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
   },
   searchButton: {
     alignItems: 'center',
-    backgroundColor: '#1f7a68',
-    borderRadius: 8,
+    backgroundColor: Teumta.green,
+    borderRadius: 14,
     justifyContent: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 17,
   },
   searchButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
+    color: Teumta.surface,
+    fontSize: 13,
     fontWeight: '700',
   },
   shortcutSection: {
-    gap: 10,
+    gap: 9,
   },
   shortcutHeader: {
     alignItems: 'center',
@@ -234,14 +236,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   shortcutTitle: {
-    color: '#121417',
+    color: Teumta.textPrimary,
     fontSize: 14,
     fontWeight: '700',
+    lineHeight: 20,
   },
   shortcutClear: {
-    color: '#687384',
-    fontSize: 12,
+    color: Teumta.greenDark,
+    fontSize: 11,
     fontWeight: '700',
+    lineHeight: 15,
   },
   chipWrap: {
     flexDirection: 'row',
@@ -249,49 +253,54 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: '#ffffff',
-    borderColor: '#d4d9df',
+    backgroundColor: Teumta.surface,
+    borderColor: Teumta.border,
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 13,
     paddingVertical: 8,
   },
   chipLabel: {
-    color: '#121417',
-    fontSize: 13,
-    fontWeight: '500',
+    color: Teumta.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
   },
   stateBox: {
     marginTop: 8,
   },
   stateText: {
-    color: '#687384',
-    fontSize: 14,
+    color: Teumta.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
   },
   list: {
-    gap: 12,
+    gap: 9,
   },
   attribution: {
     marginTop: 4,
   },
   card: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e6ea',
-    borderRadius: 8,
+    backgroundColor: Teumta.surface,
+    borderColor: Teumta.border,
+    borderRadius: 15,
     borderWidth: 1,
-    gap: 8,
-    padding: 16,
+    gap: 3,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   cardDisabled: {
     opacity: 0.5,
   },
   placeName: {
-    color: '#121417',
-    fontSize: 18,
-    fontWeight: '800',
+    color: Teumta.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   location: {
-    color: '#687384',
-    fontSize: 14,
+    color: Teumta.textSecondary,
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

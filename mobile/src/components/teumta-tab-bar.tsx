@@ -100,9 +100,9 @@ const styles = StyleSheet.create({
   },
   label: {
     color: Teumta.textTertiary,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 14,
   },
   labelActive: {
     color: Teumta.greenDark,

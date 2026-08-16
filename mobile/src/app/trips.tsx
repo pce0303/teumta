@@ -202,9 +202,9 @@ const styles = StyleSheet.create({
   },
   minutesUnit: {
     color: Teumta.greenDark,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 14,
     marginTop: 5,
   },
   rowThumb: {
@@ -225,8 +225,8 @@ const styles = StyleSheet.create({
   },
   rowMeta: {
     color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
   },
   doneBadge: {
     backgroundColor: Teumta.greenLight,
@@ -236,9 +236,9 @@ const styles = StyleSheet.create({
   },
   doneBadgeLabel: {
     color: Teumta.greenDark,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 14,
   },
   startBadge: {
     backgroundColor: Teumta.greenLight,
@@ -248,9 +248,9 @@ const styles = StyleSheet.create({
   },
   startBadgeLabel: {
     color: Teumta.greenDark,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 14,
   },
   rowChevron: {
     color: Teumta.textTertiary,

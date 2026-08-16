@@ -436,9 +436,9 @@ const styles = StyleSheet.create({
   },
   badgeLabel: {
     color: Teumta.greenDark,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 14,
   },
   summaryPill: {
     alignItems: 'center',
@@ -501,8 +501,8 @@ const styles = StyleSheet.create({
   },
   cardDescriptionAlternative: {
     color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
   },
   radioOn: {
     backgroundColor: Teumta.green,
@@ -527,9 +527,9 @@ const styles = StyleSheet.create({
   },
   stopName: {
     color: Teumta.textSecondary,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '500',
-    lineHeight: 13,
+    lineHeight: 14,
   },
   stopArrow: {
     color: Teumta.textTertiary,
@@ -568,13 +568,13 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     color: Teumta.textSecondary,
-    fontSize: 8,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 13,
   },
   statLabelAlternative: {
     color: Teumta.textSecondary,
-    fontSize: 7,
-    lineHeight: 10,
+    fontSize: 9,
+    lineHeight: 12,
   },
   infoBox: {
     backgroundColor: Teumta.greenLight,
