@@ -172,6 +172,11 @@ export default function PlaceDetailScreen() {
   const forecastSummary = forecast ? summarizeForecast(forecast.forecasts) : null;
   const palette = congestionLevel ? Teumta.congestion[congestionLevel] : null;
   const headline = congestionLevel ? CONGESTION_HEADLINE[congestionLevel] : null;
+  // 우회 트리거(congestion-rules §5): CROWDED 이상일 때만 CTA 강조.
+  // 그 미만·미제공(404)·조회 실패는 기존 모양 유지 — 예측값으로 대체 판단하지 않는다.
+  const crowdedNow =
+    congestionStatus === 'idle' &&
+    (congestionLevel === 'high' || congestionLevel === 'veryHigh');
 
   return (
     <View style={styles.screen}>
@@ -434,8 +439,16 @@ export default function PlaceDetailScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+        {crowdedNow && palette && (
+          <View style={[styles.ctaNotice, { backgroundColor: palette.background }]}>
+            <View style={[styles.ctaNoticeDot, { backgroundColor: palette.dot }]} />
+            <Text style={[styles.ctaNoticeText, { color: palette.text }]}>
+              지금 붐비는 시간이에요. 근처 로컬을 먼저 둘러보고 오면 한산해져요.
+            </Text>
+          </View>
+        )}
         <Pressable
-          style={styles.ctaButton}
+          style={[styles.ctaButton, crowdedNow && styles.ctaButtonCrowded]}
           onPress={() =>
             router.push({
               pathname: '/detours',
@@ -445,7 +458,9 @@ export default function PlaceDetailScreen() {
               },
             })
           }>
-          <Text style={styles.ctaLabel}>틈타 코스 보기</Text>
+          <Text style={styles.ctaLabel}>
+            {crowdedNow ? '지금 붐벼요 — 틈타 코스로 비켜가기' : '틈타 코스 보기'}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -756,12 +771,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
   },
+  ctaNotice: {
+    alignItems: 'center',
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  ctaNoticeDot: {
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  ctaNoticeText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
+  },
   ctaButton: {
     alignItems: 'center',
     backgroundColor: Teumta.green,
     borderRadius: 16,
     height: 50,
     justifyContent: 'center',
+  },
+  ctaButtonCrowded: {
+    backgroundColor: Teumta.greenDark,
   },
   ctaLabel: {
     color: Teumta.surface,
