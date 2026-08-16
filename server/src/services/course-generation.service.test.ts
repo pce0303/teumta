@@ -62,6 +62,13 @@ function measured(
     },
     distanceMeters: travelMinutes * 67,
     travelMinutes,
+    path: [
+      { latitude: DESTINATION.latitude, longitude: DESTINATION.longitude },
+      {
+        latitude: 37.58 + offset * 0.001,
+        longitude: 126.97 + offset * 0.001,
+      },
+    ],
   };
 }
 
@@ -73,6 +80,16 @@ beforeEach(() => {
   fetchPedestrianRouteMock.mockResolvedValue({
     features: [
       { properties: { totalDistance: 200, totalTime: 180 } },
+      {
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [126.97, 37.58],
+            [126.971, 37.581],
+          ],
+        },
+        properties: {},
+      },
     ],
   });
 });
@@ -190,8 +207,16 @@ describe('generateCourses', () => {
       name: '통인시장',
       travelMinutesFromPrevious: 10,
       stayMinutes: 30,
+      pathFromPrevious: [
+        { latitude: DESTINATION.latitude, longitude: DESTINATION.longitude },
+        { latitude: 37.58, longitude: 126.97 },
+      ],
     });
     expect(course.returnTravelMinutes).toBe(10);
+    expect(course.returnPath).toEqual([
+      { latitude: 37.58, longitude: 126.97 },
+      { latitude: DESTINATION.latitude, longitude: DESTINATION.longitude },
+    ]);
     expect(course.totalMinutes).toBe(50);
     // 정류지가 1곳이면 TMAP 추가 호출이 필요 없다.
     expect(fetchPedestrianRouteMock).not.toHaveBeenCalled();
@@ -213,6 +238,10 @@ describe('generateCourses', () => {
     // 구간 1개(첫곳 → 둘째곳)만 호출한다. 목적지↔정류지는 이미 실측값이 있다.
     expect(fetchPedestrianRouteMock).toHaveBeenCalledTimes(1);
     expect(twoStop?.stops[1].travelMinutesFromPrevious).toBe(3);
+    expect(twoStop?.stops[1].pathFromPrevious).toEqual([
+      { latitude: 37.58, longitude: 126.97 },
+      { latitude: 37.581, longitude: 126.971 },
+    ]);
   });
 
   it('실측 결과 가용 시간을 넘기면 해당 코스를 제외한다', async () => {

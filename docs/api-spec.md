@@ -456,20 +456,24 @@ GET /api/courses?poiId=10817049&availableMinutes=30
     "courses": [
       {
         "totalMinutes": 60,          // 이동 + 체류 + 복귀
-        "returnTravelMinutes": 7,    // 마지막 정류지 → 목적지
-        "returnDistanceMeters": 520,
-        "verified": true,            // 정류지 사이 구간이 TMAP 실측이면 true(추정이면 false)
-        "stops": [
-          { "name": "대한민국역사박물관", "address": "...", "latitude": 37.57, "longitude": 126.97,
-            "imageUrl": null, "travelMinutesFromPrevious": 5, "distanceMetersFromPrevious": 380,
-            "stayMinutes": 20 }
-        ]
+    "returnTravelMinutes": 7,    // 마지막 정류지 → 목적지
+    "returnDistanceMeters": 520,
+    "returnPath": [{ "latitude": 37.57, "longitude": 126.97 }, { "latitude": 37.5796, "longitude": 126.977 }],
+    "verified": true,            // 정류지 사이 구간이 TMAP 실측이면 true(추정이면 false)
+    "stops": [
+    { "name": "대한민국역사박물관", "address": "...",     "latitude": 37.57, "longitude": 126.97,
+    "imageUrl": null, "travelMinutesFromPrevious": 5, "distanceMetersFromPrevious": 380,
+    "pathFromPrevious": [{ "latitude": 37.5796, "longitude": 126.977 }, { "latitude": 37.57, "longitude": 126.97 }],
+    "stayMinutes": 20 }
+]
       }
     ]
   },
   "error": null
 }
 ```
+- `pathFromPrevious`: 이전 지점 → 해당 정류지의 TMAP 보행 경로 좌표.
+- `returnPath`: 마지막 정류지 → 목적지 복귀 보행 경로 좌표.
 
 **계산 구조:** 목적지 → 정류지1 → … → 정류지N → 목적지(복귀). 정류지 최대 3곳, 코스 최대 3개.
 - 목적지↔정류지 구간은 3.3b가 구한 **TMAP 실측값**(복귀는 대칭으로 간주해 재사용).

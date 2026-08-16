@@ -8,6 +8,7 @@ import type {
 import { ExternalApiError } from '../external/common';
 import {
   extractPoiBase,
+  extractRoutePath,
   extractRouteTotals,
   fetchPedestrianRoute,
   fetchPoiDetail,
@@ -203,6 +204,8 @@ export interface MeasuredNearbyPlace {
   distanceMeters: number;
   /** TMAP 보행시간(분, ceil). */
   travelMinutes: number;
+  /** 목적지 → 후보 장소의 TMAP 보행 경로 좌표. */
+  path: { latitude: number; longitude: number }[];
 }
 
 /** 목적지 상세 → 기준점. 좌표 없으면 null. */
@@ -356,6 +359,7 @@ async function resolveWalkingDistances(
       candidate,
       distanceMeters,
       travelMinutes: Math.ceil(totalSeconds / 60),
+      path: extractRoutePath(route),
     };
   });
 
