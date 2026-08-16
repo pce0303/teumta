@@ -13,7 +13,7 @@ import { useCurrentLocation } from '@/hooks/use-current-location';
 import { getRealtimeCongestion } from '@/api/places';
 import { getSelectedCourse } from '@/stores/selected-course';
 import type { RealtimeCongestion } from '@/types/place';
-import { openDirections } from '@/utils/directions';
+import { openDirections, openNaverMapPlace } from '@/utils/directions';
 import { distanceInMeters } from '@/utils/distance';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
@@ -55,7 +55,7 @@ export default function TripScreen() {
   const [congestion, setCongestion] = useState<RealtimeCongestion | null>(null);
 
   const { location, status, start: startLocation } = useCurrentLocation({ watch: true });
-  const { phase, currentIndex, nextStop, start, updateWithLocation } =
+  const { phase, currentIndex, nextStop, stayingAt, start, skipCurrent, updateWithLocation } =
     useCourseProgress(courseStops);
   const { markCourseCompleted } = useCourseLog();
   // 완료 기록은 코스당 1회 — 기록이 상태를 바꾸고 상태가 다시 기록을 부르는 순환 방지.
@@ -128,18 +128,42 @@ export default function TripScreen() {
         .reduce((total, stop) => total + stop.travelMinutesFromPrevious + stop.stayMinutes, 0) +
       course.returnTravelMinutes;
 
-  const statusTitle = completed
-    ? '코스를 모두 마쳤어요'
-    : nextStop
-      ? `${withRoJosa(nextStop.name)} 이동 중`
-      : '코스를 따라 이동 중';
-  const statusSubtitle = completed
-    ? '복귀까지 완료했어요. 수고하셨어요!'
-    : distanceToNext !== null && walkMinutes !== null
+  // 마지막 코스 지점 = 목적지 복귀. 그 구간에 들어서면 "되돌아가는 중"으로 보여준다.
+  const returning = !completed && currentIndex === courseStops.length - 1;
+  // stayingAt은 방금 도착한 정류지 — course.stops 기준 인덱스는 (currentIndex - 1).
+  const stayingStop = stayingAt ? course.stops[currentIndex - 1] : undefined;
+
+  const movingSubtitle =
+    distanceToNext !== null && walkMinutes !== null
       ? `${formatDistance(distanceToNext)} · 도보 약 ${walkMinutes}분 남았어요`
       : status === 'denied'
         ? '위치 권한을 허용하면 남은 거리를 알려드려요'
         : '현재 위치를 확인하고 있어요';
+
+  const statusTitle = completed
+    ? '코스를 모두 마쳤어요'
+    : stayingAt
+      ? `${stayingAt.name} 도착!`
+      : returning
+        ? `${withRoJosa(destination.name)} 되돌아가는 중`
+        : nextStop
+          ? `${withRoJosa(nextStop.name)} 이동 중`
+          : '코스를 따라 이동 중';
+  const statusSubtitle = completed
+    ? '복귀까지 완료했어요. 수고하셨어요!'
+    : stayingAt
+      ? `권장 체류 ${stayingStop?.stayMinutes ?? 10}분 · 둘러보고 나서면 다음 안내가 이어져요`
+      : movingSubtitle;
+
+  // 로컬 상세에만 있던 영업·리뷰 확인 통로 — 진행 중 가게가 닫혀 있으면 여기서 판단.
+  const reviewTarget = completed
+    ? null
+    : stayingAt
+      ? { name: stayingAt.name, address: stayingStop?.address ?? null }
+      : !returning && nextStop
+        ? { name: nextStop.name, address: course.stops[currentIndex]?.address ?? null }
+        : null;
+  const canSkip = phase === 'in_progress' && !returning && !stayingAt && nextStop !== null;
 
   const etaPillLabel =
     !completed && nextStop && walkMinutes !== null
@@ -207,6 +231,49 @@ export default function TripScreen() {
             <Text style={styles.statusSubtitle}>{statusSubtitle}</Text>
           </View>
         </View>
+
+        <View style={styles.progressRow}>
+          {courseStops.map((stop, index) => {
+            const done = completed || index < currentIndex;
+            const isCurrent = !completed && index === currentIndex;
+            const isReturn = index === courseStops.length - 1;
+            return (
+              <View
+                key={stop.id}
+                style={[
+                  styles.progressChip,
+                  done && styles.progressChipDone,
+                  isCurrent && styles.progressChipCurrent,
+                ]}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.progressChipLabel,
+                    (done || isCurrent) && styles.progressChipLabelActive,
+                  ]}>
+                  {done ? '✓' : index + 1} {isReturn ? '복귀' : stop.name}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {(canSkip || reviewTarget) && (
+          <View style={styles.stopActionRow}>
+            {reviewTarget && (
+              <Pressable
+                style={styles.stopActionButton}
+                onPress={() => void openNaverMapPlace(reviewTarget)}>
+                <Text style={styles.stopActionLabel}>영업·리뷰 확인</Text>
+              </Pressable>
+            )}
+            {canSkip && (
+              <Pressable style={styles.stopActionButton} onPress={skipCurrent}>
+                <Text style={styles.stopActionLabel}>이 장소 건너뛰기</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
 
         <View style={styles.noticeBox}>
           <Text style={styles.noticeTitle}>돌아갈 시간을 계산해 뒀어요</Text>
@@ -385,6 +452,55 @@ const styles = StyleSheet.create({
     color: Teumta.textSecondary,
     fontSize: 9,
     lineHeight: 13,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  progressChip: {
+    backgroundColor: Teumta.surface,
+    borderColor: Teumta.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    maxWidth: 132,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  progressChipDone: {
+    backgroundColor: Teumta.greenLight,
+    borderColor: Teumta.greenLight,
+  },
+  progressChipCurrent: {
+    backgroundColor: Teumta.greenLight,
+    borderColor: Teumta.green,
+  },
+  progressChipLabel: {
+    color: Teumta.textTertiary,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 13,
+  },
+  progressChipLabelActive: {
+    color: Teumta.greenDark,
+  },
+  stopActionRow: {
+    flexDirection: 'row',
+    gap: 7,
+  },
+  stopActionButton: {
+    alignItems: 'center',
+    borderColor: Teumta.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  stopActionLabel: {
+    color: Teumta.textSecondary,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 14,
   },
   noticeBox: {
     backgroundColor: Teumta.greenLight,
