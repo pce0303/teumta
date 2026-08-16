@@ -218,7 +218,12 @@ export default function PlaceDetailScreen() {
           </Pressable>
         </View>
         {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.heroImage} contentFit="cover" />
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.heroImage}
+            contentFit="cover"
+            recyclingKey={id}
+          />
         ) : (
           <View style={styles.heroImage} />
         )}
