@@ -5,3 +5,12 @@ export function timeLabelAfter(offsetMinutes: number) {
   const minutes = String(at.getMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
 }
+
+/** ISO 시각 → "M월 D일". 값이 이상하면 빈 문자열. */
+export function dateLabel(iso: string) {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) {
+    return '';
+  }
+  return `${at.getMonth() + 1}월 ${at.getDate()}일`;
+}

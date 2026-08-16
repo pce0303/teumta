@@ -11,6 +11,7 @@ import {
 } from '@/api/places';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
+import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
 import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import type {
@@ -49,20 +50,6 @@ const CONGESTION_MESSAGE: Record<CongestionLevel, string> = {
   medium: '무난한 편이지만, 여유를 원한다면 주변 로컬 장소를 먼저 둘러보는 것도 좋아요.',
   high: '혼잡한 편이에요. 아래 근처 로컬 장소로 잠시 우회했다가 다시 방문해 보세요.',
   veryHigh: '매우 혼잡해요. 지금은 근처 로컬 장소를 먼저 둘러보는 걸 추천해요.',
-};
-
-const REALTIME_LEVEL_TO_CONGESTION_LEVEL: Record<RealtimeCongestion['level'], CongestionLevel> = {
-  RELAXED: 'low',
-  NORMAL: 'medium',
-  CROWDED: 'high',
-  VERY_CROWDED: 'veryHigh',
-};
-
-const REALTIME_LEVEL_LABEL: Record<RealtimeCongestion['level'], string> = {
-  RELAXED: '여유',
-  NORMAL: '보통',
-  CROWDED: '혼잡',
-  VERY_CROWDED: '매우 혼잡',
 };
 
 /** 중앙값 대비 오늘의 위치. KTO는 등급 미제공이라 상대 표현만. */

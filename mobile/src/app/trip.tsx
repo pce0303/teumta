@@ -1,11 +1,13 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
+import { REALTIME_LEVEL_LABEL } from '@/constants/congestion';
 import { Teumta } from '@/constants/theme';
+import { useCourseLog } from '@/hooks/use-course-log';
 import { useCourseProgress, type CourseStop } from '@/hooks/use-course-progress';
 import { useCurrentLocation } from '@/hooks/use-current-location';
 import { getRealtimeCongestion } from '@/api/places';
@@ -23,13 +25,6 @@ function formatDistance(meters: number) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`;
 }
 
-/** SK 혼잡도 단계 → 화면 문구. */
-const CONGESTION_LABEL: Record<RealtimeCongestion['level'], string> = {
-  RELAXED: '여유',
-  NORMAL: '보통',
-  CROWDED: '혼잡',
-  VERY_CROWDED: '매우 혼잡',
-};
 
 export default function TripScreen() {
   const router = useRouter();
@@ -62,6 +57,17 @@ export default function TripScreen() {
   const { location, status, start: startLocation } = useCurrentLocation({ watch: true });
   const { phase, currentIndex, nextStop, start, updateWithLocation } =
     useCourseProgress(courseStops);
+  const { markCourseCompleted } = useCourseLog();
+  // 완료 기록은 코스당 1회 — 기록이 상태를 바꾸고 상태가 다시 기록을 부르는 순환 방지.
+  const completionLogged = useRef(false);
+
+  useEffect(() => {
+    // 마지막 복귀 지점 도착 판정이 나면 "다녀온 코스"로 기기에만 남긴다.
+    if (phase === 'completed' && selected && !completionLogged.current) {
+      completionLogged.current = true;
+      markCourseCompleted(selected, true);
+    }
+  }, [phase, selected, markCourseCompleted]);
 
   useEffect(() => {
     start();
@@ -217,7 +223,7 @@ export default function TripScreen() {
           <View style={styles.statTile}>
             <Text style={styles.statLabel}>목적지 혼잡</Text>
             <Text style={[styles.statValue, styles.statValueCongestion]}>
-              {congestion ? CONGESTION_LABEL[congestion.level] : '확인 중'}
+              {congestion ? REALTIME_LEVEL_LABEL[congestion.level] : '확인 중'}
             </Text>
           </View>
           <View style={styles.statTile}>
@@ -227,7 +233,16 @@ export default function TripScreen() {
         </View>
 
         <View style={styles.buttonRow}>
-          <Pressable style={styles.endButton} onPress={() => router.dismissAll()}>
+          <Pressable
+            style={styles.endButton}
+            onPress={() => {
+              // 중간에 끝내도 다녀온 기록으로 남긴다(완주 여부는 구분해 저장).
+              if (selected && !completionLogged.current) {
+                completionLogged.current = true;
+                markCourseCompleted(selected, phase === 'completed');
+              }
+              router.dismissAll();
+            }}>
             <Text style={styles.endButtonLabel}>코스 종료</Text>
           </Pressable>
           <Pressable

@@ -1,0 +1,241 @@
+import { Image } from 'expo-image';
+import { Link } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+import { getRealtimeCongestion } from '@/api/places';
+import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
+import { FEATURED_DESTINATIONS, type FeaturedDestination } from '@/constants/destinations';
+import { Teumta } from '@/constants/theme';
+import type { RealtimeCongestion } from '@/types/place';
+
+/**
+ * 홈 상단 "지금 어디가 여유로울까" — 실시간 혼잡도 한 줄.
+ *
+ * hasRealtimeCongestion은 조회 후보 선정에만 쓴다(destinations.ts 주석 참고).
+ * 화면에 보이는 단계는 전부 실제 응답값이라 플래그가 낡아도 거짓말이 되지 않는다.
+ * 서버가 장소별 5분 캐시를 두므로 홈 진입마다 조회해도 외부 호출은 거의 늘지 않는다.
+ */
+const CANDIDATES = FEATURED_DESTINATIONS.filter(
+  (destination) => destination.hasRealtimeCongestion,
+).slice(0, 4);
+
+/** 여유로운 곳이 먼저 보이도록 정렬. */
+const LEVEL_ORDER: Record<RealtimeCongestion['level'], number> = {
+  RELAXED: 0,
+  NORMAL: 1,
+  CROWDED: 2,
+  VERY_CROWDED: 3,
+};
+
+type QuietNowEntry = {
+  destination: FeaturedDestination;
+  congestion: RealtimeCongestion;
+};
+
+export function QuietNow() {
+  // null = 조회 중
+  const [entries, setEntries] = useState<QuietNowEntry[] | null>(null);
+
+  useEffect(() => {
+    let ignored = false;
+
+    void Promise.allSettled(
+      CANDIDATES.map((destination) =>
+        getRealtimeCongestion({ contentId: destination.tourApiContentId }).then(
+          (congestion): QuietNowEntry => ({ destination, congestion }),
+        ),
+      ),
+    ).then((results) => {
+      if (ignored) {
+        return;
+      }
+      // 실패(SK 미커버·일시 오류)는 조용히 빼고 성공한 곳만 보여준다.
+      const loaded = results
+        .filter(
+          (result): result is PromiseFulfilledResult<QuietNowEntry> =>
+            result.status === 'fulfilled',
+        )
+        .map((result) => result.value)
+        .sort(
+          (first, second) =>
+            LEVEL_ORDER[first.congestion.level] - LEVEL_ORDER[second.congestion.level],
+        );
+      setEntries(loaded);
+    });
+
+    return () => {
+      ignored = true;
+    };
+  }, []);
+
+  // 전부 실패하면 섹션째 숨긴다 — 빈 껍데기가 남는 것보다 낫다.
+  if (entries !== null && entries.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionTitle}>지금 어디가 여유로울까</Text>
+        <View style={styles.liveBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveLabel}>실시간</Text>
+        </View>
+      </View>
+
+      {entries === null ? (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="small" />
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.rail}>
+          {entries.map(({ destination, congestion }) => {
+            const palette = Teumta.congestion[REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level]];
+            return (
+              <Link
+                key={destination.tourApiContentId}
+                href={{
+                  pathname: '/places/[id]',
+                  params: {
+                    id: destination.tourApiContentId,
+                    source: 'TOUR',
+                    name: destination.name,
+                    address: destination.address,
+                    ...(destination.imageUrl ? { imageUrl: destination.imageUrl } : {}),
+                  },
+                }}
+                asChild>
+                <Pressable style={styles.card}>
+                  {destination.imageUrl ? (
+                    <Image
+                      source={{ uri: destination.imageUrl }}
+                      style={styles.cardImage}
+                      contentFit="cover"
+                      recyclingKey={destination.tourApiContentId}
+                    />
+                  ) : (
+                    <View style={styles.cardImage} />
+                  )}
+                  <View style={styles.cardBody}>
+                    <Text style={styles.cardName} numberOfLines={1}>
+                      {destination.name}
+                    </Text>
+                    <Text style={styles.cardMeta} numberOfLines={1}>
+                      {destination.areaLabel}
+                    </Text>
+                    <View style={[styles.levelChip, { backgroundColor: palette.background }]}>
+                      <View style={[styles.levelDot, { backgroundColor: palette.dot }]} />
+                      <Text style={[styles.levelLabel, { color: palette.text }]}>
+                        {REALTIME_LEVEL_LABEL[congestion.level]}
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              </Link>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  section: {
+    gap: 8,
+  },
+  sectionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sectionTitle: {
+    color: Teumta.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 21,
+  },
+  liveBadge: {
+    alignItems: 'center',
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  liveDot: {
+    backgroundColor: Teumta.green,
+    borderRadius: 3,
+    height: 6,
+    width: 6,
+  },
+  liveLabel: {
+    color: Teumta.greenDark,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+  loadingBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    // 로딩 → 카드 전환 시 홈 전체가 출렁이지 않게 카드 높이와 맞춘다.
+    height: 132,
+  },
+  rail: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  card: {
+    backgroundColor: Teumta.surface,
+    borderColor: Teumta.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    width: 148,
+  },
+  cardImage: {
+    backgroundColor: Teumta.imagePlaceholder,
+    height: 64,
+  },
+  cardBody: {
+    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  cardName: {
+    color: Teumta.textPrimary,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  cardMeta: {
+    color: Teumta.textSecondary,
+    fontSize: 9,
+    lineHeight: 13,
+  },
+  levelChip: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  levelDot: {
+    borderRadius: 3,
+    height: 6,
+    width: 6,
+  },
+  levelLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+});

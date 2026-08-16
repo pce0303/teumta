@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { QuietNow } from '@/components/quiet-now';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import {
@@ -67,6 +68,8 @@ export default function HomeScreen() {
             <Text style={styles.searchPlaceholder}>관광지나 지역을 검색해 보세요</Text>
           </Pressable>
         </Link>
+
+        <QuietNow />
 
         <ScrollView
           horizontal

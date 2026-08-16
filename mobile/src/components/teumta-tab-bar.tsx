@@ -48,7 +48,7 @@ export function TeumtaTabBar({ active }: { active: TeumtaTab }) {
         router.push('/search');
         break;
       case 'trips':
-        router.push('/course-map');
+        router.push('/trips');
         break;
       case 'my':
         router.push('/my');
