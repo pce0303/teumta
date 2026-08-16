@@ -41,6 +41,8 @@ export type FeaturedDestination = {
   name: string;
   region: Region;
   areaLabel: string;
+  /** TourAPI 주소(detailCommon2 addr1+addr2). 상세·북마크 표시에 쓴다. */
+  address: string;
   /** TourAPI 대표 이미지. 없는 곳이 있어 null 허용. */
   imageUrl: string | null;
 };
@@ -51,6 +53,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '경복궁',
     region: '서울',
     areaLabel: '서울 종로구',
+    address: '서울특별시 종로구 사직로 161 (세종로)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/98/3487598_image2_1.jpg',
   },
   {
@@ -58,6 +61,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '남산서울타워',
     region: '서울',
     areaLabel: '서울 용산구',
+    address: '서울특별시 용산구 남산공원길 105',
     imageUrl: null,
   },
   {
@@ -65,6 +69,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '해운대해수욕장',
     region: '부산',
     areaLabel: '부산 해운대구',
+    address: '부산광역시 해운대구 해운대해변로 264 (우동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/34/3090534_image2_1.JPG',
   },
   {
@@ -72,6 +77,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '광안리해수욕장',
     region: '부산',
     areaLabel: '부산 수영구',
+    address: '부산광역시 수영구 광안해변로 219 (광안동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/45/3311245_image2_1.jpg',
   },
   {
@@ -79,6 +85,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '수원화성',
     region: '경기',
     areaLabel: '경기 수원시',
+    address: '경기도 수원시 팔달구 정조로 780 (팔달로2가)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/36/3500936_image2_1.jpg',
   },
   {
@@ -86,6 +93,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '에버랜드',
     region: '경기',
     areaLabel: '경기 용인시',
+    address: '경기도 용인시 처인구 포곡읍 에버랜드로 199',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/53/3486453_image2_1.jpg',
   },
   {
@@ -93,6 +101,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '남이섬',
     region: '강원',
     areaLabel: '강원 춘천시',
+    address: '강원특별자치도 춘천시 남이섬길 1 남이섬',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/45/4067545_image2_1.jpg',
   },
   {
@@ -100,6 +109,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '경포해수욕장',
     region: '강원',
     areaLabel: '강원 강릉시',
+    address: '강원특별자치도 강릉시 창해로 514 (안현동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/25/4075925_image2_1.jpg',
   },
   {
@@ -107,6 +117,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '전주 한옥마을',
     region: '전라',
     areaLabel: '전북 전주시',
+    address: '전북특별자치도 전주시 완산구 기린대로 99 (남노송동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource_photo/67/3516667_image2_1.jpg',
   },
   {
@@ -114,6 +125,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '오목대와 이목대',
     region: '전라',
     areaLabel: '전북 전주시',
+    address: '전북특별자치도 전주시 완산구 기린대로 55',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/46/3533046_image2_1.jpg',
   },
   {
@@ -121,6 +133,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '불국사',
     region: '경상',
     areaLabel: '경북 경주시',
+    address: '경상북도 경주시 불국로 385 (진현동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/70/3506170_image2_1.jpg',
   },
   {
@@ -128,6 +141,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '첨성대',
     region: '경상',
     areaLabel: '경북 경주시',
+    address: '경상북도 경주시 첨성로 140-25',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/35/4097535_image2_1.JPG',
   },
   {
@@ -135,6 +149,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '성산일출봉',
     region: '제주',
     areaLabel: '제주 서귀포시',
+    address: '제주특별자치도 서귀포시 성산읍 일출로 284-12',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/82/2944282_image2_1.bmp',
   },
   {
@@ -142,6 +157,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     name: '성읍민속마을',
     region: '제주',
     areaLabel: '제주 서귀포시',
+    address: '제주특별자치도 서귀포시 표선면 성읍리 3294',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/64/3551564_image2_1.jpg',
   },
 ];

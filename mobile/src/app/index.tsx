@@ -22,6 +22,7 @@ function detailHref(destination: FeaturedDestination) {
       id: destination.tourApiContentId,
       source: 'TOUR',
       name: destination.name,
+      address: destination.address,
       ...(destination.imageUrl ? { imageUrl: destination.imageUrl } : {}),
     },
   };

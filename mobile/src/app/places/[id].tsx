@@ -202,7 +202,13 @@ export default function PlaceDetailScreen() {
           <Pressable
             style={[styles.heroButton, isPlaceBookmarked(source, id) && styles.heroButtonSaved]}
             onPress={() =>
-              togglePlaceBookmark({ id, source, name, address: address ?? null })
+              togglePlaceBookmark({
+                id,
+                source,
+                name,
+                address: address ?? null,
+                imageUrl: imageUrl ?? null,
+              })
             }>
             <Image
               source={require('@/assets/images/icons/bookmark.svg')}

@@ -23,6 +23,8 @@ export type PlaceBookmark = {
   source: 'TOUR' | 'TMAP';
   name: string;
   address: string | null;
+  /** 마이 탭 목록 썸네일용. 저장 시점 값을 그대로 들고 있는다. */
+  imageUrl: string | null;
 };
 
 type BookmarksState = {
@@ -62,7 +64,16 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
       .then((raw) => {
         if (raw) {
           const parsed = JSON.parse(raw) as Partial<BookmarksState>;
-          setState({ places: Array.isArray(parsed.places) ? parsed.places : [] });
+          const places = Array.isArray(parsed.places) ? parsed.places : [];
+          // imageUrl은 나중에 추가한 필드라 기존 저장값에는 없다. 키를 올려 버리면
+          // 사용자가 저장해 둔 목록이 통째로 사라지므로 빠진 필드만 채워서 읽는다.
+          setState({
+            places: places.map((place) => ({
+              ...place,
+              address: place.address ?? null,
+              imageUrl: place.imageUrl ?? null,
+            })),
+          });
         }
       })
       .catch(() => {
