@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { Link } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { getRealtimeCongestion } from '@/api/places';
@@ -33,41 +33,53 @@ type QuietNowEntry = {
   congestion: RealtimeCongestion;
 };
 
+/** 홈에 머물다 돌아왔을 때 이보다 오래됐으면 다시 조회 — 서버 캐시(5분)와 같은 주기. */
+const REFRESH_AFTER_MS = 5 * 60 * 1000;
+
 export function QuietNow() {
-  // null = 조회 중
+  // null = 첫 조회 중(이후 갱신 중에는 기존 카드를 그대로 보여준다)
   const [entries, setEntries] = useState<QuietNowEntry[] | null>(null);
+  const lastLoadedAt = useRef(0);
 
-  useEffect(() => {
-    let ignored = false;
-
-    void Promise.allSettled(
-      CANDIDATES.map((destination) =>
-        getRealtimeCongestion({ contentId: destination.tourApiContentId }).then(
-          (congestion): QuietNowEntry => ({ destination, congestion }),
-        ),
-      ),
-    ).then((results) => {
-      if (ignored) {
+  useFocusEffect(
+    useCallback(() => {
+      // 상세를 다녀와 홈이 다시 보일 때마다 불린다 — 5분 안이면 그대로 둬서 폭주 방지.
+      if (Date.now() - lastLoadedAt.current < REFRESH_AFTER_MS) {
         return;
       }
-      // 실패(SK 미커버·일시 오류)는 조용히 빼고 성공한 곳만 보여준다.
-      const loaded = results
-        .filter(
-          (result): result is PromiseFulfilledResult<QuietNowEntry> =>
-            result.status === 'fulfilled',
-        )
-        .map((result) => result.value)
-        .sort(
-          (first, second) =>
-            LEVEL_ORDER[first.congestion.level] - LEVEL_ORDER[second.congestion.level],
-        );
-      setEntries(loaded);
-    });
+      let ignored = false;
 
-    return () => {
-      ignored = true;
-    };
-  }, []);
+      void Promise.allSettled(
+        CANDIDATES.map((destination) =>
+          getRealtimeCongestion({ contentId: destination.tourApiContentId }).then(
+            (congestion): QuietNowEntry => ({ destination, congestion }),
+          ),
+        ),
+      ).then((results) => {
+        if (ignored) {
+          return;
+        }
+        lastLoadedAt.current = Date.now();
+        // 실패(SK 미커버·일시 오류)는 조용히 빼고 성공한 곳만 보여준다.
+        const loaded = results
+          .filter(
+            (result): result is PromiseFulfilledResult<QuietNowEntry> =>
+              result.status === 'fulfilled',
+          )
+          .map((result) => result.value)
+          .sort(
+            (first, second) =>
+              LEVEL_ORDER[first.congestion.level] - LEVEL_ORDER[second.congestion.level],
+          );
+        // 갱신이 통째로 실패했을 때 이미 보여주던 카드를 지우지 않는다(첫 조회만 빈 결과 반영).
+        setEntries((previous) => (loaded.length === 0 && previous ? previous : loaded));
+      });
+
+      return () => {
+        ignored = true;
+      };
+    }, []),
+  );
 
   // 전부 실패하면 섹션째 숨긴다 — 빈 껍데기가 남는 것보다 낫다.
   if (entries !== null && entries.length === 0) {

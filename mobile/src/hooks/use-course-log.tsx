@@ -44,6 +44,21 @@ function entryKey(selected: SelectedCourse): string {
   ].join('|');
 }
 
+/**
+ * 저장값 방어 검증 — 스키마가 바뀌거나 값이 손상돼도 항목 하나가
+ * 내 여행·마이 탭 렌더 전체를 죽이면 안 된다. 화면이 실제로 접근하는 필드만 본다.
+ */
+function isValidEntry(entry: unknown): entry is CourseLogEntry {
+  const candidate = entry as Partial<CourseLogEntry> | null;
+  return (
+    typeof candidate?.key === 'string' &&
+    typeof candidate.viewedAt === 'string' &&
+    typeof candidate.selected?.destination?.name === 'string' &&
+    typeof candidate.selected?.course?.totalMinutes === 'number' &&
+    Array.isArray(candidate.selected?.course?.stops)
+  );
+}
+
 type CourseLogContextValue = {
   ready: boolean;
   /** 최근에 본 순서. */
@@ -66,8 +81,10 @@ export function CourseLogProvider({ children }: { children: ReactNode }) {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
         if (raw) {
-          const parsed = JSON.parse(raw) as { entries?: CourseLogEntry[] };
-          setEntries(Array.isArray(parsed.entries) ? parsed.entries : []);
+          const parsed = JSON.parse(raw) as { entries?: unknown[] };
+          setEntries(
+            (Array.isArray(parsed.entries) ? parsed.entries : []).filter(isValidEntry),
+          );
         }
       })
       .catch(() => {

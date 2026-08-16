@@ -9,6 +9,7 @@ import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import { useCourseLog, type CourseLogEntry } from '@/hooks/use-course-log';
 import { setSelectedCourse } from '@/stores/selected-course';
+import { clearRecentSearchesStorage } from '@/utils/recent-searches';
 import { dateLabel } from '@/utils/time';
 
 /** 스토어 심사용 지원 페이지(web/README.md). FAQ·문의처·개인정보처리방침이 있다. */
@@ -21,7 +22,7 @@ export default function MyScreen() {
   const { completedEntries, clearCourseLog } = useCourseLog();
 
   const confirmClear = () => {
-    Alert.alert('저장 데이터 삭제', '저장한 장소와 코스 기록이 모두 삭제됩니다.', [
+    Alert.alert('저장 데이터 삭제', '저장한 장소, 코스 기록, 최근 검색어가 모두 삭제됩니다.', [
       { text: '취소', style: 'cancel' },
       {
         text: '삭제',
@@ -29,6 +30,7 @@ export default function MyScreen() {
         onPress: () => {
           clearBookmarks();
           clearCourseLog();
+          clearRecentSearchesStorage();
         },
       },
     ]);
