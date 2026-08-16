@@ -136,7 +136,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     areaLabel: '강원 강릉시',
     address: '강원특별자치도 강릉시 창해로 514 (안현동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/25/4075925_image2_1.jpg',
-    hasRealtimeCongestion: false,
+    hasRealtimeCongestion: true,
     hasConcentrationForecast: true,
   },
   {
@@ -356,7 +356,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     areaLabel: '울산 남구',
     address: '울산광역시 남구 무거동 (무거동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/21/3008621_image2_1.jpg',
-    hasRealtimeCongestion: false,
+    hasRealtimeCongestion: true,
     hasConcentrationForecast: true,
   },
   {
@@ -559,7 +559,7 @@ export const AVAILABLE_REGIONS: Region[] = ALL_REGIONS.filter((region) =>
 /**
  * 혼잡 정보가 있는 곳을 앞에 둔다.
  *
- * 실시간 혼잡도(SK)는 49곳 중 21곳, 집중률(KTO)은 35곳만 제공한다.
+ * 실시간 혼잡도(SK)는 49곳 중 23곳, 집중률(KTO)은 35곳만 제공한다.
  * (21곳은 2026-08-16 서버 매칭 개선 — SK 제공 장소 인덱스 + 실조회 검증 — 후 전수 재측정값.
  *  서버 `npm run measure:congestion`으로 언제든 재측정할 수 있다.)
  * 어디가 되는지 알 수 없으면 사용자가 눌러 보고 실망하기를 반복하게 된다.

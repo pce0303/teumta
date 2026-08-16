@@ -48,6 +48,20 @@ const NAME_FALLBACK_RADIUS_METERS = 3000;
 const RLTM_VERIFY_LIMIT = 3;
 
 /**
+ * 수동 확정 매핑 — 자동 규칙(정확 일치·"목록명⊂target" 포함)으로 이을 수 없는 표기 차이.
+ *
+ * 반대 방향 포함("태화강"⊂"태화강국가정원")을 자동화하면 "청계천"→"청계천박물관" 같은
+ * 다른 장소 오매칭이 열리므로 규칙은 그대로 두고, 실조회로 확인된 것만 여기 등재한다.
+ * 등재 기준: rltm 200 실측(2026-08-16). 값이 낡아도 아래 실조회 검증이 걸러낸다.
+ */
+const MANUAL_POI_ID_BY_CONTENT_ID: Record<string, string> = {
+  /** 태화강 → 태화강국가정원 */
+  '128201': '1129510',
+  /** 경포해수욕장 → 경포해변 */
+  '128758': '3928',
+};
+
+/**
  * 상한 — 상세를 연 목적지마다 키가 쌓이는 캐시라 무한 성장 방지가 특히 중요.
  * 값으로 null(매칭 실패)도 저장한다 — 같은 장소 반복 호출로 쿼터를 태우지 않기 위함.
  * 외부 오류로 lookup 자체가 던지면 캐시하지 않는다(일시 장애를 24시간 박제하면 안 됨).
@@ -90,11 +104,15 @@ async function lookupTmapPoiId(contentId: string): Promise<string | null> {
   );
   const best = pickBestPoiMatch(candidates, { name, coordinate }, skIndex ?? undefined);
 
-  // 후보 확정 순서: TMAP 최적 후보 → SK 목록 이름 역매칭(좌표 검증 통과분).
+  // 후보 확정 순서: 수동 확정 매핑 → TMAP 최적 후보 → SK 목록 이름 역매칭.
   // 목록에 있어도 "실시간"은 부분집합이라(통계 전용 장소 존재 — 2026-08-16 실측:
   // 불국사·남이섬은 목록엔 있지만 rltm 404) 최종 판정은 실시간 조회 성공 여부로 한다.
   const verifyCandidates: string[] = [];
-  if (best !== null) {
+  const manual = MANUAL_POI_ID_BY_CONTENT_ID[contentId];
+  if (manual) {
+    verifyCandidates.push(manual);
+  }
+  if (best !== null && !verifyCandidates.includes(best)) {
     verifyCandidates.push(best);
   }
   if (skIndex !== null) {
