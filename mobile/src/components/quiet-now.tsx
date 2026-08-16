@@ -227,8 +227,8 @@ const styles = StyleSheet.create({
   },
   cardMeta: {
     color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
   },
   levelChip: {
     alignItems: 'center',

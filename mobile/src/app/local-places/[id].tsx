@@ -301,8 +301,8 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     color: Teumta.textTertiary,
-    fontSize: 8,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 13,
   },
   statValue: {
     color: Teumta.textPrimary,
@@ -384,8 +384,8 @@ const styles = StyleSheet.create({
   },
   courseMeta: {
     color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
   },
   courseChevron: {
     color: Teumta.textTertiary,

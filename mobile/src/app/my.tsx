@@ -42,6 +42,27 @@ export default function MyScreen() {
     router.push('/course-map');
   };
 
+  // 분산 참여 통계 — 전부 기기 안 기록의 집계라 서버 전송·수집 없음("측정하지 않는 설계" 유지).
+  const now = new Date();
+  const monthlyEntries = completedEntries.filter((entry) => {
+    const at = new Date(entry.completedAt ?? '');
+    return (
+      !Number.isNaN(at.getTime()) &&
+      at.getFullYear() === now.getFullYear() &&
+      at.getMonth() === now.getMonth()
+    );
+  });
+  // 월초에 0으로 비어 보이지 않게, 이번 달 기록이 없으면 누적으로 보여준다.
+  const statsEntries = monthlyEntries.length > 0 ? monthlyEntries : completedEntries;
+  const statsLabel = monthlyEntries.length > 0 ? '이번 달' : '지금까지';
+  const statsLocalCount = new Set(
+    statsEntries.flatMap((entry) => entry.selected.course.stops.map((stop) => stop.name)),
+  ).size;
+  const statsMinutes = statsEntries.reduce(
+    (total, entry) => total + entry.selected.course.totalMinutes,
+    0,
+  );
+
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView
@@ -57,6 +78,25 @@ export default function MyScreen() {
         <Text style={styles.sectionCaption}>
           붐비는 시간을 비켜 로컬을 다녀온 기록 — 관광 분산에 참여한 흔적이에요.
         </Text>
+        {completedEntries.length > 0 && (
+          <View style={styles.statsCard}>
+            <Text style={styles.statsTitle}>{statsLabel} 분산 참여</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statsColumn}>
+                <Text style={styles.statsValue}>{statsEntries.length}번</Text>
+                <Text style={styles.statsLabel}>다녀온 코스</Text>
+              </View>
+              <View style={styles.statsColumn}>
+                <Text style={styles.statsValue}>{statsLocalCount}곳</Text>
+                <Text style={styles.statsLabel}>들른 로컬</Text>
+              </View>
+              <View style={styles.statsColumn}>
+                <Text style={styles.statsValue}>{statsMinutes}분</Text>
+                <Text style={styles.statsLabel}>비켜간 시간</Text>
+              </View>
+            </View>
+          </View>
+        )}
         {completedEntries.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyText}>
@@ -219,6 +259,37 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     marginTop: -8,
   },
+  statsCard: {
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 15,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  statsTitle: {
+    color: Teumta.greenDark,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
+  },
+  statsRow: {
+    flexDirection: 'row',
+  },
+  statsColumn: {
+    flex: 1,
+    gap: 1,
+  },
+  statsValue: {
+    color: Teumta.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  statsLabel: {
+    color: Teumta.textSecondary,
+    fontSize: 10,
+    lineHeight: 14,
+  },
   minutesTile: {
     alignItems: 'center',
     backgroundColor: Teumta.greenLight,
@@ -237,9 +308,9 @@ const styles = StyleSheet.create({
   },
   minutesUnit: {
     color: Teumta.greenDark,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 14,
     marginTop: 5,
   },
   doneBadge: {
@@ -250,9 +321,9 @@ const styles = StyleSheet.create({
   },
   doneBadgeLabel: {
     color: Teumta.greenDark,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 14,
   },
   emptyBox: {
     backgroundColor: '#F7F9F8',
@@ -299,8 +370,8 @@ const styles = StyleSheet.create({
   },
   rowMeta: {
     color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
   },
   rowChevron: {
     color: Teumta.textTertiary,

@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
@@ -35,6 +35,22 @@ export default function CourseMapScreen() {
   const distanceLabel = `${(courseDistanceMeters(course) / 1000).toFixed(1)}km`;
   const returnTimeLabel = timeLabelAfter(course.totalMinutes);
   const courseName = course.stops.map((stop) => stop.name).join(' · ');
+
+  // 같이 갈 사람에게 보내는 텍스트 요약. 코스는 서버에 없어 링크가 불가능하다 — 내용 전체를 담는다.
+  const handleShare = () => {
+    const stopNames = course.stops.map((stop) => stop.name).join(' → ');
+    void Share.share({
+      message: [
+        `${destination.name} 틈타 코스`,
+        `${stopNames} → ${destination.name} 복귀`,
+        `총 약 ${course.totalMinutes}분 · 도보 약 ${distanceLabel}`,
+        '',
+        '붐비는 시간은 비켜가고, 여행은 그대로 — 틈타',
+      ].join('\n'),
+    }).catch(() => {
+      // 공유 시트를 못 열어도 화면은 그대로
+    });
+  };
 
   // 지도용 경로: 목적지 → 정류지들 → 목적지(복귀)
   const mapDetour = {
@@ -112,6 +128,9 @@ export default function CourseMapScreen() {
             style={styles.topButtonIcon}
             contentFit="contain"
           />
+        </Pressable>
+        <Pressable style={styles.shareButton} onPress={handleShare}>
+          <Text style={styles.shareLabel}>공유</Text>
         </Pressable>
       </View>
 
@@ -245,6 +264,22 @@ const styles = StyleSheet.create({
     height: 19,
     width: 19,
   },
+  shareButton: {
+    alignItems: 'center',
+    backgroundColor: Teumta.surface,
+    borderColor: Teumta.border,
+    borderRadius: 13,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  shareLabel: {
+    color: Teumta.greenDark,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
   mapArea: {
     height: 256 + SHEET_OVERLAP,
   },
@@ -294,8 +329,8 @@ const styles = StyleSheet.create({
   },
   returnPillLabel: {
     color: Teumta.textSecondary,
-    fontSize: 8,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 13,
   },
   returnPillTime: {
     color: Teumta.greenDark,
@@ -336,14 +371,14 @@ const styles = StyleSheet.create({
   },
   timelineSubtitle: {
     color: Teumta.textSecondary,
-    fontSize: 8,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 13,
   },
   timelineTime: {
     color: Teumta.textSecondary,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 14,
   },
   statusStrip: {
     alignItems: 'center',
@@ -362,8 +397,8 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     color: Teumta.textTertiary,
-    fontSize: 8,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 13,
   },
   statusNow: {
     color: Teumta.greenDark,
