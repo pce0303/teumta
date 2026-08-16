@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,15 +7,33 @@ import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
+import { useCourseLog, type CourseLogEntry } from '@/hooks/use-course-log';
+import { setSelectedCourse } from '@/stores/selected-course';
+import { dateLabel } from '@/utils/time';
 
 export default function MyScreen() {
+  const router = useRouter();
   const { places: savedPlaces, clearBookmarks } = useBookmarks();
+  const { completedEntries, clearCourseLog } = useCourseLog();
 
   const confirmClear = () => {
-    Alert.alert('저장 데이터 삭제', '저장한 장소가 모두 삭제됩니다.', [
+    Alert.alert('저장 데이터 삭제', '저장한 장소와 코스 기록이 모두 삭제됩니다.', [
       { text: '취소', style: 'cancel' },
-      { text: '삭제', style: 'destructive', onPress: clearBookmarks },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () => {
+          clearBookmarks();
+          clearCourseLog();
+        },
+      },
     ]);
+  };
+
+  const openEntry = (entry: CourseLogEntry) => {
+    // 코스 지도 화면은 메모리 스토어를 읽으므로 스냅샷을 복원해 두고 이동한다.
+    setSelectedCourse(entry.selected);
+    router.push('/course-map');
   };
 
   return (
@@ -26,8 +44,45 @@ export default function MyScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>마이</Text>
-          <Text style={styles.headerSubtitle}>저장한 장소와 앱 설정을 관리해요.</Text>
+          <Text style={styles.headerSubtitle}>다녀온 코스와 저장한 장소를 관리해요.</Text>
         </View>
+
+        <Text style={styles.sectionTitle}>다녀온 코스</Text>
+        <Text style={styles.sectionCaption}>
+          붐비는 시간을 비켜 로컬을 다녀온 기록 — 관광 분산에 참여한 흔적이에요.
+        </Text>
+        {completedEntries.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>
+              아직 다녀온 코스가 없어요.{'\n'}코스를 마치면 이 기기에만 기록돼요.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {completedEntries.map((entry) => (
+              <Pressable key={entry.key} style={styles.rowCard} onPress={() => openEntry(entry)}>
+                <View style={styles.minutesTile}>
+                  <Text style={styles.minutesValue}>{entry.selected.course.totalMinutes}</Text>
+                  <Text style={styles.minutesUnit}>분</Text>
+                </View>
+                <View style={styles.rowTexts}>
+                  <Text style={styles.rowName} numberOfLines={1}>
+                    {entry.selected.course.stops.map((stop) => stop.name).join(' · ')}
+                  </Text>
+                  <Text style={styles.rowMeta} numberOfLines={1}>
+                    {entry.selected.destination.name} ·{' '}
+                    {dateLabel(entry.completedAt ?? entry.viewedAt)}
+                  </Text>
+                </View>
+                <View style={styles.doneBadge}>
+                  <Text style={styles.doneBadgeLabel}>
+                    {entry.completedAll ? '완주' : '다녀옴'}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         <Text style={styles.sectionTitle}>저장한 장소</Text>
         {savedPlaces.length === 0 ? (
@@ -76,8 +131,8 @@ export default function MyScreen() {
         <View style={styles.infoCard}>
           <Text style={styles.infoCardTitle}>위치는 기기 안에서만 처리돼요</Text>
           <Text style={styles.infoCardBody}>
-            현재 위치와 이동 경로는 서버로 전송하지 않아요. 저장한 장소도 이 기기 안에만
-            보관됩니다.
+            현재 위치와 이동 경로는 서버로 전송하지 않아요. 저장한 장소와 코스 기록도 이 기기
+            안에만 보관됩니다.
           </Text>
           <Pressable onPress={confirmClear} hitSlop={8}>
             <Text style={styles.dangerAction}>저장 데이터 전체 삭제</Text>
@@ -137,6 +192,47 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 21,
     marginTop: 2,
+  },
+  sectionCaption: {
+    color: Teumta.textSecondary,
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: -8,
+  },
+  minutesTile: {
+    alignItems: 'center',
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 1,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  minutesValue: {
+    color: Teumta.greenDark,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  minutesUnit: {
+    color: Teumta.greenDark,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 13,
+    marginTop: 5,
+  },
+  doneBadge: {
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  doneBadgeLabel: {
+    color: Teumta.greenDark,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 13,
   },
   emptyBox: {
     backgroundColor: '#F7F9F8',
