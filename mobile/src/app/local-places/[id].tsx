@@ -10,6 +10,7 @@ import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
 import type { LocalPlaceDetail } from '@/types/place';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
+import { withRoJosa } from '@/utils/text';
 
 const STATUS_BAR_TINT = '#CCE8DB';
 const HERO_BAND = '#1C4738';
@@ -172,17 +173,25 @@ export default function LocalPlaceDetailScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
-        <Pressable
-          style={styles.ctaButton}
-          onPress={() => {
-            void openDirections({
-              name: params.name as string,
-              latitude,
-              longitude,
-            });
-          }}>
-          <Text style={styles.ctaLabel}>길찾기 열기</Text>
-        </Pressable>
+        <View style={styles.footerRow}>
+          {/* 뒤로가기 아이콘만으로는 코스 화면으로 돌아갈 길이 안 보인다 — 엄지 위치에 명시. */}
+          <Pressable style={styles.returnButton} onPress={() => router.back()}>
+            <Text style={styles.returnLabel} numberOfLines={1}>
+              {params.destinationName ? `${withRoJosa(params.destinationName)} 돌아가기` : '돌아가기'}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={styles.ctaButton}
+            onPress={() => {
+              void openDirections({
+                name: params.name as string,
+                latitude,
+                longitude,
+              });
+            }}>
+            <Text style={styles.ctaLabel}>길찾기 열기</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -389,10 +398,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
   },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  returnButton: {
+    alignItems: 'center',
+    borderColor: Teumta.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flex: 1,
+    height: 50,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  returnLabel: {
+    color: Teumta.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   ctaButton: {
     alignItems: 'center',
     backgroundColor: Teumta.green,
     borderRadius: 16,
+    flex: 1,
     height: 50,
     justifyContent: 'center',
   },

@@ -1,5 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,21 +17,66 @@ import type { SearchPlaceResult } from '@/types/place';
 
 type SearchStatus = 'idle' | 'loading' | 'error';
 
+/** 최근 검색어(기기 전용). 검색 실행 시점의 입력만 남긴다. */
+const RECENT_STORAGE_KEY = 'teumta:recent-searches:v1';
+const MAX_RECENT = 8;
+
+/** 빈 화면용 추천 검색어 — 지역이 겹치지 않게 대표 목적지에서 골랐다. */
+const SUGGESTED_KEYWORDS = [
+  '경복궁',
+  '해운대해수욕장',
+  '전주 한옥마을',
+  '성산일출봉',
+  '감천문화마을',
+  '남이섬',
+];
+
 export default function SearchScreen() {
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<SearchPlaceResult[]>([]);
   const [status, setStatus] = useState<SearchStatus>('idle');
   const [hasSearched, setHasSearched] = useState(false);
+  const [recent, setRecent] = useState<string[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          const parsed = JSON.parse(raw) as unknown;
+          if (Array.isArray(parsed)) {
+            setRecent(parsed.filter((item): item is string => typeof item === 'string'));
+          }
+        }
+      })
+      .catch(() => {
+        // 손상된 저장값은 빈 상태로 시작
+      });
+  }, []);
+
+  function rememberKeyword(term: string) {
+    setRecent((previous) => {
+      const next = [term, ...previous.filter((item) => item !== term)].slice(0, MAX_RECENT);
+      AsyncStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }
+
+  function clearRecent() {
+    setRecent([]);
+    AsyncStorage.removeItem(RECENT_STORAGE_KEY).catch(() => {});
+  }
 
   function handleChangeKeyword(text: string) {
     setKeyword(text);
     setHasSearched(false);
   }
 
-  async function handleSearch() {
-    const trimmed = keyword.trim();
+  async function runSearch(term: string) {
+    const trimmed = term.trim();
     if (!trimmed) return;
 
+    setKeyword(trimmed);
+    rememberKeyword(trimmed);
     setStatus('loading');
     try {
       const data = await searchPlaces(trimmed);
@@ -44,22 +90,60 @@ export default function SearchScreen() {
     }
   }
 
+  // 결과가 아직 없을 때만 최근·추천을 보여준다 — 결과 목록과 겹치면 눈만 어지럽다.
+  const showShortcuts = status === 'idle' && !hasSearched && results.length === 0;
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.searchRow}>
         <TextInput
           value={keyword}
           onChangeText={handleChangeKeyword}
-          onSubmitEditing={handleSearch}
+          onSubmitEditing={() => void runSearch(keyword)}
           returnKeyType="search"
           placeholder="관광지, 지역, 테마 검색"
           placeholderTextColor="#7b8490"
           style={styles.searchInput}
         />
-        <Pressable style={styles.searchButton} onPress={handleSearch}>
+        <Pressable style={styles.searchButton} onPress={() => void runSearch(keyword)}>
           <Text style={styles.searchButtonText}>검색</Text>
         </Pressable>
       </View>
+
+      {showShortcuts && (
+        <>
+          {recent.length > 0 && (
+            <View style={styles.shortcutSection}>
+              <View style={styles.shortcutHeader}>
+                <Text style={styles.shortcutTitle}>최근 검색</Text>
+                <Pressable onPress={clearRecent} hitSlop={8}>
+                  <Text style={styles.shortcutClear}>지우기</Text>
+                </Pressable>
+              </View>
+              <View style={styles.chipWrap}>
+                {recent.map((term) => (
+                  <Pressable key={term} style={styles.chip} onPress={() => void runSearch(term)}>
+                    <Text style={styles.chipLabel}>{term}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.shortcutSection}>
+            <View style={styles.shortcutHeader}>
+              <Text style={styles.shortcutTitle}>이런 곳은 어때요</Text>
+            </View>
+            <View style={styles.chipWrap}>
+              {SUGGESTED_KEYWORDS.map((term) => (
+                <Pressable key={term} style={styles.chip} onPress={() => void runSearch(term)}>
+                  <Text style={styles.chipLabel}>{term}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </>
+      )}
 
       {status === 'loading' && <ActivityIndicator style={styles.stateBox} />}
 
@@ -147,6 +231,42 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  shortcutSection: {
+    gap: 10,
+  },
+  shortcutHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  shortcutTitle: {
+    color: '#121417',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  shortcutClear: {
+    color: '#687384',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    backgroundColor: '#ffffff',
+    borderColor: '#d4d9df',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  chipLabel: {
+    color: '#121417',
+    fontSize: 13,
+    fontWeight: '500',
   },
   stateBox: {
     marginTop: 8,

@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { Link, useRouter } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlaceThumbnail } from '@/components/place-thumbnail';
@@ -10,6 +10,10 @@ import { useBookmarks } from '@/hooks/use-bookmarks';
 import { useCourseLog, type CourseLogEntry } from '@/hooks/use-course-log';
 import { setSelectedCourse } from '@/stores/selected-course';
 import { dateLabel } from '@/utils/time';
+
+/** 스토어 심사용 지원 페이지(web/README.md). FAQ·문의처·개인정보처리방침이 있다. */
+const SUPPORT_URL = 'https://saesgil-yulamdan.github.io/teumta/';
+const PRIVACY_URL = 'https://saesgil-yulamdan.github.io/teumta/privacy.html';
 
 export default function MyScreen() {
   const router = useRouter();
@@ -149,6 +153,20 @@ export default function MyScreen() {
             <Text style={styles.infoRowLabel}>데이터 출처</Text>
             <Text style={styles.infoRowValue}>한국관광공사 · SK open API · TMAP</Text>
           </View>
+          <Pressable
+            style={styles.infoRow}
+            onPress={() => void Linking.openURL(SUPPORT_URL)}
+            hitSlop={4}>
+            <Text style={styles.infoRowLabel}>지원·문의</Text>
+            <Text style={styles.infoRowLink}>열기 ›</Text>
+          </Pressable>
+          <Pressable
+            style={styles.infoRow}
+            onPress={() => void Linking.openURL(PRIVACY_URL)}
+            hitSlop={4}>
+            <Text style={styles.infoRowLabel}>개인정보처리방침</Text>
+            <Text style={styles.infoRowLink}>열기 ›</Text>
+          </Pressable>
         </View>
       </ScrollView>
 
@@ -327,6 +345,12 @@ const styles = StyleSheet.create({
   },
   infoRowValue: {
     color: Teumta.textPrimary,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+  infoRowLink: {
+    color: Teumta.greenDark,
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 14,
