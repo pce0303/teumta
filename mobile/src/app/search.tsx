@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -14,12 +13,14 @@ import {
 import { searchPlaces } from '@/api/places';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import type { SearchPlaceResult } from '@/types/place';
+import {
+  MAX_RECENT_SEARCHES,
+  clearRecentSearchesStorage,
+  loadRecentSearches,
+  saveRecentSearches,
+} from '@/utils/recent-searches';
 
 type SearchStatus = 'idle' | 'loading' | 'error';
-
-/** 최근 검색어(기기 전용). 검색 실행 시점의 입력만 남긴다. */
-const RECENT_STORAGE_KEY = 'teumta:recent-searches:v1';
-const MAX_RECENT = 8;
 
 /** 빈 화면용 추천 검색어 — 지역이 겹치지 않게 대표 목적지에서 골랐다. */
 const SUGGESTED_KEYWORDS = [
@@ -39,31 +40,23 @@ export default function SearchScreen() {
   const [recent, setRecent] = useState<string[]>([]);
 
   useEffect(() => {
-    AsyncStorage.getItem(RECENT_STORAGE_KEY)
-      .then((raw) => {
-        if (raw) {
-          const parsed = JSON.parse(raw) as unknown;
-          if (Array.isArray(parsed)) {
-            setRecent(parsed.filter((item): item is string => typeof item === 'string'));
-          }
-        }
-      })
-      .catch(() => {
-        // 손상된 저장값은 빈 상태로 시작
-      });
+    void loadRecentSearches().then(setRecent);
   }, []);
 
   function rememberKeyword(term: string) {
     setRecent((previous) => {
-      const next = [term, ...previous.filter((item) => item !== term)].slice(0, MAX_RECENT);
-      AsyncStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+      const next = [term, ...previous.filter((item) => item !== term)].slice(
+        0,
+        MAX_RECENT_SEARCHES,
+      );
+      saveRecentSearches(next);
       return next;
     });
   }
 
   function clearRecent() {
     setRecent([]);
-    AsyncStorage.removeItem(RECENT_STORAGE_KEY).catch(() => {});
+    clearRecentSearchesStorage();
   }
 
   function handleChangeKeyword(text: string) {

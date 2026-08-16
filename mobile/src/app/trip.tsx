@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,6 +17,7 @@ import { buildCourseRoutePath } from '@/utils/course-path';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
 import { distanceInMeters } from '@/utils/distance';
 import {
+  cancelAllScheduledCourseNotifications,
   cancelScheduledCourseNotification,
   ensureNotificationPermission,
   presentCourseNotification,
@@ -72,7 +73,14 @@ export default function TripScreen() {
 
   const returnReminderId = useRef<string | null>(null);
   const notificationsGranted = useRef(false);
+  // 재예약(취소→예약)이 겹치면 고아 알림이 남는다 — 진행 중엔 건너뛰기를 무시.
+  const reschedulingReminder = useRef(false);
   const [returnAlarmSet, setReturnAlarmSet] = useState(false);
+
+  const routePath = useMemo(
+    () => (course && destination ? buildCourseRoutePath(destination, course) : []),
+    [course, destination],
+  );
 
   const cancelReturnReminder = useCallback(() => {
     if (returnReminderId.current) {
@@ -191,10 +199,17 @@ export default function TripScreen() {
         fetchCongestion();
       }
     }, CONGESTION_POLL_INTERVAL_MS);
+    // 백그라운드에 오래 있다 돌아오면 다음 틱까지 최대 5분 낡은 값 — 복귀 즉시 한 번 갱신.
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        fetchCongestion();
+      }
+    });
 
     return () => {
       ignored = true;
       clearInterval(timer);
+      appStateSubscription.remove();
     };
   }, [destinationParams, selected]);
 
@@ -260,6 +275,36 @@ export default function TripScreen() {
         : null;
   const canSkip = phase === 'in_progress' && !returning && !stayingAt && nextStop !== null;
 
+  const handleSkip = () => {
+    const skipped = course.stops[currentIndex];
+    if (!skipped || reschedulingReminder.current) {
+      return;
+    }
+    skipCurrent();
+    if (!notificationsGranted.current) {
+      return;
+    }
+    // 건너뛴 이동+체류만큼 복귀가 앞당겨진다 — 예약 알림을 새 예상에 맞춘다.
+    const newRemainingMinutes =
+      remainingMinutes - skipped.travelMinutesFromPrevious - skipped.stayMinutes;
+    reschedulingReminder.current = true;
+    void (async () => {
+      try {
+        await cancelAllScheduledCourseNotifications();
+        returnReminderId.current = null;
+        const id = await scheduleReturnReminder({
+          destinationName: destination.name,
+          totalMinutes: newRemainingMinutes,
+          returnWalkMinutes: course.returnTravelMinutes,
+        });
+        returnReminderId.current = id;
+        setReturnAlarmSet(id !== null);
+      } finally {
+        reschedulingReminder.current = false;
+      }
+    })();
+  };
+
   const etaPillLabel =
     !completed && nextStop && walkMinutes !== null
       ? `${nextStop.name.split(' ')[0]}까지 ${walkMinutes}분`
@@ -306,7 +351,7 @@ export default function TripScreen() {
               `${destination.name} 복귀`,
             ],
           }}
-          routePath={buildCourseRoutePath(destination, course)}
+          routePath={routePath}
           showsUserLocation={status === 'granted'}
         />
       </View>
@@ -356,7 +401,9 @@ export default function TripScreen() {
                     styles.progressChipLabel,
                     (done || isCurrent) && styles.progressChipLabelActive,
                   ]}>
-                  {done ? '✓' : index + 1} {isReturn ? '복귀' : stop.name}
+                  {/* 복귀 칩은 순번이 무의미하다 — 숫자 없이 라벨만. */}
+                  {(done ? '✓ ' : isReturn ? '' : `${index + 1} `) +
+                    (isReturn ? '복귀' : stop.name)}
                 </Text>
               </View>
             );
@@ -373,7 +420,7 @@ export default function TripScreen() {
               </Pressable>
             )}
             {canSkip && (
-              <Pressable style={styles.stopActionButton} onPress={skipCurrent}>
+              <Pressable style={styles.stopActionButton} onPress={handleSkip}>
                 <Text style={styles.stopActionLabel}>이 장소 건너뛰기</Text>
               </Pressable>
             )}

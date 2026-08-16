@@ -104,6 +104,18 @@ export async function cancelScheduledCourseNotification(id: string): Promise<voi
   }
 }
 
+/**
+ * 예약 알림 전체 취소. 이 앱의 예약 알림은 복귀 리마인더 하나뿐이라
+ * "전체"가 곧 "그 하나" — 재예약 직전에 불러 고아 알림을 원천 차단한다.
+ */
+export async function cancelAllScheduledCourseNotifications(): Promise<void> {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch {
+    // 미지원 환경 — 무시
+  }
+}
+
 /** 즉시 로컬 알림(혼잡 해소 등). 권한 없으면 조용히 실패한다. */
 export async function presentCourseNotification(title: string, body: string): Promise<void> {
   try {
