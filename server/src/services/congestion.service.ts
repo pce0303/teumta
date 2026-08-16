@@ -4,6 +4,7 @@ import { KTO_CONCENTRATION_FORECAST_SOURCE } from '../dtos';
 import { ExternalApiNotFoundError } from '../external/common';
 import { fetchRealtimeCongestion, mapSkCongestionToCongestionData } from '../external/congestion';
 import { prisma } from '../utils/prisma';
+import { TtlCache } from '../utils/ttl-cache';
 import { resolveTmapPoiId } from './poi-matching.service';
 
 /**
@@ -94,34 +95,38 @@ export interface RealtimeCongestionView {
   isRealtime: true;
 }
 
-const realtimeCache = new Map<string, { view: RealtimeCongestionView; expiresAt: number }>();
+/** 상한은 실시간 혼잡도를 실제로 조회할 만한 POI 수보다 넉넉하게. */
+const REALTIME_CACHE_MAX_ENTRIES = 500;
+
+const realtimeCache = new TtlCache<RealtimeCongestionView>(
+  REALTIME_CONGESTION_CACHE_TTL_MS,
+  REALTIME_CACHE_MAX_ENTRIES,
+);
 
 /** 테스트용 캐시 초기화. */
 export function clearRealtimeCongestionCache(): void {
   realtimeCache.clear();
 }
 
-/** POI 실시간 혼잡도(5분 캐시). 외부 오류는 그대로 전파 — 변환은 error.middleware. */
+/**
+ * POI 실시간 혼잡도(5분 캐시). 외부 오류는 그대로 전파 — 변환은 error.middleware.
+ * 같은 POI 동시 미스는 외부 호출 1회를 공유한다(TtlCache.getOrCreate).
+ */
 export async function getRealtimeCongestion(poiId: string): Promise<RealtimeCongestionView> {
   const key = poiId.trim();
-  const cached = realtimeCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.view;
-  }
-
-  const raw = await fetchRealtimeCongestion(key);
-  const data = mapSkCongestionToCongestionData(raw);
-  const view: RealtimeCongestionView = {
-    poiId: key,
-    poiName: raw.contents?.poiName ?? null,
-    level: data.level,
-    source: data.source ?? 'SK_PUZZLE',
-    measuredAt: data.measuredAt,
-    fetchedAt: new Date(),
-    isRealtime: true,
-  };
-  realtimeCache.set(key, { view, expiresAt: Date.now() + REALTIME_CONGESTION_CACHE_TTL_MS });
-  return view;
+  return realtimeCache.getOrCreate(key, async () => {
+    const raw = await fetchRealtimeCongestion(key);
+    const data = mapSkCongestionToCongestionData(raw);
+    return {
+      poiId: key,
+      poiName: raw.contents?.poiName ?? null,
+      level: data.level,
+      source: data.source ?? 'SK_PUZZLE',
+      measuredAt: data.measuredAt,
+      fetchedAt: new Date(),
+      isRealtime: true,
+    };
+  });
 }
 
 /**

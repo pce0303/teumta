@@ -7,6 +7,7 @@ import {
   normalizeServiceKey,
   requestJson,
 } from '../common';
+import { TtlCache } from '../../utils/ttl-cache';
 import type { TourApiDetailResponse, TourApiListResponse } from './tour.dto';
 
 /**
@@ -166,6 +167,26 @@ export async function fetchTourPlacesByKeyword(
   return requestTourList(buildTourUrl('searchKeyword2', buildKeywordSearchQuery(params)));
 }
 
+/**
+ * 상세 응답 캐시.
+ *
+ * 목적지 상세 화면 하나가 detailCommon2를 최대 3번 부른다 — 혼잡도 POI 매칭·집중률
+ * 지역 해석·주변 로컬 기준점이 각자 같은 contentId 상세를 요청(병렬이라 그동안은 전부
+ * 실호출). 관광지 상세는 사실상 정적이므로 짧게 캐시해 쿼터(일 1,000)와 지연을 줄인다.
+ * 동시 미스는 getOrCreate가 호출 1건으로 합친다. 실패는 캐시하지 않는다.
+ */
+const DETAIL_CACHE_TTL_MS = 10 * 60 * 1000;
+const DETAIL_CACHE_MAX_ENTRIES = 500;
+const detailCache = new TtlCache<TourApiDetailResponse>(
+  DETAIL_CACHE_TTL_MS,
+  DETAIL_CACHE_MAX_ENTRIES,
+);
+
+/** 테스트용 캐시 초기화. */
+export function clearTourDetailCache(): void {
+  detailCache.clear();
+}
+
 /** 공통정보 조회(detailCommon2). 기준 관광지 좌표 실시간 확보용. */
 export async function fetchTourPlaceDetail(
   contentId: string | number,
@@ -174,11 +195,13 @@ export async function fetchTourPlaceDetail(
   if (trimmed.length === 0) {
     throw new ExternalApiError(SERVICE, 'contentId is required', { code: 'INVALID_PARAM' });
   }
-  // v4.4에서 defaultYN/mapinfoYN 등 플래그는 폐지됨(전달 시 resultCode 10).
-  const url = buildTourUrl('detailCommon2', { contentId: trimmed });
-  const response = await requestJson<TourApiDetailResponse>({ service: SERVICE, url });
-  assertTourApiOk(response);
-  return response;
+  return detailCache.getOrCreate(`common:${trimmed}`, async () => {
+    // v4.4에서 defaultYN/mapinfoYN 등 플래그는 폐지됨(전달 시 resultCode 10).
+    const url = buildTourUrl('detailCommon2', { contentId: trimmed });
+    const response = await requestJson<TourApiDetailResponse>({ service: SERVICE, url });
+    assertTourApiOk(response);
+    return response;
+  });
 }
 
 /**
@@ -196,13 +219,15 @@ export async function fetchTourPlaceIntro(
       code: 'INVALID_PARAM',
     });
   }
-  const url = buildTourUrl('detailIntro2', {
-    contentId: trimmedId,
-    contentTypeId: trimmedTypeId,
+  return detailCache.getOrCreate(`intro:${trimmedId}:${trimmedTypeId}`, async () => {
+    const url = buildTourUrl('detailIntro2', {
+      contentId: trimmedId,
+      contentTypeId: trimmedTypeId,
+    });
+    const response = await requestJson<TourApiDetailResponse>({ service: SERVICE, url });
+    assertTourApiOk(response);
+    return response;
   });
-  const response = await requestJson<TourApiDetailResponse>({ service: SERVICE, url });
-  assertTourApiOk(response);
-  return response;
 }
 
 async function requestTourList(url: string): Promise<TourApiListResponse> {

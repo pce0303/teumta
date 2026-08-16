@@ -31,6 +31,9 @@ import { ExternalApiError } from '../common/external-api.error';
 import {
   buildAreaListQuery,
   buildLocationListQuery,
+  clearTourDetailCache,
+  fetchTourPlaceDetail,
+  fetchTourPlaceIntro,
   fetchTourPlacesByArea,
   fetchTourPlacesByKeyword,
   fetchTourPlacesByLocation,
@@ -48,6 +51,7 @@ function okResponse(): TourApiListResponse {
 beforeEach(() => {
   requestJsonMock.mockReset();
   requestJsonMock.mockResolvedValue(okResponse());
+  clearTourDetailCache();
 });
 
 describe('buildAreaListQuery', () => {
@@ -201,5 +205,42 @@ describe('resultCode 처리', () => {
       (error: unknown) => error,
     );
     expect((caught as ExternalApiError).code).toBe('RATE_LIMITED');
+  });
+});
+
+describe('상세 응답 캐시(detailCommon2/detailIntro2)', () => {
+  it('같은 contentId는 TTL 안에서 외부 호출 1회만 발생한다', async () => {
+    await fetchTourPlaceDetail('126508');
+    await fetchTourPlaceDetail('126508');
+    expect(requestJsonMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('다른 contentId는 각각 호출한다', async () => {
+    await fetchTourPlaceDetail('126508');
+    await fetchTourPlaceDetail('126081');
+    expect(requestJsonMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('동시 요청도 호출 1회로 합쳐진다(화면 하나가 3곳에서 병렬 조회)', async () => {
+    await Promise.all([
+      fetchTourPlaceDetail('126508'),
+      fetchTourPlaceDetail('126508'),
+      fetchTourPlaceDetail('126508'),
+    ]);
+    expect(requestJsonMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('실패는 캐시하지 않아 다음 호출이 다시 시도한다', async () => {
+    requestJsonMock.mockRejectedValueOnce(new ExternalApiError('tour', 'boom'));
+    await expect(fetchTourPlaceDetail('126508')).rejects.toThrow();
+    await fetchTourPlaceDetail('126508');
+    expect(requestJsonMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('common과 intro는 키가 달라 서로 캐시를 공유하지 않는다', async () => {
+    await fetchTourPlaceDetail('126508');
+    await fetchTourPlaceIntro('126508', '12');
+    await fetchTourPlaceIntro('126508', '12');
+    expect(requestJsonMock).toHaveBeenCalledTimes(2);
   });
 });
