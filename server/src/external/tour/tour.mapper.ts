@@ -202,7 +202,51 @@ export function mapLocalPlaceDetail(response: TourApiDetailResponse): LocalPlace
     overview: cleanRichText(item.overview),
     tel: cleanRichText(item.tel),
     homepage: extractFirstUrl(item.homepage),
+    // 운영시간·휴무일은 detailIntro2에서 별도 병합(서비스 담당)
+    openHours: null,
+    restDays: null,
   };
+}
+
+/**
+ * detailIntro2 → 운영시간·휴무일.
+ *
+ * 필드명이 contentTypeId마다 다르다 — 관광지(12) usetime/restdate,
+ * 문화시설(14) usetimeculture/restdateculture, 쇼핑(38) opentime/restdateshopping,
+ * 음식점(39) opentimefood/restdatefood. 타입 분기 대신 "있는 첫 값"을 쓴다 —
+ * 대상 타입이 늘어도 후보 목록만 늘리면 된다.
+ */
+const OPEN_HOURS_FIELDS = ['usetime', 'usetimeculture', 'opentime', 'opentimefood'] as const;
+const REST_DAYS_FIELDS = ['restdate', 'restdateculture', 'restdateshopping', 'restdatefood'] as const;
+
+export function mapLocalPlaceIntro(response: TourApiDetailResponse): {
+  openHours: string | null;
+  restDays: string | null;
+} {
+  const item = extractDetailItem(response);
+  return {
+    openHours: firstCleanText(item, OPEN_HOURS_FIELDS),
+    restDays: firstCleanText(item, REST_DAYS_FIELDS),
+  };
+}
+
+function firstCleanText(
+  item: TourApiDetailItem | null,
+  fields: readonly string[],
+): string | null {
+  if (!item) {
+    return null;
+  }
+  for (const field of fields) {
+    const value = item[field];
+    if (typeof value === 'string') {
+      const cleaned = cleanRichText(value);
+      if (cleaned) {
+        return cleaned;
+      }
+    }
+  }
+  return null;
 }
 
 /** HTML 태그·엔티티 제거. 소개문에 `<br>`, `&amp;` 등이 섞여 온다. */

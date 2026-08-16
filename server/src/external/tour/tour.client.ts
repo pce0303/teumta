@@ -181,6 +181,30 @@ export async function fetchTourPlaceDetail(
   return response;
 }
 
+/**
+ * 소개정보 조회(detailIntro2) — 운영시간·휴무일.
+ * contentTypeId가 필수이고, 응답 필드명도 contentTypeId마다 다르다(매퍼에서 흡수).
+ */
+export async function fetchTourPlaceIntro(
+  contentId: string | number,
+  contentTypeId: string | number,
+): Promise<TourApiDetailResponse> {
+  const trimmedId = String(contentId).trim();
+  const trimmedTypeId = String(contentTypeId).trim();
+  if (trimmedId.length === 0 || trimmedTypeId.length === 0) {
+    throw new ExternalApiError(SERVICE, 'contentId and contentTypeId are required', {
+      code: 'INVALID_PARAM',
+    });
+  }
+  const url = buildTourUrl('detailIntro2', {
+    contentId: trimmedId,
+    contentTypeId: trimmedTypeId,
+  });
+  const response = await requestJson<TourApiDetailResponse>({ service: SERVICE, url });
+  assertTourApiOk(response);
+  return response;
+}
+
 async function requestTourList(url: string): Promise<TourApiListResponse> {
   const response = await requestJson<TourApiListResponse>({ service: SERVICE, url });
   assertTourApiOk(response);

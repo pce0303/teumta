@@ -17,8 +17,10 @@ import {
   extractDetailCoordinate,
   extractDetailItem,
   fetchTourPlaceDetail,
+  fetchTourPlaceIntro,
   fetchTourPlacesByLocation,
   mapLocalPlaceDetail,
+  mapLocalPlaceIntro,
   mapNearbyCandidateList,
 } from '../external/tour';
 import { prisma } from '../utils/prisma';
@@ -185,7 +187,25 @@ export async function getNearbyLocalPlacesRealtime(
 export async function getLocalPlaceDetail(
   contentId: string,
 ): Promise<LocalPlaceDetailData | null> {
-  return mapLocalPlaceDetail(await fetchTourPlaceDetail(contentId));
+  const commonResponse = await fetchTourPlaceDetail(contentId);
+  const detail = mapLocalPlaceDetail(commonResponse);
+  if (!detail) {
+    return null;
+  }
+
+  // 운영시간·휴무일은 detailIntro2에만 있고 contentTypeId가 필수 — common 응답에서 얻는다.
+  // 상세 진입당 TourAPI 2회(일 1,000 쿼터 안에서 감당). 목록에는 여전히 붙이지 않는다.
+  const contentTypeId = extractDetailItem(commonResponse)?.contenttypeid;
+  if (!contentTypeId) {
+    return detail;
+  }
+  try {
+    const intro = mapLocalPlaceIntro(await fetchTourPlaceIntro(contentId, contentTypeId));
+    return { ...detail, ...intro };
+  } catch {
+    // 운영 정보는 부가 — intro 실패로 소개 전체를 잃지 않는다
+    return detail;
+  }
 }
 
 /** 목적지 기준점. 좌표는 서버가 식별자로 해석한 값(사용자 GPS 아님). */

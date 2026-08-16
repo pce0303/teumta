@@ -295,6 +295,36 @@ DB는 기준 관광지 1건 읽기(findUnique)에만 사용한다.
 > 용도로만 남아 있으며, 주변 로컬 장소 조회 목적의 관광정보 DB 적재에는 사용 금지.
 > `place.service.ts`의 구 `getNearbyLocalPlaces`(DB 전체 조회 + 하버사인)는 deprecated.
 
+### 3.3c 로컬 장소 소개 — [B] (실시간 외부 API, 구현됨)
+```
+GET /api/local-places/detail?contentId=2871024
+```
+주변 로컬 장소(3.3b) 목록에는 소개문이 없어 이름·거리만으로 "가볼지"를 판단해야 한다.
+목록에 붙이면 항목 수만큼 외부 호출이 늘어나므로(10곳 × 조회 수) **상세 화면 진입 시 1곳만** 조회한다.
+
+**호출량:** TourAPI 2건 — `detailCommon2`(소개·연락처) + `detailIntro2`(운영시간·휴무일).
+`detailIntro2`는 `contentTypeId`가 필수인데 클라이언트에 없으므로 common 응답에서 얻어 이어 부른다.
+
+```jsonc
+{
+  "success": true,
+  "data": {
+    "tourApiContentId": "2871024",
+    "name": "통인시장",
+    "overview": "골목형 재래시장으로 …",   // HTML 정리 후 평문
+    "tel": "02-722-0911",
+    "homepage": "https://tonginmarket.co.kr",
+    "openHours": "10:00 ~ 22:00",          // detailIntro2 — 타입별 필드명(usetime/usetimeculture/opentime/opentimefood)을 흡수한 표시용 문자열
+    "restDays": "매주 월요일"               // 휴무일(restdate 계열). 미제공이면 null
+  },
+  "error": null
+}
+```
+- `openHours`/`restDays`는 **부가 정보** — `detailIntro2` 실패 시 null로 두고 나머지는 그대로 반환(부분 성공).
+- 휴무일 표시는 "휴무일 장소를 코스로 제안하면 신뢰가 깨진다"(team-todo 미결정 항목)를
+  **스키마 변경 없이** 실시간 조회로 다루는 방식이다 — 판단은 사용자에게, 데이터는 화면에.
+- `400 INVALID_CONTENT_ID` — contentId 누락/공백 · `404 LOCAL_PLACE_NOT_FOUND` — TourAPI에 항목 없음.
+
 ---
 
 ### 3.4 장소 혼잡도 — [B]

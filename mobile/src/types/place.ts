@@ -101,4 +101,8 @@ export type LocalPlaceDetail = {
   overview: string | null;
   tel: string | null;
   homepage: string | null;
+  /** 운영시간(TourAPI detailIntro2). 미제공이면 null. 구서버 응답엔 필드가 없을 수 있다. */
+  openHours?: string | null;
+  /** 휴무일. 미제공이면 null. */
+  restDays?: string | null;
 };
