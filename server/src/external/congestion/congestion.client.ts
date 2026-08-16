@@ -5,7 +5,7 @@ import {
   externalConfig,
   requestJson,
 } from '../common';
-import type { SkCongestionResponse } from './congestion.dto';
+import type { SkCongestionResponse, SkPoiListResponse } from './congestion.dto';
 
 /**
  * SK 지오비전 퍼즐 "실시간 장소 혼잡도" 클라이언트. 통신 책임만 — 변환은 congestion.mapper.ts.
@@ -14,13 +14,10 @@ import type { SkCongestionResponse } from './congestion.dto';
 
 const SERVICE = 'congestion';
 const RLTM_PATH = '/place/congestion/rltm/pois';
+const META_POIS_PATH = '/place/meta/pois';
 
-/** POI 실시간 혼잡도 조회. poiId는 TMAP 장소 통합 검색의 id. */
-export async function fetchRealtimeCongestion(
-  poiId: string | number,
-): Promise<SkCongestionResponse> {
+function requireCongestionConfig(): { baseUrl: string; apiKey: string } {
   const { baseUrl, apiKey } = externalConfig.congestion;
-
   if (!baseUrl) {
     throw new ExternalApiError(SERVICE, 'CONGESTION_API_BASE_URL is not configured', {
       code: 'CONFIG_MISSING',
@@ -31,13 +28,21 @@ export async function fetchRealtimeCongestion(
       code: 'CONFIG_MISSING',
     });
   }
+  return { baseUrl: baseUrl.replace(/\/+$/, ''), apiKey };
+}
+
+/** POI 실시간 혼잡도 조회. poiId는 TMAP 장소 통합 검색의 id. */
+export async function fetchRealtimeCongestion(
+  poiId: string | number,
+): Promise<SkCongestionResponse> {
+  const { baseUrl, apiKey } = requireCongestionConfig();
 
   const trimmed = String(poiId).trim();
   if (trimmed.length === 0) {
     throw new ExternalApiError(SERVICE, 'poiId is required', { code: 'INVALID_PARAM' });
   }
 
-  const url = `${baseUrl.replace(/\/+$/, '')}${RLTM_PATH}/${encodeURIComponent(trimmed)}`;
+  const url = `${baseUrl}${RLTM_PATH}/${encodeURIComponent(trimmed)}`;
   const response = await requestJson<SkCongestionResponse>({
     service: SERVICE,
     url,
@@ -46,6 +51,36 @@ export async function fetchRealtimeCongestion(
     acceptStatuses: [400, 404],
   });
   assertPuzzleOk(response);
+  return response;
+}
+
+/**
+ * "데이터 제공 가능 장소" 목록 1페이지 조회.
+ *
+ * 전체 약 3.4만 곳(2026-08-16 기준 33,745). limit 최대 1000이 실측으로 통했고,
+ * offset 30,000 이상은 400을 준다 — 페이지네이션 종료 판단은 호출부(sk-poi-index) 몫.
+ * 이름 검색 파라미터는 없다(name/searchKeyword 전부 무시 확인).
+ */
+export async function fetchCongestionPoiPage(
+  offset: number,
+  limit: number,
+): Promise<SkPoiListResponse> {
+  const { baseUrl, apiKey } = requireCongestionConfig();
+
+  const url = `${baseUrl}${META_POIS_PATH}?offset=${offset}&limit=${limit}`;
+  const response = await requestJson<SkPoiListResponse>({
+    service: SERVICE,
+    url,
+    headers: { appKey: apiKey },
+  });
+
+  const code = response.status?.code;
+  if (code !== '00') {
+    throw new ExternalApiResponseError(
+      SERVICE,
+      `Puzzle API returned status ${code ?? 'UNKNOWN'} for poi list`,
+    );
+  }
   return response;
 }
 

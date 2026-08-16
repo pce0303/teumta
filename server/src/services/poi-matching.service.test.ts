@@ -2,9 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /** TourAPI 관광지 ↔ TMAP POI 매칭 테스트. 외부 API는 전부 mock. */
 
-const { fetchTourPlaceDetailMock, fetchPoiSearchMock } = vi.hoisted(() => ({
+const {
+  fetchTourPlaceDetailMock,
+  fetchPoiSearchMock,
+  fetchPoiDetailMock,
+  fetchRealtimeCongestionMock,
+  getSkPoiIndexMock,
+} = vi.hoisted(() => ({
   fetchTourPlaceDetailMock: vi.fn(),
   fetchPoiSearchMock: vi.fn(),
+  fetchPoiDetailMock: vi.fn(),
+  fetchRealtimeCongestionMock: vi.fn(),
+  getSkPoiIndexMock: vi.fn(),
 }));
 
 vi.mock('../external/tour', async (importOriginal) => {
@@ -14,8 +23,23 @@ vi.mock('../external/tour', async (importOriginal) => {
 
 vi.mock('../external/tmap', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../external/tmap')>();
-  return { ...actual, fetchPoiSearch: fetchPoiSearchMock };
+  return {
+    ...actual,
+    fetchPoiSearch: fetchPoiSearchMock,
+    fetchPoiDetail: fetchPoiDetailMock,
+  };
 });
+
+vi.mock('../external/congestion', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../external/congestion')>();
+  return { ...actual, fetchRealtimeCongestion: fetchRealtimeCongestionMock };
+});
+
+vi.mock('./sk-poi-index.service', () => ({
+  getSkPoiIndex: getSkPoiIndexMock,
+}));
+
+import { ExternalApiNotFoundError } from '../external/common';
 
 import {
   clearPoiMatchCache,
@@ -39,10 +63,37 @@ function poiSearch(pois: Record<string, unknown>[]) {
   return { searchPoiInfo: { pois: { poi: pois } } };
 }
 
+/** 테스트용 SK 제공 장소 인덱스. */
+function skIndex(poiIds: string[], byName: Record<string, string[]> = {}) {
+  const ids = new Set(poiIds);
+  return {
+    hasPoi: (poiId: string) => ids.has(poiId),
+    findPoiIdsByName: (name: string) => byName[name.replace(/\s+/g, '')] ?? [],
+    findPoiIdsContainedInName: (name: string) => {
+      const target = name.replace(/\s+/g, '');
+      return Object.entries(byName)
+        .filter(([key]) => key !== target && key.length >= 3 && target.includes(key))
+        .sort(([a], [b]) => b.length - a.length)
+        .flatMap(([, list]) => list);
+    },
+    size: ids.size,
+  };
+}
+
 beforeEach(() => {
   clearPoiMatchCache();
   fetchTourPlaceDetailMock.mockReset();
   fetchPoiSearchMock.mockReset();
+  fetchPoiDetailMock.mockReset();
+  fetchRealtimeCongestionMock.mockReset();
+  getSkPoiIndexMock.mockReset();
+  // 기본은 인덱스 없음 — 기존 TMAP 매칭 동작이 그대로인지 먼저 보장한다.
+  getSkPoiIndexMock.mockResolvedValue(null);
+  // 기본은 실시간 조회 성공 — 검증 단계가 매칭을 바꾸지 않는 상태.
+  fetchRealtimeCongestionMock.mockResolvedValue({
+    status: { code: '00', message: 'success' },
+    contents: { poiId: 'any', rltm: [] },
+  });
 
   fetchTourPlaceDetailMock.mockResolvedValue(
     tourDetail({
@@ -168,5 +219,140 @@ describe('resolveTmapPoiId', () => {
 
     await expect(resolveTmapPoiId('126508')).resolves.toBeNull();
     expect(fetchPoiSearchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('SK 제공 장소 인덱스 연동', () => {
+  it('반경 안 후보 중 SK가 커버하는 쪽을 우선한다(이름 랭크보다 먼저)', () => {
+    const picked = pickBestPoiMatch(
+      [
+        { tmapPoiId: '100', name: '경복궁', latitude: 37.5761, longitude: 126.9768 },
+        { tmapPoiId: '200', name: '경복궁 안내소', latitude: 37.5762, longitude: 126.9769 },
+      ],
+      { name: '경복궁', coordinate: { latitude: 37.5760307, longitude: 126.9767218 } },
+      { hasPoi: (poiId: string) => poiId === '200' },
+    );
+    expect(picked).toBe('200');
+  });
+
+  it('TMAP 최적 후보가 실시간 미제공이면 이름 역매칭 후보로 확정한다', async () => {
+    // 실제 케이스: 에버랜드 — TMAP 검색은 주차장류 id만 주지만 목록에는 "에버랜드"(387701)가 있고
+    // rltm도 387701만 성공한다. 최종 판정은 실시간 조회 검증.
+    getSkPoiIndexMock.mockResolvedValue(
+      skIndex(['387701'], { 에버랜드: ['387701'] }),
+    );
+    fetchTourPlaceDetailMock.mockResolvedValue(
+      tourDetail({ contentid: '127797', title: '에버랜드', mapy: '37.2940', mapx: '127.2020' }),
+    );
+    fetchPoiSearchMock.mockResolvedValue(
+      poiSearch([{ id: '999999', name: '에버랜드 주차장', noorLat: '37.2941', noorLon: '127.2021' }]),
+    );
+    fetchPoiDetailMock.mockResolvedValue({
+      poiDetailInfo: { id: '387701', name: '에버랜드', lat: '37.2939', lon: '127.2019' },
+    });
+    fetchRealtimeCongestionMock.mockImplementation((poiId: string | number) => {
+      if (String(poiId) === '387701') {
+        return Promise.resolve({ status: { code: '00', message: 'success' }, contents: {} });
+      }
+      return Promise.reject(
+        new ExternalApiNotFoundError('congestion', 'no data', {
+          code: 'CONGESTION_DATA_NOT_FOUND',
+        }),
+      );
+    });
+
+    await expect(resolveTmapPoiId('127797')).resolves.toBe('387701');
+    expect(fetchPoiDetailMock).toHaveBeenCalledWith('387701');
+  });
+
+  it('목록에 있어도 전 후보가 실시간 미제공(통계 전용)이면 기존 최적 후보를 유지한다', async () => {
+    // 실측: 불국사·남이섬은 "데이터 제공 가능 장소" 목록에는 있지만 rltm은 404다.
+    getSkPoiIndexMock.mockResolvedValue(skIndex(['318106'], { 불국사: ['318106'] }));
+    fetchTourPlaceDetailMock.mockResolvedValue(
+      tourDetail({ contentid: '126166', title: '불국사', mapy: '35.7900', mapx: '129.3320' }),
+    );
+    fetchPoiSearchMock.mockResolvedValue(
+      poiSearch([{ id: '318106', name: '불국사', noorLat: '35.7901', noorLon: '129.3321' }]),
+    );
+    fetchRealtimeCongestionMock.mockRejectedValue(
+      new ExternalApiNotFoundError('congestion', 'no data', {
+        code: 'CONGESTION_DATA_NOT_FOUND',
+      }),
+    );
+
+    await expect(resolveTmapPoiId('126166')).resolves.toBe('318106');
+  });
+
+  it('검증 중 일시 장애(5xx류)는 미커버로 오판하지 않고 기존 후보를 유지한다', async () => {
+    fetchRealtimeCongestionMock.mockRejectedValue(new Error('upstream down'));
+
+    await expect(resolveTmapPoiId('126508')).resolves.toBe('362105');
+  });
+
+  it('이름이 같아도 좌표가 반경 밖이면 역매칭하지 않는다(동명이소 차단)', async () => {
+    getSkPoiIndexMock.mockResolvedValue(skIndex(['555'], { 경복궁: ['555'] }));
+    // TMAP 검색 결과 없음 → 기존 매칭 실패 상황
+    fetchPoiSearchMock.mockResolvedValue(poiSearch([]));
+    // 동명이지만 부산 좌표
+    fetchPoiDetailMock.mockResolvedValue({
+      poiDetailInfo: { id: '555', name: '경복궁', lat: '35.1796', lon: '129.0756' },
+    });
+
+    await expect(resolveTmapPoiId('126508')).resolves.toBeNull();
+  });
+
+  it('인덱스 로드 실패(null)면 기존 TMAP 매칭 결과를 그대로 쓴다', async () => {
+    getSkPoiIndexMock.mockResolvedValue(null);
+    await expect(resolveTmapPoiId('126508')).resolves.toBe('362105');
+    expect(fetchPoiDetailMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('이름 포함 방향 폴백', () => {
+  it('TourAPI가 부가 표기를 붙이면 목록의 더 짧은 본시설명으로 잇는다(수원화성)', async () => {
+    getSkPoiIndexMock.mockResolvedValue(
+      skIndex(['205065', '10289502'], {
+        수원화성: ['205065'],
+        수원화성관광특구: ['10289502'],
+      }),
+    );
+    fetchTourPlaceDetailMock.mockResolvedValue(
+      tourDetail({ contentid: '2480899', title: '수원화성 관광특구', mapy: '37.2776', mapx: '127.0168' }),
+    );
+    fetchPoiSearchMock.mockResolvedValue(poiSearch([]));
+    fetchPoiDetailMock.mockImplementation((poiId: string | number) =>
+      Promise.resolve({
+        poiDetailInfo:
+          String(poiId) === '205065'
+            ? { id: '205065', name: '수원화성', lat: '37.2814', lon: '127.0098' }
+            : { id: '10289502', name: '수원화성 관광특구', lat: '37.2776', lon: '127.0168' },
+      }),
+    );
+    // 정확 일치(관광특구)는 실시간 미제공, 본시설(수원화성)만 제공 — 실측 재현
+    fetchRealtimeCongestionMock.mockImplementation((poiId: string | number) => {
+      if (String(poiId) === '205065') {
+        return Promise.resolve({ status: { code: '00', message: 'success' }, contents: {} });
+      }
+      return Promise.reject(
+        new ExternalApiNotFoundError('congestion', 'no data', {
+          code: 'CONGESTION_DATA_NOT_FOUND',
+        }),
+      );
+    });
+
+    await expect(resolveTmapPoiId('2480899')).resolves.toBe('205065');
+  });
+
+  it('반대 방향(목록명이 target을 포함 — "청계천"→"청계천박물관")은 후보로 잡지 않는다', async () => {
+    getSkPoiIndexMock.mockResolvedValue(
+      skIndex(['1157887'], { 청계천박물관: ['1157887'] }),
+    );
+    fetchTourPlaceDetailMock.mockResolvedValue(
+      tourDetail({ contentid: '129507', title: '청계천', mapy: '37.5696', mapx: '127.0056' }),
+    );
+    fetchPoiSearchMock.mockResolvedValue(poiSearch([]));
+
+    await expect(resolveTmapPoiId('129507')).resolves.toBeNull();
+    expect(fetchPoiDetailMock).not.toHaveBeenCalled();
   });
 });

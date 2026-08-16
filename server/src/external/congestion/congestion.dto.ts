@@ -43,3 +43,20 @@ export interface SkCongestionResponse {
   contents?: SkCongestionContents;
   error?: SkPuzzleError;
 }
+
+/**
+ * "데이터 제공 가능 장소" 목록 항목.
+ * GET {CONGESTION_API_BASE_URL}/place/meta/pois?offset=&limit= (헤더 appKey)
+ * 실제 응답 샘플 기준(2026-08-16 검증) — 좌표는 주지 않는다(poiId·이름뿐).
+ */
+export interface SkPoiListItem {
+  poiId: string;
+  poiName?: string;
+  [key: string]: unknown;
+}
+
+export interface SkPoiListResponse {
+  status?: SkPuzzleStatus & { offset?: number; limit?: number };
+  contents?: SkPoiListItem[];
+  error?: SkPuzzleError;
+}
