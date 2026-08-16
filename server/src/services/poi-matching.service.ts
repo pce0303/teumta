@@ -2,6 +2,7 @@ import { fetchPoiSearch, mapPoiSearchToDestinations } from '../external/tmap';
 import { extractDetailCoordinate, extractDetailItem, fetchTourPlaceDetail } from '../external/tour';
 import { distanceMeters, type GeoPoint } from '../utils/geo';
 import { placeNameRank } from '../utils/place-name';
+import { TtlCache } from '../utils/ttl-cache';
 
 /**
  * TourAPI 관광지(contentId) → TMAP POI(poiId) 매칭.
@@ -26,13 +27,14 @@ export const POI_MATCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 /** POI 검색 후보 확인 수. 상위 몇 개면 충분. */
 const POI_SEARCH_COUNT = 5;
 
-interface CacheEntry {
-  /** 매칭 실패도 캐시 — 같은 장소 반복 호출로 쿼터 소모 방지. */
-  poiId: string | null;
-  expiresAt: number;
-}
+/**
+ * 상한 — 상세를 연 목적지마다 키가 쌓이는 캐시라 무한 성장 방지가 특히 중요.
+ * 값으로 null(매칭 실패)도 저장한다 — 같은 장소 반복 호출로 쿼터를 태우지 않기 위함.
+ * 외부 오류로 lookup 자체가 던지면 캐시하지 않는다(일시 장애를 24시간 박제하면 안 됨).
+ */
+const POI_MATCH_CACHE_MAX_ENTRIES = 2000;
 
-const cache = new Map<string, CacheEntry>();
+const cache = new TtlCache<string | null>(POI_MATCH_CACHE_TTL_MS, POI_MATCH_CACHE_MAX_ENTRIES);
 
 /** 테스트용 캐시 초기화. */
 export function clearPoiMatchCache(): void {
@@ -42,17 +44,11 @@ export function clearPoiMatchCache(): void {
 /**
  * contentId에 대응하는 TMAP poiId. 없으면 null.
  * 외부 호출은 최초 1회(TourAPI 상세 1 + POI 검색 1), 이후 캐시.
+ * 같은 contentId 동시 미스도 호출 1회를 공유한다.
  */
 export async function resolveTmapPoiId(contentId: string): Promise<string | null> {
   const key = contentId.trim();
-  const cached = cache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.poiId;
-  }
-
-  const poiId = await lookupTmapPoiId(key);
-  cache.set(key, { poiId, expiresAt: Date.now() + POI_MATCH_CACHE_TTL_MS });
-  return poiId;
+  return cache.getOrCreate(key, () => lookupTmapPoiId(key));
 }
 
 async function lookupTmapPoiId(contentId: string): Promise<string | null> {

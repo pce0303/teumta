@@ -5,6 +5,7 @@ import {
 } from '../external/prediction';
 import { extractDetailItem, fetchTourPlaceDetail } from '../external/tour';
 import { toPlaceMatchKey } from '../utils/place-name';
+import { TtlCache } from '../utils/ttl-cache';
 
 /**
  * 집중률 예측 실시간 조회 — DB 미사용, 전국.
@@ -41,12 +42,13 @@ export interface ConcentrationForecastByContentIdResult {
   forecasts: ConcentrationForecastEntry[];
 }
 
-interface RegionCacheEntry {
-  forecasts: ConcentrationForecastData[];
-  expiresAt: number;
-}
+/** 상한 — 전국 시군구 수(~250)보다 넉넉하게. */
+const REGION_CACHE_MAX_ENTRIES = 300;
 
-const regionCache = new Map<string, RegionCacheEntry>();
+const regionCache = new TtlCache<ConcentrationForecastData[]>(
+  FORECAST_REGION_CACHE_TTL_MS,
+  REGION_CACHE_MAX_ENTRIES,
+);
 
 /** 테스트용 캐시 초기화. */
 export function clearForecastRegionCache(): void {
@@ -74,26 +76,22 @@ export function toFullSignguCode(areaCd: string, signguCd: string): string {
   return `${area}${signgu}`;
 }
 
-/** 지역 단위 예측 목록(캐시). 같은 시군구 목적지끼리 호출 1건 공유. */
+/**
+ * 지역 단위 예측 목록(캐시). 같은 시군구 목적지끼리 호출 1건 공유하고,
+ * 같은 지역 동시 미스도 호출 1건으로 합쳐진다(getOrCreate).
+ */
 async function getRegionForecasts(
   areaCd: string,
   signguCd: string,
 ): Promise<ConcentrationForecastData[]> {
-  const key = `${areaCd}:${signguCd}`;
-  const cached = regionCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.forecasts;
-  }
-
-  const response = await fetchConcentrationForecast({
-    areaCd,
-    signguCd,
-    numOfRows: FORECAST_NUM_OF_ROWS,
+  return regionCache.getOrCreate(`${areaCd}:${signguCd}`, async () => {
+    const response = await fetchConcentrationForecast({
+      areaCd,
+      signguCd,
+      numOfRows: FORECAST_NUM_OF_ROWS,
+    });
+    return mapConcentrationForecast(response).forecasts;
   });
-  const { forecasts } = mapConcentrationForecast(response);
-
-  regionCache.set(key, { forecasts, expiresAt: Date.now() + FORECAST_REGION_CACHE_TTL_MS });
-  return forecasts;
 }
 
 /**
@@ -109,25 +107,31 @@ export function selectForecastsByName(
     return [];
   }
 
-  const exact = forecasts.filter((forecast) => toPlaceMatchKey(forecast.tAtsNm) === target);
+  // 이름 정규화(NFC + 정규식 2회)는 행마다 비싸다. 시군구 하나가 수천 행이라
+  // 정확/부분/최단 선별마다 다시 하면 요청당 수만 번 — 행당 1회만 계산해 재사용.
+  const keyed = forecasts.map((forecast) => ({ forecast, key: toPlaceMatchKey(forecast.tAtsNm) }));
+
+  const exact = keyed.filter((entry) => entry.key === target);
   if (exact.length > 0) {
-    return exact;
+    return exact.map((entry) => entry.forecast);
   }
 
   // 부분 일치는 후보 다수 가능 → 가장 짧은 이름(부속 아닌 본 시설)으로 압축
-  const partial = forecasts.filter((forecast) => {
-    const name = toPlaceMatchKey(forecast.tAtsNm);
-    return name.includes(target) || target.includes(name);
-  });
+  const partial = keyed.filter(
+    (entry) => entry.key.includes(target) || target.includes(entry.key),
+  );
   if (partial.length === 0) {
     return [];
   }
 
-  const bestName = partial
-    .map((forecast) => toPlaceMatchKey(forecast.tAtsNm))
-    .sort((first, second) => first.length - second.length)[0];
+  let bestName = partial[0].key;
+  for (const entry of partial) {
+    if (entry.key.length < bestName.length) {
+      bestName = entry.key;
+    }
+  }
 
-  return partial.filter((forecast) => toPlaceMatchKey(forecast.tAtsNm) === bestName);
+  return partial.filter((entry) => entry.key === bestName).map((entry) => entry.forecast);
 }
 
 

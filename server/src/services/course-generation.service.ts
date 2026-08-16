@@ -196,13 +196,16 @@ export function planCourses(
     for (const combo of combinations(pool, size)) {
       // 방문 순서: 목적지에서 가까운 순 — 불필요한 왕복 감소
       const stops = [...combo].sort((a, b) => a.distanceMeters - b.distanceMeters);
-      const legs = stops.slice(1).map((stop, index) => ({
-        travelMinutes: estimateWalkMinutes(stops[index].candidate, stop.candidate),
-        distanceMeters: Math.round(
-          distanceMeters(stops[index].candidate, stop.candidate) * DETOUR_FACTOR,
-        ),
-        path: null,
-      }));
+      const legs = stops.slice(1).map((stop, index) => {
+        // 하버사인은 구간당 1회만 — 시간·거리 추정이 같은 직선거리를 공유한다
+        const detourMeters =
+          distanceMeters(stops[index].candidate, stop.candidate) * DETOUR_FACTOR;
+        return {
+          travelMinutes: Math.max(1, Math.ceil(detourMeters / WALKING_METERS_PER_MINUTE)),
+          distanceMeters: Math.round(detourMeters),
+          path: null,
+        };
+      });
       const travelMinutes = travelMinutesOf(stops, legs);
       const stayMinutes = fitStayMinutes(stops, travelMinutes, availableMinutes);
       if (stayMinutes === null) {
