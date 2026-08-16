@@ -8,6 +8,7 @@ import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
 import { getSelectedCourse } from '@/stores/selected-course';
 import { courseDistanceMeters, courseStayMinutes } from '@/types/course';
+import { buildCourseRoutePath } from '@/utils/course-path';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
 
@@ -115,7 +116,7 @@ export default function CourseMapScreen() {
       </View>
 
       <View style={styles.mapArea}>
-        <CourseMapView detour={mapDetour} />
+        <CourseMapView detour={mapDetour} routePath={buildCourseRoutePath(destination, course)} />
       </View>
 
       <ScrollView

@@ -6,6 +6,11 @@ import type { Coordinate, DetourCourse } from '@/types/place';
 
 type CourseMapViewProps = {
   detour?: DetourCourse;
+  /**
+   * 실제 보행 경로 좌표(구간별 TMAP 경로 연결). 없으면 정류지 직선 연결로 그린다.
+   * 마커는 계속 detour.coordinates(지점)에서 나온다 — 선과 점의 역할 분리.
+   */
+  routePath?: Coordinate[];
   /** 지도에 내 위치(파란 점)를 표시. 위치 권한이 허용된 화면에서만 켠다. */
   showsUserLocation?: boolean;
 };
@@ -19,12 +24,14 @@ function sameCoordinate(first: Coordinate, second: Coordinate): boolean {
   return first.latitude === second.latitude && first.longitude === second.longitude;
 }
 
-export function CourseMapView({ detour, showsUserLocation }: CourseMapViewProps) {
+export function CourseMapView({ detour, routePath, showsUserLocation }: CourseMapViewProps) {
   const coordinates = detour?.coordinates ?? [];
-  const latitudes = coordinates.map((coordinate) => coordinate.latitude);
-  const longitudes = coordinates.map((coordinate) => coordinate.longitude);
+  // 실경로가 있으면 선은 그걸로 긋고, 화면 범위도 경로가 지점 바깥으로 볼록한 만큼 포함한다.
+  const lineCoordinates = routePath && routePath.length > 1 ? routePath : coordinates;
+  const latitudes = lineCoordinates.map((coordinate) => coordinate.latitude);
+  const longitudes = lineCoordinates.map((coordinate) => coordinate.longitude);
   const region =
-    coordinates.length > 0
+    lineCoordinates.length > 0
       ? {
           latitude: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
           longitude: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
@@ -76,7 +83,7 @@ export function CourseMapView({ detour, showsUserLocation }: CourseMapViewProps)
             장소 마커와 모양이 같아 어느 것이 들르는 곳인지 구분되지 않았다.
             밑선은 파선 사이가 끊겨 보이지 않게 경로를 이어주고, 지도 배경과도 대비를 만든다. */}
         <Polyline
-          coordinates={coordinates}
+          coordinates={lineCoordinates}
           strokeColor={Teumta.surface}
           strokeWidth={9}
           lineCap="round"
@@ -84,7 +91,7 @@ export function CourseMapView({ detour, showsUserLocation }: CourseMapViewProps)
           zIndex={1}
         />
         <Polyline
-          coordinates={coordinates}
+          coordinates={lineCoordinates}
           strokeColor={Teumta.green}
           strokeWidth={4}
           lineCap="butt"
