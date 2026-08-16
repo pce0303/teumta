@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { Link, type Href } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Onboarding } from '@/components/onboarding';
@@ -38,12 +38,28 @@ export default function HomeScreen() {
   // 예전에는 2곳만 잘라 보여줘서 목적지를 늘려도 홈에는 3곳밖에 안 나왔다.
   const [featured, ...regionDestinations] = destinations;
 
+  // 당겨서 새로고침 — 홈에서 실시간인 건 혼잡도 섹션뿐이라 신호만 넘긴다.
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshSignal, setRefreshSignal] = useState(0);
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    setRefreshSignal((signal) => signal + 1);
+  }, []);
+  const handleRefreshed = useCallback(() => setRefreshing(false), []);
+
   return (
     <SafeAreaView style={styles.screen}>
       <Onboarding />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Teumta.green}
+          />
+        }
         showsVerticalScrollIndicator={false}>
         <View style={styles.brandRow}>
           <Image
@@ -71,7 +87,7 @@ export default function HomeScreen() {
           </Pressable>
         </Link>
 
-        <QuietNow />
+        <QuietNow refreshSignal={refreshSignal} onRefreshed={handleRefreshed} />
 
         <ScrollView
           horizontal

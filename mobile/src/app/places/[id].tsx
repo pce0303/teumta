@@ -1,7 +1,15 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -104,6 +112,9 @@ export default function PlaceDetailScreen() {
 
   const [forecast, setForecast] = useState<ConcentrationForecast | null>(null);
 
+  // 당겨서 새로고침 — 값이 바뀌면 아래 효과가 전부 다시 조회한다(서버 5분 캐시가 흡수).
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!id || !source) return;
@@ -118,11 +129,14 @@ export default function PlaceDetailScreen() {
     setCongestionStatus('loading');
     getRealtimeCongestion(source === 'TOUR' ? { contentId: id } : { poiId: id })
       .then((data) => {
+        // 당김 스피너는 대표 조회(혼잡도)가 끝나면 내린다 — 반영 여부와 무관.
+        setRefreshing(false);
         if (ignored) return;
         setCongestion(data);
         setCongestionStatus('idle');
       })
       .catch((error: unknown) => {
+        setRefreshing(false);
         if (ignored) return;
         // 404는 SK 미커버 장소 — 장애가 아니라 원래 없는 데이터
         const status = (error as { response?: { status?: number } }).response?.status;
@@ -158,7 +172,7 @@ export default function PlaceDetailScreen() {
     return () => {
       ignored = true;
     };
-  }, [id, source]);
+  }, [id, source, refreshNonce]);
 
   if (!id || !source || !name) {
     return (
@@ -182,7 +196,19 @@ export default function PlaceDetailScreen() {
     <View style={styles.screen}>
       <View style={{ height: insets.top, backgroundColor: STATUS_BAR_TINT }} />
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              setRefreshNonce((nonce) => nonce + 1);
+            }}
+            tintColor={Teumta.green}
+          />
+        }
+        showsVerticalScrollIndicator={false}>
         <View style={styles.heroTopRow}>
           <Pressable style={styles.heroButton} onPress={() => router.back()}>
             <Image
