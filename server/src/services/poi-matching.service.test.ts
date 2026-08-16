@@ -356,3 +356,30 @@ describe('이름 포함 방향 폴백', () => {
     expect(fetchPoiDetailMock).not.toHaveBeenCalled();
   });
 });
+
+describe('수동 확정 매핑', () => {
+  it('자동 규칙로 못 잇는 표기 차이는 확정 매핑으로 최우선 검증한다(태화강)', async () => {
+    fetchTourPlaceDetailMock.mockResolvedValue(
+      tourDetail({ contentid: '128201', title: '태화강', mapy: '35.5470', mapx: '129.3160' }),
+    );
+    // TMAP 검색·SK 인덱스가 아무것도 못 줘도 확정 매핑이 후보에 들어간다
+    fetchPoiSearchMock.mockResolvedValue(poiSearch([]));
+
+    await expect(resolveTmapPoiId('128201')).resolves.toBe('1129510');
+    expect(fetchRealtimeCongestionMock).toHaveBeenCalledWith('1129510');
+  });
+
+  it('확정 매핑도 실조회 검증을 통과해야 한다 — 낡은 값은 폴백', async () => {
+    fetchTourPlaceDetailMock.mockResolvedValue(
+      tourDetail({ contentid: '128201', title: '태화강', mapy: '35.5470', mapx: '129.3160' }),
+    );
+    fetchPoiSearchMock.mockResolvedValue(poiSearch([]));
+    fetchRealtimeCongestionMock.mockRejectedValue(
+      new ExternalApiNotFoundError('congestion', 'no data', {
+        code: 'CONGESTION_DATA_NOT_FOUND',
+      }),
+    );
+
+    await expect(resolveTmapPoiId('128201')).resolves.toBeNull();
+  });
+});
