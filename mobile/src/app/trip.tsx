@@ -13,6 +13,7 @@ import { useCurrentLocation } from '@/hooks/use-current-location';
 import { getRealtimeCongestion } from '@/api/places';
 import { getSelectedCourse } from '@/stores/selected-course';
 import type { RealtimeCongestion } from '@/types/place';
+import { buildCourseRoutePath } from '@/utils/course-path';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
 import { distanceInMeters } from '@/utils/distance';
 import {
@@ -305,6 +306,7 @@ export default function TripScreen() {
               `${destination.name} 복귀`,
             ],
           }}
+          routePath={buildCourseRoutePath(destination, course)}
           showsUserLocation={status === 'granted'}
         />
       </View>
