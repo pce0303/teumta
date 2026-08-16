@@ -53,7 +53,7 @@
 유명 관광지만 보고 지나쳤다면 몰랐을 근처의 문화시설, 밥집, 상점을 만나보세요.
 
 ■ 돌아갈 시간 안내
-우회의 끝은 새로운 목적지가 아닙니다. 처음 가려던 곳으로 돌아갈 예상 시각을 코스와 함께 보여드려요.
+우회의 끝은 새로운 목적지가 아닙니다. 처음 가려던 곳으로 돌아갈 예상 시각을 코스와 함께 보여드리고, 알림을 허용하면 복귀 출발 5분 전에 알려드려요.
 
 ■ 로그인 없이, 위치는 기기 안에서만
 회원가입이 필요 없습니다. 현재 위치는 도착 여부를 확인하는 데만 쓰이며 기기 밖으로 나가지 않습니다.
@@ -124,6 +124,13 @@ work without granting it. Location is only used during an active course to
 detect arrival at a stop, and it is processed on the device only — it is never
 sent to our servers. We do not use background location.
 
+LOCAL NOTIFICATIONS
+When a course starts, the app asks for notification permission and schedules a
+local reminder to head back (5 minutes before the return leg). Notifications
+are optional and scheduled entirely on the device — the app never creates push
+tokens and has no remote push capability. Declining the permission only skips
+the reminder; everything else works.
+
 DATA SOURCES
 Tourism data is provided by the Korea Tourism Organization (public open data).
 Walking routes and real-time crowd levels come from SK Telecom open APIs.
@@ -132,7 +139,8 @@ on screens that display this data.
 
 PRIVACY
 No user accounts, no analytics, no advertising identifiers. We do not collect
-personal data. Saved places are stored on the device only.
+personal data. Saved places, course history and recent searches are stored on
+the device only.
 ```
 
 ## 그 외 입력 항목
@@ -156,7 +164,7 @@ personal data. Saved places are stored on the device only.
 | "덜 붐비는 날 고르기" 항목 추가 | 30일 집중률 예측은 실제 기능인데 이전 문구에 빠져 있었다. 여행 **전** 단계의 분산이라 서사에도 맞는다 |
 | "실제 보행 경로로 계산" 문구 추가 | 직선거리가 아니라 실제 도보 경로로 계산한다. 경쟁 앱과 구분되는 지점 |
 | 혼잡도에 "제공되는 관광지에 한해" 단서 | 모든 관광지에 실시간 혼잡도가 있지 않다. 과장하면 리젝 사유가 된다 |
-| **"복귀 10분 전에 알려드려요" 삭제** | **알림 기능이 구현돼 있지 않다.** 없는 기능을 설명에 쓰면 안 된다(앱 내 문구도 함께 수정) |
+| **"복귀 전 알림" 문구 복원** (한때 미구현으로 삭제) | 2026-08-16 로컬 알림 구현 완료 — 코스 시작 시 복귀 출발 5분 전 알림 예약(예약·발송 전부 단말 내, 푸시 토큰 미생성). 예전 문구 "10분 전"이 아니라 **실제 동작대로 "복귀 출발 5분 전"** 으로 서술하고, 권한 선택 사항이므로 "알림을 허용하면" 단서를 붙였다 |
 | 로그인 불필요·위치 미전송 명시 | 심사에서 유리하고, 우리 아키텍처의 실제 강점이다 |
 
 
@@ -176,12 +184,14 @@ Apple 기준의 "수집(collect)"은 데이터를 기기 밖으로 보내 **요�
 | 위치 전송 | 없음 — 서버 API에 좌표 파라미터가 존재하지 않음 |
 | 서버로 가는 값 | 검색어·목적지 코드·가용 시간. 해당 요청 처리에만 쓰고 보관하지 않음 |
 | 요청 본문 로깅 | 없음(`error.middleware`가 sanitized message만 기록) |
-| 기기 저장 데이터 | 저장한 장소(AsyncStorage) — 기기 밖으로 나가지 않음 |
+| 기기 저장 데이터 | 저장한 장소·코스 기록·최근 검색어(AsyncStorage) — 기기 밖으로 나가지 않음 |
+| 알림 | 로컬 알림만(복귀 임박·혼잡 해소). 단말이 스스로 예약·발송, 푸시 토큰 미생성 |
 | 추적(Tracking) | 없음 → ATT 팝업 불필요(`expo-tracking-transparency` 미설치) |
 
 ### 이 신고를 반드시 다시 검토해야 하는 변경
 
 - 크래시 리포팅·분석 도구 도입(Sentry, Firebase Analytics 등)
+- **원격 푸시 알림 도입 시** — 푸시 토큰은 기기 식별자라 신고 대상이 된다(현재는 로컬 알림만이라 해당 없음)
 - 서버에서 검색어·요청 내역을 로그로 축적
 - **성과 분석을 위해 TripEvent를 실제로 기록하기 시작할 때** — 계정이 없어 개인 식별은 안 되지만
   사용 이력을 서버에 남기는 것이라 `Usage Data` 신고 대상이 될 수 있다
