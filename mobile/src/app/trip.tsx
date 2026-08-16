@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
+import { REALTIME_LEVEL_LABEL } from '@/constants/congestion';
 import { Teumta } from '@/constants/theme';
 import { useCourseProgress, type CourseStop } from '@/hooks/use-course-progress';
 import { useCurrentLocation } from '@/hooks/use-current-location';
@@ -23,13 +24,6 @@ function formatDistance(meters: number) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`;
 }
 
-/** SK 혼잡도 단계 → 화면 문구. */
-const CONGESTION_LABEL: Record<RealtimeCongestion['level'], string> = {
-  RELAXED: '여유',
-  NORMAL: '보통',
-  CROWDED: '혼잡',
-  VERY_CROWDED: '매우 혼잡',
-};
 
 export default function TripScreen() {
   const router = useRouter();
@@ -217,7 +211,7 @@ export default function TripScreen() {
           <View style={styles.statTile}>
             <Text style={styles.statLabel}>목적지 혼잡</Text>
             <Text style={[styles.statValue, styles.statValueCongestion]}>
-              {congestion ? CONGESTION_LABEL[congestion.level] : '확인 중'}
+              {congestion ? REALTIME_LEVEL_LABEL[congestion.level] : '확인 중'}
             </Text>
           </View>
           <View style={styles.statTile}>
