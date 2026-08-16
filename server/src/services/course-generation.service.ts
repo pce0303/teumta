@@ -1,5 +1,9 @@
 import type { NearbyLocalPlaceCandidate } from '../dtos';
-import { extractRouteTotals, fetchPedestrianRoute } from '../external/tmap';
+import {
+  extractRoutePath,
+  extractRouteTotals,
+  fetchPedestrianRoute,
+} from '../external/tmap';
 import { distanceMeters } from '../utils/geo';
 import {
   DEFAULT_RADIUS_METERS,
@@ -65,6 +69,7 @@ export interface CourseStop {
   travelMinutesFromPrevious: number;
   /** 이전 지점에서 여기까지 보행거리(m). */
   distanceMetersFromPrevious: number;
+  pathFromPrevious: { latitude: number; longitude: number }[] | null;
   stayMinutes: number;
 }
 
@@ -74,6 +79,7 @@ export interface GeneratedCourse {
   /** 마지막 정류지 → 목적지 복귀 시간(분). */
   returnTravelMinutes: number;
   returnDistanceMeters: number;
+  returnPath: { latitude: number; longitude: number }[] | null;
   stops: CourseStop[];
   /** 정류지 사이 구간이 TMAP 실측인지 여부. 정류지 1곳이면 전 구간 실측이라 항상 true. */
   verified: boolean;
@@ -122,7 +128,11 @@ function combinations<T>(items: T[], size: number): T[][] {
 interface CoursePlan {
   stops: MeasuredNearbyPlace[];
   /** 정류지 사이 구간(추정 또는 실측). legs[i] = stops[i] → stops[i+1]. */
-  legs: { travelMinutes: number; distanceMeters: number }[];
+  legs: {
+    travelMinutes: number;
+    distanceMeters: number;
+    path: { latitude: number; longitude: number }[] | null;
+  }[];
   /** 정류지별 체류시간. 가용 시간에 따라 기본값에서 축소 가능. */
   stayMinutes: number[];
   totalMinutes: number;
@@ -191,8 +201,8 @@ export function planCourses(
         distanceMeters: Math.round(
           distanceMeters(stops[index].candidate, stop.candidate) * DETOUR_FACTOR,
         ),
+        path: null,
       }));
-
       const travelMinutes = travelMinutesOf(stops, legs);
       const stayMinutes = fitStayMinutes(stops, travelMinutes, availableMinutes);
       if (stayMinutes === null) {
@@ -246,6 +256,7 @@ async function verifyPlan(plan: CoursePlan): Promise<CoursePlan> {
       return {
         travelMinutes: Math.ceil(totals.totalSeconds / 60),
         distanceMeters: totals.distanceMeters,
+        path: extractRoutePath(route),
       };
     },
   );
@@ -272,6 +283,7 @@ function toGeneratedCourse(plan: CoursePlan): GeneratedCourse {
     travelMinutesFromPrevious: index === 0 ? stop.travelMinutes : plan.legs[index - 1].travelMinutes,
     distanceMetersFromPrevious:
       index === 0 ? stop.distanceMeters : plan.legs[index - 1].distanceMeters,
+    pathFromPrevious: index === 0 ? stop.path : plan.legs[index - 1].path,
     stayMinutes: plan.stayMinutes[index],
   }));
 
@@ -281,6 +293,7 @@ function toGeneratedCourse(plan: CoursePlan): GeneratedCourse {
     totalMinutes: plan.totalMinutes,
     returnTravelMinutes: last.travelMinutes,
     returnDistanceMeters: last.distanceMeters,
+    returnPath: [...last.path].reverse(),
     stops,
     verified: plan.verified,
   };
