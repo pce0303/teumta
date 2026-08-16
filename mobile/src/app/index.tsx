@@ -109,6 +109,9 @@ export default function HomeScreen() {
                   source={{ uri: featured.imageUrl }}
                   style={styles.featuredImage}
                   contentFit="cover"
+                  // 지역을 바꾸면 같은 자리의 뷰가 재활용된다. 키가 없으면 새 이미지가
+                  // 로드되기 전(또는 실패했을 때) 직전 지역 사진이 그대로 남는다.
+                  recyclingKey={featured.tourApiContentId}
                 />
               ) : (
                 <View style={styles.featuredImage} />
@@ -138,6 +141,7 @@ export default function HomeScreen() {
                     source={{ uri: destination.imageUrl }}
                     style={styles.regionImage}
                     contentFit="cover"
+                    recyclingKey={destination.tourApiContentId}
                   />
                 ) : (
                   <View style={styles.regionImage} />

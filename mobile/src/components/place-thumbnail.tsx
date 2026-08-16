@@ -78,7 +78,10 @@ function shortLabel(category: string): string {
 
 export function PlaceThumbnail({ imageUrl, category, variant, style }: PlaceThumbnailProps) {
   if (imageUrl) {
-    return <Image source={{ uri: imageUrl }} style={style} contentFit="cover" />;
+    // 목록에서 뷰가 재활용될 때 직전 항목의 사진이 남지 않게 한다.
+    return (
+      <Image source={{ uri: imageUrl }} style={style} contentFit="cover" recyclingKey={imageUrl} />
+    );
   }
 
   const tone = (category && TONE_BY_CATEGORY[category]) || NEUTRAL;
