@@ -32,8 +32,9 @@ export default function HomeScreen() {
   // null = 전체
   const [region, setRegion] = useState<Region | null>(null);
   const destinations = destinationsInRegion(region);
-  const [featured, ...restDestinations] = destinations;
-  const regionDestinations = restDestinations.slice(0, 2);
+  // 대표 1곳을 위에 크게 두고 나머지는 전부 아래 격자에 편다.
+  // 예전에는 2곳만 잘라 보여줘서 목적지를 늘려도 홈에는 3곳밖에 안 나왔다.
+  const [featured, ...regionDestinations] = destinations;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -93,11 +94,11 @@ export default function HomeScreen() {
 
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>붐비기 쉬운 대표 관광지</Text>
-          <Link href={'/search' as Href} asChild>
-            <Pressable>
-              <Text style={styles.sectionAction}>전체 보기</Text>
+          {region !== null && (
+            <Pressable onPress={() => setRegion(null)} hitSlop={8}>
+              <Text style={styles.sectionAction}>전체 지역 보기</Text>
             </Pressable>
-          </Link>
+          )}
         </View>
 
         {featured && (
@@ -316,6 +317,7 @@ const styles = StyleSheet.create({
   },
   regionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   regionCard: {
@@ -323,8 +325,9 @@ const styles = StyleSheet.create({
     borderColor: Teumta.border,
     borderRadius: 16,
     borderWidth: 1,
-    flex: 1,
+    // flex:1은 줄바꿈과 함께 쓰면 한 줄에 전부 밀어넣는다. 2열 격자라 폭을 고정한다.
     overflow: 'hidden',
+    width: '48%',
   },
   regionImage: {
     backgroundColor: Teumta.imagePlaceholder,
