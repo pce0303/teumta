@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
@@ -47,11 +48,17 @@ export default function MyScreen() {
                     source: place.source,
                     name: place.name,
                     ...(place.address ? { address: place.address } : {}),
+                    ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
                   },
                 }}
                 asChild>
                 <Pressable style={styles.rowCard}>
-                  <View style={styles.rowThumb} />
+                  {/* 저장 시점 이미지를 그대로 쓴다. 목적지는 분류가 없어 중립 배경으로 떨어진다. */}
+                  <PlaceThumbnail
+                    imageUrl={place.imageUrl}
+                    variant="card"
+                    style={styles.rowThumb}
+                  />
                   <View style={styles.rowTexts}>
                     <Text style={styles.rowName}>{place.name}</Text>
                     <Text style={styles.rowMeta} numberOfLines={1}>
