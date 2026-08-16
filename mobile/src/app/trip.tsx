@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +15,11 @@ import { getSelectedCourse } from '@/stores/selected-course';
 import type { RealtimeCongestion } from '@/types/place';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
 import { distanceInMeters } from '@/utils/distance';
+import {
+  cancelScheduledCourseNotification,
+  ensureNotificationPermission,
+  scheduleReturnReminder,
+} from '@/utils/notifications';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
 
@@ -61,13 +66,68 @@ export default function TripScreen() {
   // 완료 기록은 코스당 1회 — 기록이 상태를 바꾸고 상태가 다시 기록을 부르는 순환 방지.
   const completionLogged = useRef(false);
 
+  const returnReminderId = useRef<string | null>(null);
+  const notificationsGranted = useRef(false);
+  const [returnAlarmSet, setReturnAlarmSet] = useState(false);
+
+  const cancelReturnReminder = useCallback(() => {
+    if (returnReminderId.current) {
+      void cancelScheduledCourseNotification(returnReminderId.current);
+      returnReminderId.current = null;
+    }
+  }, []);
+
   useEffect(() => {
+    if (!course || !destination) {
+      return;
+    }
+    let cancelled = false;
+
+    // 복귀 임박 로컬 알림. 예약·발송 모두 단말 안 — 권한을 거부하면 화면 안내만으로 진행.
+    void (async () => {
+      const granted = await ensureNotificationPermission();
+      if (!granted || cancelled) {
+        return;
+      }
+      notificationsGranted.current = true;
+      const id = await scheduleReturnReminder({
+        destinationName: destination.name,
+        totalMinutes: course.totalMinutes,
+        returnWalkMinutes: course.returnTravelMinutes,
+      });
+      if (cancelled) {
+        if (id) {
+          void cancelScheduledCourseNotification(id);
+        }
+        return;
+      }
+      returnReminderId.current = id;
+      setReturnAlarmSet(id !== null);
+    })();
+
+    return () => {
+      cancelled = true;
+      // 화면을 떠나면 코스 안내도 끝 — 유령 알림을 남기지 않는다.
+      if (returnReminderId.current) {
+        void cancelScheduledCourseNotification(returnReminderId.current);
+        returnReminderId.current = null;
+      }
+    };
+  }, [course, destination]);
+
+  useEffect(() => {
+    if (phase !== 'completed') {
+      return;
+    }
+    // 복귀를 마쳤으면 예약 알림은 필요 없다.
+    cancelReturnReminder();
+    setReturnAlarmSet(false);
     // 마지막 복귀 지점 도착 판정이 나면 "다녀온 코스"로 기기에만 남긴다.
-    if (phase === 'completed' && selected && !completionLogged.current) {
+    if (selected && !completionLogged.current) {
       completionLogged.current = true;
       markCourseCompleted(selected, true);
     }
-  }, [phase, selected, markCourseCompleted]);
+  }, [phase, selected, markCourseCompleted, cancelReturnReminder]);
 
   useEffect(() => {
     start();
@@ -276,9 +336,13 @@ export default function TripScreen() {
         )}
 
         <View style={styles.noticeBox}>
-          <Text style={styles.noticeTitle}>돌아갈 시간을 계산해 뒀어요</Text>
+          <Text style={styles.noticeTitle}>
+            {returnAlarmSet ? '돌아갈 시간이 되면 알려드려요' : '돌아갈 시간을 계산해 뒀어요'}
+          </Text>
           <Text style={styles.noticeBody}>
-            복귀 예정 시각을 기준으로 코스를 구성했어요. 목적지 혼잡도는 위에서 다시 확인할 수 있어요.
+            {returnAlarmSet
+              ? '복귀 출발 5분 전에 알림을 드려요. 알림도 이 기기 안에서만 처리돼요.'
+              : '복귀 예정 시각을 기준으로 코스를 구성했어요. 목적지 혼잡도는 위에서 다시 확인할 수 있어요.'}
           </Text>
         </View>
 
@@ -303,6 +367,7 @@ export default function TripScreen() {
           <Pressable
             style={styles.endButton}
             onPress={() => {
+              cancelReturnReminder();
               // 중간에 끝내도 다녀온 기록으로 남긴다(완주 여부는 구분해 저장).
               if (selected && !completionLogged.current) {
                 completionLogged.current = true;
