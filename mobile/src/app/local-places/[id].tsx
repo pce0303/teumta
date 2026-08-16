@@ -143,6 +143,27 @@ export default function LocalPlaceDetailScreen() {
             </>
           ) : null}
 
+          {/* 휴무일 데이터가 스키마에 없어 "닫힌 가게 제안" 신뢰 문제가 있었다 — TourAPI 실시간으로 채운다. */}
+          {(detail?.openHours || detail?.restDays) && (
+            <>
+              <Text style={styles.sectionTitle}>운영 정보</Text>
+              <View style={styles.hoursCard}>
+                {detail?.openHours ? (
+                  <View style={styles.hoursRow}>
+                    <Text style={styles.hoursLabel}>운영시간</Text>
+                    <Text style={styles.hoursValue}>{detail.openHours}</Text>
+                  </View>
+                ) : null}
+                {detail?.restDays ? (
+                  <View style={styles.hoursRow}>
+                    <Text style={styles.hoursLabel}>휴무일</Text>
+                    <Text style={styles.hoursValue}>{detail.restDays}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </>
+          )}
+
           <Text style={styles.sectionTitle}>주소</Text>
           <Text style={styles.description}>{params.address ?? '주소 정보가 없어요.'}</Text>
 
@@ -325,6 +346,30 @@ const styles = StyleSheet.create({
     color: Teumta.textPrimary,
     fontSize: 13,
     lineHeight: 21,
+  },
+  hoursCard: {
+    backgroundColor: '#F7F9F8',
+    borderRadius: 12,
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  hoursLabel: {
+    color: Teumta.textTertiary,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 17,
+    width: 52,
+  },
+  hoursValue: {
+    color: Teumta.textPrimary,
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
   },
   emptyBox: {
     backgroundColor: '#F7F9F8',

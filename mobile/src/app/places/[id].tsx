@@ -1,7 +1,15 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -104,6 +112,9 @@ export default function PlaceDetailScreen() {
 
   const [forecast, setForecast] = useState<ConcentrationForecast | null>(null);
 
+  // 당겨서 새로고침 — 값이 바뀌면 아래 효과가 전부 다시 조회한다(서버 5분 캐시가 흡수).
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!id || !source) return;
@@ -118,11 +129,14 @@ export default function PlaceDetailScreen() {
     setCongestionStatus('loading');
     getRealtimeCongestion(source === 'TOUR' ? { contentId: id } : { poiId: id })
       .then((data) => {
+        // 당김 스피너는 대표 조회(혼잡도)가 끝나면 내린다 — 반영 여부와 무관.
+        setRefreshing(false);
         if (ignored) return;
         setCongestion(data);
         setCongestionStatus('idle');
       })
       .catch((error: unknown) => {
+        setRefreshing(false);
         if (ignored) return;
         // 404는 SK 미커버 장소 — 장애가 아니라 원래 없는 데이터
         const status = (error as { response?: { status?: number } }).response?.status;
@@ -158,7 +172,7 @@ export default function PlaceDetailScreen() {
     return () => {
       ignored = true;
     };
-  }, [id, source]);
+  }, [id, source, refreshNonce]);
 
   if (!id || !source || !name) {
     return (
@@ -172,12 +186,29 @@ export default function PlaceDetailScreen() {
   const forecastSummary = forecast ? summarizeForecast(forecast.forecasts) : null;
   const palette = congestionLevel ? Teumta.congestion[congestionLevel] : null;
   const headline = congestionLevel ? CONGESTION_HEADLINE[congestionLevel] : null;
+  // 우회 트리거(congestion-rules §5): CROWDED 이상일 때만 CTA 강조.
+  // 그 미만·미제공(404)·조회 실패는 기존 모양 유지 — 예측값으로 대체 판단하지 않는다.
+  const crowdedNow =
+    congestionStatus === 'idle' &&
+    (congestionLevel === 'high' || congestionLevel === 'veryHigh');
 
   return (
     <View style={styles.screen}>
       <View style={{ height: insets.top, backgroundColor: STATUS_BAR_TINT }} />
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              setRefreshNonce((nonce) => nonce + 1);
+            }}
+            tintColor={Teumta.green}
+          />
+        }
+        showsVerticalScrollIndicator={false}>
         <View style={styles.heroTopRow}>
           <Pressable style={styles.heroButton} onPress={() => router.back()}>
             <Image
@@ -434,8 +465,16 @@ export default function PlaceDetailScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+        {crowdedNow && palette && (
+          <View style={[styles.ctaNotice, { backgroundColor: palette.background }]}>
+            <View style={[styles.ctaNoticeDot, { backgroundColor: palette.dot }]} />
+            <Text style={[styles.ctaNoticeText, { color: palette.text }]}>
+              지금 붐비는 시간이에요. 근처 로컬을 먼저 둘러보고 오면 한산해져요.
+            </Text>
+          </View>
+        )}
         <Pressable
-          style={styles.ctaButton}
+          style={[styles.ctaButton, crowdedNow && styles.ctaButtonCrowded]}
           onPress={() =>
             router.push({
               pathname: '/detours',
@@ -445,7 +484,9 @@ export default function PlaceDetailScreen() {
               },
             })
           }>
-          <Text style={styles.ctaLabel}>틈타 코스 보기</Text>
+          <Text style={styles.ctaLabel}>
+            {crowdedNow ? '지금 붐벼요 — 틈타 코스로 비켜가기' : '틈타 코스 보기'}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -756,12 +797,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
   },
+  ctaNotice: {
+    alignItems: 'center',
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  ctaNoticeDot: {
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  ctaNoticeText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
+  },
   ctaButton: {
     alignItems: 'center',
     backgroundColor: Teumta.green,
     borderRadius: 16,
     height: 50,
     justifyContent: 'center',
+  },
+  ctaButtonCrowded: {
+    backgroundColor: Teumta.greenDark,
   },
   ctaLabel: {
     color: Teumta.surface,

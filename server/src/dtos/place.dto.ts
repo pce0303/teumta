@@ -85,6 +85,13 @@ export interface LocalPlaceDetailData {
   overview: string | null;
   tel: string | null;
   homepage: string | null;
+  /**
+   * 운영시간(detailIntro2). 휴무일인 장소를 제안하면 신뢰가 깨지는 문제(team-todo 미결정)를
+   * DB 스키마 없이 실시간 조회로 푼다. TourAPI 미제공이면 null.
+   */
+  openHours: string | null;
+  /** 휴무일(detailIntro2). 미제공이면 null. */
+  restDays: string | null;
 }
 
 /** 주변 로컬 장소 응답 항목. distanceMeters는 직선거리 아닌 TMAP 실측 보행거리. */

@@ -13,6 +13,7 @@ import type { TmapRouteResponse } from '../external/tmap/tmap.dto';
 const {
   prismaMock,
   fetchTourPlaceDetailMock,
+  fetchTourPlaceIntroMock,
   fetchTourPlacesByLocationMock,
   fetchPedestrianRouteMock,
   fetchPoiDetailMock,
@@ -27,6 +28,7 @@ const {
     },
   },
   fetchTourPlaceDetailMock: vi.fn(),
+  fetchTourPlaceIntroMock: vi.fn(),
   fetchTourPlacesByLocationMock: vi.fn(),
   fetchPedestrianRouteMock: vi.fn(),
   fetchPoiDetailMock: vi.fn(),
@@ -39,6 +41,7 @@ vi.mock('../external/tour', async (importOriginal) => {
   return {
     ...actual,
     fetchTourPlaceDetail: fetchTourPlaceDetailMock,
+    fetchTourPlaceIntro: fetchTourPlaceIntroMock,
     fetchTourPlacesByLocation: fetchTourPlacesByLocationMock,
   };
 });
@@ -55,6 +58,7 @@ vi.mock('../external/tmap', async (importOriginal) => {
 import { ExternalApiError } from '../external/common/external-api.error';
 import { resolveErrorResponse } from '../middlewares/error.middleware';
 import {
+  getLocalPlaceDetail,
   getNearbyLocalPlacesByContentId,
   getNearbyLocalPlacesByPoiId,
   getNearbyLocalPlacesRealtime,
@@ -98,12 +102,26 @@ function listResponse(items: TourApiPlaceItem[]): TourApiListResponse {
   };
 }
 
-function detailResponse(mapx: string, mapy: string) {
+function detailResponse(mapx: string, mapy: string, extraItemFields: Record<string, unknown> = {}) {
   return {
     response: {
       header: { resultCode: '0000', resultMsg: 'OK' },
       body: {
-        items: { item: { contentid: '999', title: '경복궁', mapx, mapy } },
+        items: { item: { contentid: '999', title: '경복궁', mapx, mapy, ...extraItemFields } },
+        numOfRows: 1,
+        pageNo: 1,
+        totalCount: 1,
+      },
+    },
+  };
+}
+
+function introResponse(fields: Record<string, unknown>) {
+  return {
+    response: {
+      header: { resultCode: '0000', resultMsg: 'OK' },
+      body: {
+        items: { item: { contentid: '999', ...fields } },
         numOfRows: 1,
         pageNo: 1,
         totalCount: 1,
@@ -129,6 +147,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.place.findUnique.mockResolvedValue(BASE_PLACE);
   fetchTourPlaceDetailMock.mockResolvedValue(detailResponse('126.9770', '37.5788'));
+  fetchTourPlaceIntroMock.mockResolvedValue(introResponse({}));
   fetchTourPlacesByLocationMock.mockResolvedValue(listResponse([]));
   fetchPedestrianRouteMock.mockResolvedValue(tmapResponse(500, 400));
 });
@@ -528,5 +547,51 @@ describe('mapWithConcurrency', () => {
       return value * 10;
     });
     expect(results).toEqual([10, null, 30]);
+  });
+});
+
+describe('getLocalPlaceDetail', () => {
+  it('detailIntro2의 운영시간·휴무일을 병합해 내려준다(음식점 필드명)', async () => {
+    fetchTourPlaceDetailMock.mockResolvedValue(
+      detailResponse('126.9700', '37.5800', {
+        contentid: '100',
+        title: '통인시장',
+        contenttypeid: '39',
+        overview: '재래시장',
+      }),
+    );
+    fetchTourPlaceIntroMock.mockResolvedValue(
+      introResponse({ opentimefood: '10:00 ~ 22:00', restdatefood: '매주 월요일' }),
+    );
+
+    const detail = await getLocalPlaceDetail('100');
+
+    expect(fetchTourPlaceIntroMock).toHaveBeenCalledWith('100', '39');
+    expect(detail).toMatchObject({
+      overview: '재래시장',
+      openHours: '10:00 ~ 22:00',
+      restDays: '매주 월요일',
+    });
+  });
+
+  it('detailIntro2 실패 시 소개만 내려준다(운영 정보는 부가)', async () => {
+    fetchTourPlaceDetailMock.mockResolvedValue(
+      detailResponse('126.9700', '37.5800', { contenttypeid: '39' }),
+    );
+    fetchTourPlaceIntroMock.mockRejectedValue(new ExternalApiError('tour', 'boom'));
+
+    const detail = await getLocalPlaceDetail('999');
+
+    expect(detail).not.toBeNull();
+    expect(detail).toMatchObject({ openHours: null, restDays: null });
+  });
+
+  it('contentTypeId가 없으면 intro를 호출하지 않는다', async () => {
+    fetchTourPlaceDetailMock.mockResolvedValue(detailResponse('126.9700', '37.5800'));
+
+    const detail = await getLocalPlaceDetail('999');
+
+    expect(fetchTourPlaceIntroMock).not.toHaveBeenCalled();
+    expect(detail).toMatchObject({ openHours: null, restDays: null });
   });
 });

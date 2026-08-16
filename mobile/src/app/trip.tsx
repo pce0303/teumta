@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
@@ -275,6 +276,16 @@ export default function TripScreen() {
         : null;
   const canSkip = phase === 'in_progress' && !returning && !stayingAt && nextStop !== null;
 
+  // 도착!·복귀 전환·완료 같은 "순간"에만 카드가 새로 떨어지게 키로 구분 —
+  // GPS 거리 갱신(같은 상태)에는 애니메이션이 다시 돌지 않는다.
+  const statusMomentKey = completed
+    ? 'completed'
+    : stayingAt
+      ? `stay-${currentIndex}`
+      : returning
+        ? 'returning'
+        : `moving-${currentIndex}`;
+
   const handleSkip = () => {
     const skipped = course.stops[currentIndex];
     if (!skipped || reschedulingReminder.current) {
@@ -359,7 +370,10 @@ export default function TripScreen() {
       <View style={[styles.sheet, { paddingBottom: 18 + insets.bottom }]}>
         <View style={styles.sheetHandle} />
 
-        <View style={styles.statusCard}>
+        <Animated.View
+          key={statusMomentKey}
+          entering={FadeInDown.duration(280)}
+          style={styles.statusCard}>
           <View style={styles.statusIconTile}>
             <Image
               source={require('@/assets/images/icons/arrow-move.svg')}
@@ -371,7 +385,7 @@ export default function TripScreen() {
             <Text style={styles.statusTitle}>{statusTitle}</Text>
             <Text style={styles.statusSubtitle}>{statusSubtitle}</Text>
           </View>
-        </View>
+        </Animated.View>
 
         {congestionEased && !completed && (
           <View style={styles.easedBanner}>
