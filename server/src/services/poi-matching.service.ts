@@ -1,8 +1,11 @@
-import { fetchPoiSearch, mapPoiSearchToDestinations } from '../external/tmap';
+import { ExternalApiNotFoundError } from '../external/common';
+import { fetchRealtimeCongestion } from '../external/congestion';
+import { extractPoiBase, fetchPoiDetail, fetchPoiSearch, mapPoiSearchToDestinations } from '../external/tmap';
 import { extractDetailCoordinate, extractDetailItem, fetchTourPlaceDetail } from '../external/tour';
 import { distanceMeters, type GeoPoint } from '../utils/geo';
 import { placeNameRank } from '../utils/place-name';
 import { TtlCache } from '../utils/ttl-cache';
+import { getSkPoiIndex, type SkPoiIndex } from './sk-poi-index.service';
 
 /**
  * TourAPI 관광지(contentId) → TMAP POI(poiId) 매칭.
@@ -26,6 +29,23 @@ export const POI_MATCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** POI 검색 후보 확인 수. 상위 몇 개면 충분. */
 const POI_SEARCH_COUNT = 5;
+
+/** 이름 역매칭 폴백에서 좌표를 검증할 동명 후보 상한(TMAP 상세 호출 수 제한). */
+const NAME_FALLBACK_DETAIL_LIMIT = 3;
+
+/**
+ * 이름 역매칭 폴백 전용 검증 반경.
+ *
+ * 300m는 대형 시설에 너무 엄격하다 — 에버랜드·수원화성처럼 부지가 넓으면
+ * TourAPI와 TMAP의 대표 좌표가 수백 m 이상 벌어져 실시간이 되는 곳을 놓친다
+ * (2026-08-16 실측: 둘 다 rltm 정상인데 반경 검증에서 탈락).
+ * 이름 "정확 일치"가 전제이고 최종 문지기는 실시간 조회 검증이라 3km로 완화 —
+ * 동명이소(전국의 같은 상호)는 보통 도시 단위로 떨어져 있어 이 반경에 안 걸린다.
+ */
+const NAME_FALLBACK_RADIUS_METERS = 3000;
+
+/** 실시간 조회로 확정 검증할 후보 상한(SK 쿼터 보호 — 매칭 캐시 24h라 장소당 최초 1회). */
+const RLTM_VERIFY_LIMIT = 3;
 
 /**
  * 상한 — 상세를 연 목적지마다 키가 쌓이는 캐시라 무한 성장 방지가 특히 중요.
@@ -62,11 +82,80 @@ async function lookupTmapPoiId(contentId: string): Promise<string | null> {
     return null;
   }
 
+  // SK 제공 장소 인덱스는 매칭 힌트 — 로드 실패(null)면 기존 TMAP 매칭만으로 동작.
+  const skIndex = await getSkPoiIndex();
+
   const candidates = mapPoiSearchToDestinations(
     await fetchPoiSearch(name, { count: POI_SEARCH_COUNT }),
   );
+  const best = pickBestPoiMatch(candidates, { name, coordinate }, skIndex ?? undefined);
 
-  return pickBestPoiMatch(candidates, { name, coordinate });
+  // 후보 확정 순서: TMAP 최적 후보 → SK 목록 이름 역매칭(좌표 검증 통과분).
+  // 목록에 있어도 "실시간"은 부분집합이라(통계 전용 장소 존재 — 2026-08-16 실측:
+  // 불국사·남이섬은 목록엔 있지만 rltm 404) 최종 판정은 실시간 조회 성공 여부로 한다.
+  const verifyCandidates: string[] = [];
+  if (best !== null) {
+    verifyCandidates.push(best);
+  }
+  if (skIndex !== null) {
+    for (const poiId of await matchBySkPoiName(skIndex, name, coordinate)) {
+      if (!verifyCandidates.includes(poiId)) {
+        verifyCandidates.push(poiId);
+      }
+    }
+  }
+
+  const verified = await firstWithRealtime(verifyCandidates.slice(0, RLTM_VERIFY_LIMIT));
+  // 전부 실시간 미제공이면 기존 최적 후보 유지 — 사용자에게는 최종 조회가 404로 알린다.
+  return verified ?? best;
+}
+
+/**
+ * SK 목록에서 이름으로 후보를 뽑아 TMAP 상세 좌표로 반경 검증해 반환.
+ * 정확 일치 우선, 그다음 "목록명이 target에 포함"(TourAPI가 '수원화성 관광특구'처럼
+ * 부가 표기를 붙인 경우 목록의 '수원화성'을 찾는 방향)만 허용.
+ */
+async function matchBySkPoiName(
+  skIndex: SkPoiIndex,
+  name: string,
+  coordinate: GeoPoint,
+): Promise<string[]> {
+  const matched: string[] = [];
+  const poiIds = [
+    ...skIndex.findPoiIdsByName(name),
+    ...skIndex.findPoiIdsContainedInName(name),
+  ].slice(0, NAME_FALLBACK_DETAIL_LIMIT);
+  for (const poiId of poiIds) {
+    try {
+      const base = extractPoiBase(await fetchPoiDetail(poiId));
+      if (base && distanceMeters(coordinate, base) <= NAME_FALLBACK_RADIUS_METERS) {
+        matched.push(poiId);
+      }
+    } catch {
+      // 후보 하나의 상세 조회 실패는 다음 후보로
+    }
+  }
+  return matched;
+}
+
+/**
+ * 후보들을 실시간 혼잡도로 확정 검증 — 첫 성공 poiId를 반환.
+ * 404(미커버)는 다음 후보로, 그 외 오류(일시 장애)는 검증을 멈춘다 —
+ * 장애를 "미커버"로 오판해 24시간 캐시에 박제하지 않기 위함.
+ */
+async function firstWithRealtime(poiIds: string[]): Promise<string | null> {
+  for (const poiId of poiIds) {
+    try {
+      await fetchRealtimeCongestion(poiId);
+      return poiId;
+    } catch (error) {
+      if (error instanceof ExternalApiNotFoundError) {
+        continue;
+      }
+      return null;
+    }
+  }
+  return null;
 }
 
 export interface PoiCandidate {
@@ -90,8 +179,9 @@ export interface PoiCandidate {
 export function pickBestPoiMatch(
   candidates: PoiCandidate[],
   target: { name: string; coordinate: GeoPoint },
+  skIndex?: Pick<SkPoiIndex, 'hasPoi'>,
 ): string | null {
-  let best: { poiId: string; rank: number; distance: number } | null = null;
+  let best: { poiId: string; covered: boolean; rank: number; distance: number } | null = null;
 
   for (const candidate of candidates) {
     if (candidate.tmapPoiId === null || candidate.latitude === null || candidate.longitude === null) {
@@ -106,12 +196,20 @@ export function pickBestPoiMatch(
       continue;
     }
 
+    // SK가 데이터를 주는 후보 우선 — 본시설·부속시설이 둘 다 반경 안일 때
+    // 이름·거리가 비슷해도 혼잡도가 나오는 쪽을 골라야 한다. 인덱스가 없으면 기존 기준 그대로.
+    const covered = skIndex?.hasPoi(candidate.tmapPoiId) ?? false;
     const rank = placeNameRank(candidate.name, target.name);
     const better =
-      best === null || rank < best.rank || (rank === best.rank && distance < best.distance);
+      best === null ||
+      (covered !== best.covered
+        ? covered
+        : rank !== best.rank
+          ? rank < best.rank
+          : distance < best.distance);
 
     if (better) {
-      best = { poiId: candidate.tmapPoiId, rank, distance };
+      best = { poiId: candidate.tmapPoiId, covered, rank, distance };
     }
   }
 

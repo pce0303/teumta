@@ -106,7 +106,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     areaLabel: '경기 수원시',
     address: '경기도 수원시 팔달구 정조로 780 (팔달로2가)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/36/3500936_image2_1.jpg',
-    hasRealtimeCongestion: false,
+    hasRealtimeCongestion: true,
     hasConcentrationForecast: true,
   },
   {
@@ -116,7 +116,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     areaLabel: '경기 용인시',
     address: '경기도 용인시 처인구 포곡읍 에버랜드로 199',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/53/3486453_image2_1.jpg',
-    hasRealtimeCongestion: false,
+    hasRealtimeCongestion: true,
     hasConcentrationForecast: true,
   },
   {
@@ -256,7 +256,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     areaLabel: '부산 영도구',
     address: '부산광역시 영도구 전망로 24 (동삼동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/83/3506383_image2_1.jpg',
-    hasRealtimeCongestion: false,
+    hasRealtimeCongestion: true,
     hasConcentrationForecast: true,
   },
   {
@@ -316,7 +316,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     areaLabel: '인천 남동구',
     address: '인천광역시 남동구 무네미로 236',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/53/4061653_image2_1.jpg',
-    hasRealtimeCongestion: false,
+    hasRealtimeCongestion: true,
     hasConcentrationForecast: true,
   },
   {
@@ -346,7 +346,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     areaLabel: '울산 동구',
     address: '울산광역시 동구 등대로 95 (일산동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/16/3583516_image2_1.jpg',
-    hasRealtimeCongestion: false,
+    hasRealtimeCongestion: true,
     hasConcentrationForecast: true,
   },
   {
@@ -396,7 +396,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     areaLabel: '경기 용인시',
     address: '경기도 용인시 기흥구 민속촌로 90 (보라동)',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/87/3563987_image2_1.jpg',
-    hasRealtimeCongestion: false,
+    hasRealtimeCongestion: true,
     hasConcentrationForecast: true,
   },
   {
@@ -476,7 +476,7 @@ export const FEATURED_DESTINATIONS: FeaturedDestination[] = [
     areaLabel: '충남 보령시',
     address: '충청남도 보령시 머드로 123',
     imageUrl: 'https://tong.visitkorea.or.kr/cms/resource/66/3513866_image2_1.jpg',
-    hasRealtimeCongestion: false,
+    hasRealtimeCongestion: true,
     hasConcentrationForecast: true,
   },
   {
@@ -559,7 +559,9 @@ export const AVAILABLE_REGIONS: Region[] = ALL_REGIONS.filter((region) =>
 /**
  * 혼잡 정보가 있는 곳을 앞에 둔다.
  *
- * 실시간 혼잡도(SK)는 49곳 중 14곳, 집중률(KTO)은 35곳만 제공한다.
+ * 실시간 혼잡도(SK)는 49곳 중 21곳, 집중률(KTO)은 35곳만 제공한다.
+ * (21곳은 2026-08-16 서버 매칭 개선 — SK 제공 장소 인덱스 + 실조회 검증 — 후 전수 재측정값.
+ *  서버 `npm run measure:congestion`으로 언제든 재측정할 수 있다.)
  * 어디가 되는지 알 수 없으면 사용자가 눌러 보고 실망하기를 반복하게 된다.
  * 배지로 알리는 대신 순서로 알린다 — 틀려도 순서만 어긋난다.
  */
