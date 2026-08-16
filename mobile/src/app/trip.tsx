@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
@@ -18,6 +18,7 @@ import { distanceInMeters } from '@/utils/distance';
 import {
   cancelScheduledCourseNotification,
   ensureNotificationPermission,
+  presentCourseNotification,
   scheduleReturnReminder,
 } from '@/utils/notifications';
 import { withRoJosa } from '@/utils/text';
@@ -25,6 +26,8 @@ import { timeLabelAfter } from '@/utils/time';
 
 const SHEET_OVERLAP = 26;
 const WALK_METERS_PER_MINUTE = 67;
+/** 서버 혼잡도 캐시가 5분 — 같은 주기면 폴링해도 외부 호출이 거의 늘지 않는다. */
+const CONGESTION_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 function formatDistance(meters: number) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`;
@@ -121,7 +124,6 @@ export default function TripScreen() {
     }
     // 복귀를 마쳤으면 예약 알림은 필요 없다.
     cancelReturnReminder();
-    setReturnAlarmSet(false);
     // 마지막 복귀 지점 도착 판정이 나면 "다녀온 코스"로 기기에만 남긴다.
     if (selected && !completionLogged.current) {
       completionLogged.current = true;
@@ -141,27 +143,59 @@ export default function TripScreen() {
   }, [location, updateWithLocation]);
 
   const destinationParams = selected?.destinationParams;
+  const lastCongestionLevel = useRef<RealtimeCongestion['level'] | null>(null);
+  const easedNotified = useRef(false);
+  const [congestionEased, setCongestionEased] = useState(false);
+
   useEffect(() => {
     if (!destinationParams) {
       return;
     }
     let ignored = false;
 
-    // 복귀 판단용 목적지 혼잡도. 진입 시 1회만(서버 5분 캐시)
-    getRealtimeCongestion(destinationParams)
-      .then((data) => {
-        if (!ignored) {
+    // 복귀 판단용 목적지 혼잡도. "풀리면 복귀"가 핵심 루프인데 진입 시 1회 조회로는
+    // 풀린 걸 알 수 없다 — 앱이 떠 있는 동안 서버 캐시와 같은 주기로 갱신한다.
+    const fetchCongestion = () => {
+      getRealtimeCongestion(destinationParams)
+        .then((data) => {
+          if (ignored) {
+            return;
+          }
           setCongestion(data);
-        }
-      })
-      .catch(() => {
-        // 혼잡도 조회 실패해도 코스 진행은 계속
-      });
+          const previous = lastCongestionLevel.current;
+          lastCongestionLevel.current = data.level;
+          // 회복 = 우회 트리거 단계(CROWDED 이상, congestion-rules §5)에서 그 아래로 내려옴
+          const wasCrowded = previous === 'CROWDED' || previous === 'VERY_CROWDED';
+          const nowCalm = data.level === 'RELAXED' || data.level === 'NORMAL';
+          if (wasCrowded && nowCalm && !easedNotified.current) {
+            easedNotified.current = true;
+            setCongestionEased(true);
+            if (notificationsGranted.current) {
+              void presentCourseNotification(
+                '목적지 혼잡이 풀렸어요',
+                `${selected?.destination.name ?? '목적지'} 지금 ${REALTIME_LEVEL_LABEL[data.level]} — 돌아가기 좋은 타이밍이에요.`,
+              );
+            }
+          }
+        })
+        .catch(() => {
+          // 혼잡도 조회 실패해도 코스 진행은 계속
+        });
+    };
+
+    fetchCongestion();
+    const timer = setInterval(() => {
+      // iOS는 백그라운드에서 JS 타이머가 멈춘다 — 사실상 포그라운드 전용 폴링.
+      if (AppState.currentState === 'active') {
+        fetchCongestion();
+      }
+    }, CONGESTION_POLL_INTERVAL_MS);
 
     return () => {
       ignored = true;
+      clearInterval(timer);
     };
-  }, [destinationParams]);
+  }, [destinationParams, selected]);
 
   if (!course || !destination) {
     return (
@@ -292,6 +326,15 @@ export default function TripScreen() {
           </View>
         </View>
 
+        {congestionEased && !completed && (
+          <View style={styles.easedBanner}>
+            <View style={styles.easedDot} />
+            <Text style={styles.easedText}>
+              {destination.name} 혼잡이 풀렸어요 — 지금 돌아가기 좋아요.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.progressRow}>
           {courseStops.map((stop, index) => {
             const done = completed || index < currentIndex;
@@ -336,11 +379,14 @@ export default function TripScreen() {
         )}
 
         <View style={styles.noticeBox}>
+          {/* 완료 후에는 예약이 취소되므로 알림 문구도 함께 내린다(상태 대신 파생 조건). */}
           <Text style={styles.noticeTitle}>
-            {returnAlarmSet ? '돌아갈 시간이 되면 알려드려요' : '돌아갈 시간을 계산해 뒀어요'}
+            {returnAlarmSet && !completed
+              ? '돌아갈 시간이 되면 알려드려요'
+              : '돌아갈 시간을 계산해 뒀어요'}
           </Text>
           <Text style={styles.noticeBody}>
-            {returnAlarmSet
+            {returnAlarmSet && !completed
               ? '복귀 출발 5분 전에 알림을 드려요. 알림도 이 기기 안에서만 처리돼요.'
               : '복귀 예정 시각을 기준으로 코스를 구성했어요. 목적지 혼잡도는 위에서 다시 확인할 수 있어요.'}
           </Text>
@@ -517,6 +563,30 @@ const styles = StyleSheet.create({
     color: Teumta.textSecondary,
     fontSize: 9,
     lineHeight: 13,
+  },
+  easedBanner: {
+    alignItems: 'center',
+    backgroundColor: Teumta.greenLight,
+    borderColor: Teumta.green,
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  easedDot: {
+    backgroundColor: Teumta.green,
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  easedText: {
+    color: Teumta.greenDark,
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 14,
   },
   progressRow: {
     flexDirection: 'row',
