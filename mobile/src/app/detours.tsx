@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,8 +16,8 @@ import {
   type DestinationIdentifier,
   type GeneratedCourse,
 } from '@/types/course';
-import { isStaleRequest, nextRequestId } from '@/utils/async-request';
 import { courseCompositionLabel, courseTitle, formatKilometers } from '@/utils/course-labels';
+import { createRequestGuard } from '@/utils/request-guard';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
 
@@ -152,7 +152,7 @@ export default function DetoursScreen() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [status, setStatus] = useState<Status>('loading');
   const [variant, setVariant] = useState(0);
-  const loadRequestId = useRef(0);
+  const requestGuard = useMemo(() => createRequestGuard(), []);
 
   const identifier: DestinationIdentifier | null = contentId
     ? { contentId }
@@ -166,8 +166,7 @@ export default function DetoursScreen() {
       : poiId
         ? { poiId }
         : null;
-    const requestId = nextRequestId(loadRequestId.current);
-    loadRequestId.current = requestId;
+    const requestId = requestGuard.start();
 
     if (!currentIdentifier) {
       setStatus('error');
@@ -177,7 +176,7 @@ export default function DetoursScreen() {
     setStatus('loading');
     try {
       const result = await fetchCourses(currentIdentifier, availableMinutes, variant);
-      if (isStaleRequest(requestId, loadRequestId.current)) {
+      if (!requestGuard.isCurrent(requestId)) {
         return;
       }
       setDestination(result.destination);
@@ -185,13 +184,13 @@ export default function DetoursScreen() {
       setSelectedIndex(0);
       setStatus('idle');
     } catch {
-      if (isStaleRequest(requestId, loadRequestId.current)) {
+      if (!requestGuard.isCurrent(requestId)) {
         return;
       }
       setCourses([]);
       setStatus('error');
     }
-  }, [contentId, poiId, availableMinutes, variant]);
+  }, [contentId, poiId, availableMinutes, variant, requestGuard]);
 
   useEffect(() => {
     // 코스 생성은 외부 API 다중 호출 → 화면 전환 뒤 늦게 온 응답이 상태를 덮어쓰지 않게
@@ -201,9 +200,9 @@ export default function DetoursScreen() {
 
     return () => {
       clearTimeout(timer);
-      loadRequestId.current = nextRequestId(loadRequestId.current);
+      requestGuard.invalidate();
     };
-  }, [load]);
+  }, [load, requestGuard]);
 
   const handleStart = () => {
     const course = courses[selectedIndex];

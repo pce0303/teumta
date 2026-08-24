@@ -20,7 +20,7 @@ import {
   loadRecentSearches,
   saveRecentSearches,
 } from '@/utils/recent-searches';
-import { isStaleRequest, nextRequestId } from '@/utils/async-request';
+import { createRequestGuard } from '@/utils/request-guard';
 
 type SearchStatus = 'idle' | 'loading' | 'error';
 
@@ -40,7 +40,7 @@ export default function SearchScreen() {
   const [status, setStatus] = useState<SearchStatus>('idle');
   const [hasSearched, setHasSearched] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
-  const searchRequestId = useRef(0);
+  const requestGuard = useRef(createRequestGuard()).current;
 
   useEffect(() => {
     void loadRecentSearches().then(setRecent);
@@ -63,36 +63,34 @@ export default function SearchScreen() {
   }
 
   function handleChangeKeyword(text: string) {
-    searchRequestId.current = nextRequestId(searchRequestId.current);
     setKeyword(text);
     setStatus('idle');
     setHasSearched(false);
+    // hasSearched=false인데 이전 검색어의 results가 남아있으면 화면이 다른 검색어를 가리킨다 —
+    // 진행 중이던 요청도 함께 무효화해, 늦게 도착한 응답이 지금 입력값을 덮어쓰지 않게 한다.
+    setResults([]);
+    requestGuard.invalidate();
   }
 
   async function runSearch(term: string) {
     const trimmed = term.trim();
     if (!trimmed) return;
 
+    const requestId = requestGuard.start();
     setKeyword(trimmed);
     rememberKeyword(trimmed);
     setStatus('loading');
-    const requestId = nextRequestId(searchRequestId.current);
-    searchRequestId.current = requestId;
     try {
       const data = await searchPlaces(trimmed);
-      if (isStaleRequest(requestId, searchRequestId.current)) {
-        return;
-      }
+      if (!requestGuard.isCurrent(requestId)) return;
       setResults(data);
       setStatus('idle');
     } catch {
-      if (isStaleRequest(requestId, searchRequestId.current)) {
-        return;
-      }
+      if (!requestGuard.isCurrent(requestId)) return;
       setResults([]);
       setStatus('error');
     } finally {
-      if (!isStaleRequest(requestId, searchRequestId.current)) {
+      if (requestGuard.isCurrent(requestId)) {
         setHasSearched(true);
       }
     }

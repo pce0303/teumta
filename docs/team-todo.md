@@ -77,33 +77,47 @@
 
 ---
 
-## 📱 프론트 담당 — 남은 확인 작업
+## 📱 프론트 담당 — 남은 0건 (2026-08-22 기준)
 
 앞선 항목(TOUR 목적지 실시간 혼잡도, `404 CONGESTION_DATA_NOT_FOUND` 안내, 집중률 예측 화면,
 출처 표기 범위 확대, 주변 행사 섹션, 즉석 우회 코스, 다른 코스 보기, 코스 추천 태그)은 코드에서 반영 확인됨.
 
-### 1. 혼잡 시 우회 제안 팝업/강조 UX — 검토
+### 1. 우회 제안 강조 기준 — 완료 (2026-08-22)
 
-`places/[id].tsx`의 "틈타 코스 보기" CTA와 혼잡 안내는 연결돼 있다. 프론트 담당자가 검토하던
-팝업/경고 UX는 선택 사항으로 남긴다. 적용한다면 `congestion-rules.md` §5의 확정 기준대로
-`CROWDED` 이상에서만 노출한다.
+`places/[id].tsx`의 "틈타 코스 보기" CTA가 혼잡도와 무관하게 항상 같은 모양이던 문제 해결.
+`congestion-rules.md` §5의 확정 기준대로 `CROWDED` 이상일 때만 강조한다.
 
-- `CROWDED`/`VERY_CROWDED` → CTA 강조 + "지금 붐빕니다. 근처 조용한 곳으로 가볼까요?" 류 안내
-- 그 미만 → 현재 모양 유지
-- 실시간 혼잡도가 없는 장소(`404`)는 집중률 예측값으로 대체하지 않는다 — 둘은 다른 지표다
+- `CROWDED`/`VERY_CROWDED` 진입 시 "잠깐! 붐비는 장소예요" 팝업 5초 노출(자동 소멸,
+  탭하면 바로 틈타 코스로 이동) + 혼잡 배너·CTA 버튼을 빨강으로 강조
+- 그 미만·미제공(`404`)·조회 실패는 기존 모양 유지 — 집중률 예측값으로 대체 판단하지 않음
+- `0cc2ff7`에서 먼저 들어간 진한 초록 안내 배너(`ctaNotice`)는 이 팝업+빨강 조합으로 교체
+- 브랜치 `fix/search-clear-and-crowded-popup`
 
-**심사에서 이 화면이 서비스 프레임 그 자체다.** 혼잡을 감지해 분산을 제안하는 순간이 눈에 보여야 한다.
+### 2. 코스 지도 경로선 — 완료 (2026-08-22)
 
-### 2. 코스 지도 경로선 — 실기기 확인
+경로가 둥근 점으로 그려져 장소 마커와 구분되지 않던 문제. 파선 + 흰 밑선 교체(`#66`)는
+이미 반영돼 있었고, 이번에 이동 경로 색을 정류지 마커(초록)와 겹치던 초록에서
+**파랑**(`#2F6FED`)으로 분리해 더 명확하게 구분되도록 했다. 브랜치 `fix/search-clear-and-crowded-popup`.
 
-경로선 유틸 테스트는 추가됨. 실제 지도 SDK에서 파선/흰 밑선/마커 겹침이 iOS·Android 모두 의도대로
-보이는지 확인한다.
+### 3. 코스 화면 실데이터 확인 — 구조 변경으로 해당 없음 (2026-08-22 확인)
 
-### 3. 코스 화면 실데이터 확인 — 실키 기반
+이 항목은 "DB에 저장된 `Route`를 `GET /api/places/:placeId/routes`로 조회하는 화면"을
+전제로 썼는데, **그 구조를 앱이 더는 쓰지 않는다.**
 
-즉석 생성 코스는 `GET /api/courses`를 사용한다. 대표 목적지 5곳 이상에서
-행사 포함/미포함, `variant` 변경, `stops[].pathFromPrevious`, `returnPath`가 화면과 지도에서
-맞게 보이는지 확인한다.
+- `mobile/src` 전체에서 `/places/:placeId/routes`, `/routes/:routeId` 호출 0건(grep 확인)
+- 지금 코스 화면(`detours.tsx` → `course-map.tsx`)은 요청 시점 실시간 생성(`GET /api/courses`,
+  `course-generation.service.ts`)을 쓴다 — DB에 코스가 없어도 전국 어디든 동작
+- 실제 좌표 폴리라인(`pathFromPrevious`/`returnPath`)도 `course-path.ts`가 이미 조립해서
+  `course-map.tsx`가 그리고 있고, 전용 테스트(`course-path.test.ts`) 통과 확인
+- `Route`/`RouteStop` DB 테이블 자체는 남아있지만 쓰임새는 **관리자 웹 코스 관리 CRUD**와
+  **성과 분석 화면의 공급 지표**(데이터로직 담당 표의 "코스 보유 관광지 수" 등)로 바뀌었다 —
+  모바일 코스 화면과는 무관해졌으니 "코스 입력 후 재확인" 자체가 불필요
+
+### 4. 실키 기반 시연 점검 — 남은 확인
+
+대표 목적지 5곳 이상에서 행사 포함/미포함, `variant` 변경, `stops[].pathFromPrevious`,
+`returnPath`가 화면과 지도에서 맞게 보이는지 확인한다. 구조상 프론트 구현 TODO는 아니고,
+외부 API 키·쿼터·실기기 지도 SDK 렌더링 점검이다.
 
 ### 상시 원칙
 
@@ -187,9 +201,9 @@ Route/Trip 조회·방문 API(3.5~3.9) · `tag` 필터 · 쿼리 검증 응답 `
 
 ## 📊 데이터로직 담당
 
-판단 기준 문서 3건 머지 완료 — [congestion-rules](./congestion-rules.md)(우회 트리거 `CROWDED` 이상,
-KTO/SK 역할 구분, 30/60/90분 계산), [route-data-rules](./route-data-rules.md),
-[kto-concentration-data-flow](./kto-concentration-data-flow.md).
+판단 기준 문서 정리 완료 — [congestion-rules](./congestion-rules.md)(우회 트리거 `CROWDED` 이상,
+KTO/SK 역할 구분, KTO 적재 규칙), [route-data-rules](./route-data-rules.md)(코스 구성·체류시간·예외 처리).
+`kto-concentration-data-flow`는 내용이 코드·테스트와 중복되어 congestion-rules §6으로 흡수했다.
 
 ### 1. 분산 효과 지표 — 공급 지표로 확정
 
